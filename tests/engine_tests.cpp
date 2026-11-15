@@ -253,6 +253,16 @@ static void abilitiesAndValidation() {
   assert(playCard(medic,0,"medic",Row::None,"revive"));
   assert(medic.players[0].board[0].size()==2 && medic.players[0].graveyard.empty());
 
+  Game agileMedic;auto am=unit("agile-medic",3);am.medic=true;agileMedic.players[0].hand.push_back(am);
+  auto agileRevive=unit("agile-revive",7,Row::None);agileRevive.agile=true;agileRevive.abilities={"agile"};
+  agileMedic.players[0].graveyard.push_back(agileRevive);
+  assert(!playCard(agileMedic,0,"agile-medic",Row::None,"agile-revive"));
+  assert(agileMedic.players[0].hand.size()==1&&agileMedic.players[0].graveyard.size()==1);
+  assert(playCard(agileMedic,0,"agile-medic",Row::Ranged,"agile-revive"));
+  assert(agileMedic.players[0].board[1].size()==1&&agileMedic.players[0].board[1][0].id=="agile-revive");
+  assert(std::none_of(agileMedic.players[0].board[0].begin(),agileMedic.players[0].board[0].end(),
+                      [](const Card& card){return card.id=="agile-revive";}));
+
   Game medicHero; auto mh=unit("medic-hero",2); mh.medic=true; medicHero.players[0].hand.push_back(mh);
   auto forbiddenHero=unit("forbidden-hero",10); forbiddenHero.hero=true;
   medicHero.players[0].graveyard.push_back(forbiddenHero);
@@ -368,20 +378,19 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
   Game difficultyChoice;
   difficultyChoice.phase=Phase::OpponentTurn;difficultyChoice.currentPlayer=1;
   difficultyChoice.players[1].hand={unit("weak",1),unit("strong",10)};
-  const auto hardChoice=chooseAiAction(difficultyChoice,1,AiDifficulty::Hard);
-  assert(!hardChoice.pass && hardChoice.cardId=="strong");
-  for(const auto level:{AiDifficulty::Easy,AiDifficulty::Normal,AiDifficulty::Hard}) {
-    Game preview=difficultyChoice;
-    const auto action=chooseAiAction(preview,1,level);
-    assert(action.pass || action.activateLeader ||
-           playCard(preview,1,action.cardId,action.target,action.selectedCardId));
-  }
+  Game preview=difficultyChoice;
+  const auto action=chooseAiAction(preview,1);
+  assert(action.pass || action.activateLeader ||
+         playCard(preview,1,action.cardId,action.target,action.selectedCardId));
 
   Game roachMulligan;roachMulligan.phase=Phase::Mulligan;
   roachMulligan.players[1].hand={referenceCard("Roach"),referenceCard("Geralt of Rivia"),unit("low-priority",2)};
   roachMulligan.players[1].deck={unit("replacement-a",4),unit("replacement-b",5)};
   const auto roachDiscard=chooseAiMulligan(roachMulligan,1);
-  assert(std::find(roachDiscard.begin(),roachDiscard.end(),roachMulligan.players[1].hand[0].id)==roachDiscard.end());
+  // ControllerAI.redraw() makes two sequential discardOrder() decisions; a
+  // low-power Roach is eligible on the second redraw once weaker candidates
+  // have moved through the simulated hand/deck swap.
+  assert(std::find(roachDiscard.begin(),roachDiscard.end(),roachMulligan.players[1].hand[0].id)!=roachDiscard.end());
 
   Game leaderChoice;
   leaderChoice.players[0].leader.id="foltest_siegemaster";
@@ -396,9 +405,9 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
   const auto& recipes=referencePremadeDecks();
   const auto deck0=makeReferenceDeck(recipes[0]);
   const auto deck1=makeReferenceDeck(recipes[2]);
-  for(const auto level:{AiDifficulty::Easy,AiDifficulty::Normal,AiDifficulty::Hard}) {
+  {
     Game game;
-    beginMatch(game,deck0,recipes[0].faction,deck1,recipes[2].faction,0x987654+static_cast<int>(level),0);
+    beginMatch(game,deck0,recipes[0].faction,deck1,recipes[2].faction,0x987654,0);
     const auto aiMulligan=chooseAiMulligan(game,1);
     assert(aiMulligan.size()<=2);
     assert(replaceMulliganCards(game,0,{})); assert(replaceMulliganCards(game,1,aiMulligan));
@@ -406,7 +415,7 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
     while(game.phase!=Phase::MatchResult && actions<500) {
       if(game.phase==Phase::RoundResult) { assert(startNextRound(game)); continue; }
       const int actor=game.currentPlayer;
-      const auto action=chooseAiAction(game,actor,level);
+      const auto action=chooseAiAction(game,actor);
       const bool ok=action.pass ? pass(game,actor) : action.activateLeader ? activateLeader(game,actor,action.target,action.leaderSelection) :
         playCard(game,actor,action.cardId,action.target,action.selectedCardId);
       assert(ok); ++actions;

@@ -1,5 +1,31 @@
 # Postęp projektu
 
+## Praca kontynuowana na czystej gałęzi — 15.11.2026
+
+Gałąź `codex/full-source-parity` bazuje na publicznym HEAD `01df8a7` i zawiera
+niezmienione pliki źródłowe `asundr/gwent-classic` przypięte do
+`08592d847f2573440a34deb9f32bc855b2544cdd`. Mapa pełnego audytu źródło→port
+znajduje się w `docs/SOURCE_PARITY.md`. Port nadal nie spełnia kryterium 1:1 i
+nie jest wydaniem do instalacji.
+
+- Naprawiono mapowanie własnych maksimów w wyborze celu AI dla Manekina:
+  wariant źródłowy losuje spośród maksimum każdego własnego rzędu, nie tylko
+  globalnego maksimum planszy.
+- Usunięto odzyskiwanie błędnego ruchu AI przez automatyczne pasowanie. Odrzucony
+  ruch zostawia stan tury bez zmian i pokazuje diagnostykę zamiast fałszować
+  zachowanie oryginalnego przeciwnika.
+- Medyk wskrzeszający kartę Zręczną wymaga teraz wskazania rzędu wręcz albo
+  dystansowego; wejście SDL pozwala przełączać rząd góra/dół przed zatwierdzeniem.
+  Test sprawdza również odrzucenie niekompletnego wyboru bez częściowej zmiany
+  stanu.
+- Weryfikacja lokalna w kontenerze: kompilacja SDL2, CTest 2/2 oraz
+  `gwent --input-test` z SDL dummy. Nie jest to test urządzenia Miyoo; nie
+  zbudowano ani nie wgrano nowej paczki ARM/SD w tej gałęzi.
+
+AI jest teraz porównywany do pojedynczego `ControllerAI` z przypiętego źródła;
+trzy poziomy trudności opisane w starszym wpisie są rozbieżnością względem
+aktualnie przyjętego wymagania 1:1 i zostały usunięte z tej gałęzi.
+
 ## Status: aktywna implementacja — 15.11.2026
 
 Repozytorium wejściowe było puste. Powstał szkielet C++17/CMake, model silnika i prosty frontend SDL2. To nie jest ukończona gra ani wydanie dla Miyoo.

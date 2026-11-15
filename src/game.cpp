@@ -341,6 +341,7 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
     if (selectedId.empty() || targetRow < 0 || boardTarget->kind != Kind::Unit || boardTarget->hero) return false;
   }
   int medicIndex = -1;
+  int medicReviveRow = -1;
   if (c.kind == Kind::Unit && c.medic) {
     if (g.randomRespawn) {
       std::vector<int> units;
@@ -352,6 +353,10 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
       if(found==p.graveyard.end() || found->kind!=Kind::Unit || found->hero) return false;
       medicIndex=static_cast<int>(found-p.graveyard.begin());
     } else if(std::any_of(p.graveyard.begin(),p.graveyard.end(),[](const Card& card){return card.kind==Kind::Unit && !card.hero;})) return false;
+    if(medicIndex>=0 && p.graveyard[static_cast<std::size_t>(medicIndex)].agile) {
+      if(target!=Row::Melee && target!=Row::Ranged)return false;
+      medicReviveRow=rowIndex(target);
+    }
   }
 
   p.hand.erase(it);
@@ -402,8 +407,8 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
       if (medicIndex >= 0) {
         const Card revived = p.graveyard[medicIndex];
         p.graveyard.erase(p.graveyard.begin()+medicIndex);
-        int reviveRow = rowIndex(revived.row);
-        if (revived.agile && !validRow(revived.row)) reviveRow = 0;
+        int reviveRow = revived.agile ? medicReviveRow : rowIndex(revived.row);
+        if (revived.agile && reviveRow < 0) reviveRow = 0;
         if (reviveRow >= 0 && reviveRow < 3) p.board[reviveRow].push_back(revived);
       }
       if (hasAbility(c, "scorch_c")) scorchEnemyRow(g, who, 0);

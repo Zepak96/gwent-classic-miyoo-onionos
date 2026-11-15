@@ -131,7 +131,6 @@ struct App {
   };
   Screen screen{Screen::Title};
   Language language{Language::Polish};
-  gwent::AiDifficulty aiDifficulty{gwent::AiDifficulty::Normal};
   std::size_t deckIndex{0};
   int deckSlot{1};
   bool userDeckSelected{false};
@@ -154,6 +153,7 @@ struct App {
   gwent::Game game;
   int handIndex{0};
   int rowIndex{0};
+  int reviveRowIndex{0};
   int targetIndex{0};
   bool targetMode{false};
   std::vector<std::string> selectedTargets;
@@ -225,7 +225,6 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="opponent")return pl?"PRZECIWNIK":"OPPONENT";
   if(key=="opponent_short")return pl?"RYWAL":"OPPONENT";
   if(key=="ai")return pl?"PRZECIWNIK AI":"AI OPPONENT";
-  if(key=="difficulty")return pl?"POZIOM AI (GORA/DOL)":"AI LEVEL (UP/DOWN)";
   if(key=="language")return pl?"JEZYK":"LANGUAGE";
   if(key=="instructions")return pl?"LEWO/PRAWO - TALIA":"LEFT/RIGHT - DECK";
   if(key=="confirm")return pl?"ENTER - GRA   Z - JEZYK":"ENTER - PLAY   Z - LANGUAGE";
@@ -277,7 +276,6 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="pause_resume")return pl?"WROC DO GRY":"RESUME GAME";
   if(key=="pause_save")return pl?"ZAPISZ MECZ":"SAVE MATCH";
   if(key=="pause_load")return pl?"WCZYTAJ MECZ":"LOAD MATCH";
-  if(key=="pause_difficulty")return pl?"POZIOM AI":"AI DIFFICULTY";
   if(key=="pause_language")return pl?"JEZYK":"LANGUAGE";
   if(key=="pause_sfx")return pl?"EFEKTY DZWIEKOWE":"SOUND EFFECTS";
   if(key=="pause_exit")return pl?"WROC DO MENU TALII":"RETURN TO DECK MENU";
@@ -323,26 +321,21 @@ std::string factionName(gwent::Faction faction,bool pl) {
 std::string userDeckPath(const App& a,int slot) {
   return a.dataDirectory+"deck-"+std::to_string(slot)+".gwd";
 }
-std::string difficultyName(gwent::AiDifficulty difficulty) {
-  switch(difficulty) {
-    case gwent::AiDifficulty::Easy:return "EASY";
-    case gwent::AiDifficulty::Hard:return "HARD";
-    default:return "NORMAL";
-  }
-}
 void saveSettings(const App& a) {
   if(a.dataDirectory.empty())return;
   std::ofstream settings(a.dataDirectory+"settings-v1.cfg",std::ios::trunc);
-  if(settings)settings<<static_cast<int>(a.language)<<' '<<static_cast<int>(a.aiDifficulty)<<' '<<static_cast<int>(a.sfxEnabled)<<'\n';
+  if(settings)settings<<static_cast<int>(a.language)<<' '<<static_cast<int>(a.sfxEnabled)<<'\n';
 }
 void loadSettings(App& a) {
   if(a.dataDirectory.empty())return;
   std::ifstream settings(a.dataDirectory+"settings-v1.cfg");
-  int language=0,difficulty=1,sfx=1;
-  if(!(settings>>language>>difficulty))return;
+  int language=0,sfx=1;
+  if(!(settings>>language))return;
   if(language>=0&&language<=1)a.language=static_cast<Language>(language);
-  if(difficulty>=0&&difficulty<=2)a.aiDifficulty=static_cast<gwent::AiDifficulty>(difficulty);
-  if(settings>>sfx)a.sfxEnabled=sfx!=0;
+  if(!(settings>>sfx))return;
+  int legacySfx=0;
+  if(sfx>=0&&sfx<=2&&settings>>legacySfx)sfx=legacySfx;
+  a.sfxEnabled=sfx!=0;
 }
 void playCardSound(App& a,const gwent::Card& card) {
   std::string key;
@@ -507,7 +500,7 @@ void doHumanPlay(App& a) {
   const auto targets=legalCardTargets(a,card);
   if(card.kind==gwent::Kind::Decoy && targets.empty()) { a.status="DECOY NEEDS A UNIT"; return; }
   if(!targets.empty()) {
-    a.targetMode=true; a.selectedTargets=targets; a.targetIndex=0; a.audio.play("open");a.status=tr(a,"target"); return;
+    a.targetMode=true; a.selectedTargets=targets; a.targetIndex=0; a.reviveRowIndex=0; a.audio.play("open");a.status=tr(a,"target"); return;
   }
   const int handSizeBefore=static_cast<int>(hand.size());
   if(gwent::playCard(a.game,0,card.id,static_cast<gwent::Row>(a.rowIndex))) {
@@ -518,7 +511,7 @@ void doHumanPlay(App& a) {
 }
 void performAi(App& a) {
   if(a.game.phase!=gwent::Phase::OpponentTurn) return;
-  const auto action=gwent::chooseAiAction(a.game,1,a.aiDifficulty);
+  const auto action=gwent::chooseAiAction(a.game,1);
   bool success=false;
   if(action.pass) { success=gwent::pass(a.game,1);a.audio.play("pass");a.status=tr(a,"ai_turn")+" - PASS"; }
   else if(action.activateLeader) {
@@ -533,7 +526,12 @@ void performAi(App& a) {
     if(success) { animatePlayedCard(a,card,1,cardIndex,handSizeBefore);playCardSound(a,card); }
     a.status="OPPONENT PLAYED "+card.name;
   }
-  if(!success) { gwent::pass(a.game,1); a.status="OPPONENT PASSED (RECOVERY)"; }
+  if(!success) {
+    // Do not disguise an invalid ported AI action as a voluntary source-game
+    // pass. Keep the turn state intact and make the failed action visible so
+    // the mismatched rule can be corrected instead of silently changing play.
+    a.status="AI ACTION REJECTED - SOURCE PARITY ERROR";
+  }
   a.aiAt=SDL_GetTicks()+360;
 }
 int rowScore(const gwent::Game& game,int owner,int row) {
@@ -763,9 +761,7 @@ void drawDeckSelect(SDL_Renderer* r,const App& a) {
   box(r,73,174,493,1,Color{65,72,67});
   text(r,74,193,tr(a,"opponent"),muted,1);
   text(r,74,215,factionName(opponent.faction,a.language==Language::Polish)+" / "+opponentLeader.name,paper,1);
-  text(r,74,251,tr(a,"difficulty"),muted,1);
-  text(r,226,251,difficultyName(a.aiDifficulty),gold,1);
-  text(r,74,276,tr(a,"language"),muted,1); text(r,226,276,a.language==Language::Polish?"POLSKI":"ENGLISH",gold,1);
+  text(r,74,251,tr(a,"language"),muted,1); text(r,226,251,a.language==Language::Polish?"POLSKI":"ENGLISH",gold,1);
   text(r,25,332,custom?tr(a,"deck_slot")+" "+std::to_string(a.deckSlot)+"  B: EDIT  P: PREMADE":tr(a,"instructions"),paper,1);
   text(r,119,370,tr(a,"confirm"),gold,1);
   text(r,170,414,tr(a,"resume"),muted,1);
@@ -985,6 +981,15 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     const int selected=std::clamp(a.handIndex,0,static_cast<int>(me.hand.size())-1);
     drawCardDetails(r,a,me.hand[static_cast<std::size_t>(selected)]);
   }
+  if(a.targetMode&&a.handIndex>=0&&a.handIndex<static_cast<int>(me.hand.size())&&
+     me.hand[static_cast<std::size_t>(a.handIndex)].medic&&a.targetIndex>=0&&a.targetIndex<static_cast<int>(a.selectedTargets.size())) {
+    const auto revived=std::find_if(me.graveyard.begin(),me.graveyard.end(),[&](const gwent::Card& c){return c.id==a.selectedTargets[static_cast<std::size_t>(a.targetIndex)];});
+    if(revived!=me.graveyard.end()&&revived->agile) {
+      box(r,148,240,344,39,Color{10,9,8,238});frame(r,148,240,344,39,gold);
+      centeredTextInBox(r,154,244,332,12,a.language==Language::Polish?"WZNAWIANA KARTA AGILE":"REVIVING AGILE CARD",paper,1);
+      centeredTextInBox(r,154,260,332,13,(a.reviveRowIndex==0?tr(a,"melee"):tr(a,"ranged"))+"  -  UP/DOWN  -  A/X",gold,1);
+    }
+  }
   if(a.game.phase==gwent::Phase::Mulligan&&!a.game.scoiataelChoicePending) {
     box(r,8,328,410,43,Color{7,6,5,238});frame(r,8,328,410,43,Color{143,108,54});
     centeredTextInBox(r,16,333,394,13,tr(a,"mulligan_controls"),paper,1);
@@ -1055,9 +1060,8 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     frame(r,120,22,400,316,gold);
     box(r,122,24,396,312,panel);
     centeredTextInBox(r,142,35,356,20,tr(a,"pause"),gold,2);
-    const std::array<std::string,7> options={
+    const std::array<std::string,6> options={
       tr(a,"pause_resume"),tr(a,"pause_save"),tr(a,"pause_load"),
-      tr(a,"pause_difficulty")+": "+difficultyName(a.aiDifficulty),
       tr(a,"pause_language")+": "+(a.language==Language::Polish?"POLSKI":"ENGLISH"),
       tr(a,"pause_sfx")+": "+tr(a,a.sfxEnabled?"on":"off"),tr(a,"pause_exit")
     };
@@ -1082,7 +1086,7 @@ void drawMatchOnScreen(SDL_Renderer* r,const App& a) {
 }
 void handleMatchKey(App& a,SDL_Keycode key) {
   if(a.pauseOpen) {
-    constexpr int optionCount=7;
+    constexpr int optionCount=6;
     if(key==SDLK_ESCAPE||key==SDLK_z||key==SDLK_BACKSPACE) { a.pauseOpen=false;return; }
     if(key==SDLK_UP||key==SDLK_LEFT) { a.pauseIndex=(a.pauseIndex+optionCount-1)%optionCount;return; }
     if(key==SDLK_DOWN||key==SDLK_RIGHT) { a.pauseIndex=(a.pauseIndex+1)%optionCount;return; }
@@ -1091,10 +1095,9 @@ void handleMatchKey(App& a,SDL_Keycode key) {
         case 0:a.pauseOpen=false;break;
         case 1:saveCurrentMatch(a);break;
         case 2:a.pauseOpen=false;loadSavedMatch(a);break;
-        case 3:a.aiDifficulty=static_cast<gwent::AiDifficulty>((static_cast<int>(a.aiDifficulty)+1)%3);saveSettings(a);break;
-        case 4:a.language=a.language==Language::Polish?Language::English:Language::Polish;saveSettings(a);break;
-        case 5:a.sfxEnabled=!a.sfxEnabled;a.audio.setEnabled(a.sfxEnabled);saveSettings(a);break;
-        case 6:saveCurrentMatch(a);a.pauseOpen=false;a.screen=Screen::DeckSelect;break;
+        case 3:a.language=a.language==Language::Polish?Language::English:Language::Polish;saveSettings(a);break;
+        case 4:a.sfxEnabled=!a.sfxEnabled;a.audio.setEnabled(a.sfxEnabled);saveSettings(a);break;
+        case 5:saveCurrentMatch(a);a.pauseOpen=false;a.screen=Screen::DeckSelect;break;
       }
     }
     return;
@@ -1207,13 +1210,25 @@ void handleMatchKey(App& a,SDL_Keycode key) {
   auto& hand=a.game.players[0].hand;
   if(a.targetMode) {
     if(key==SDLK_ESCAPE||key==SDLK_z) { a.targetMode=false; a.selectedTargets.clear(); a.status=tr(a,"your_turn"); }
-    else if(key==SDLK_UP||key==SDLK_LEFT) a.targetIndex=(a.targetIndex+static_cast<int>(a.selectedTargets.size())-1)%static_cast<int>(a.selectedTargets.size());
-    else if(key==SDLK_DOWN||key==SDLK_RIGHT) a.targetIndex=(a.targetIndex+1)%static_cast<int>(a.selectedTargets.size());
+    else if((key==SDLK_UP||key==SDLK_DOWN||key==SDLK_LEFT||key==SDLK_RIGHT)&&!a.selectedTargets.empty()&&a.targetIndex>=0&&a.targetIndex<static_cast<int>(a.selectedTargets.size())&&
+            a.handIndex>=0&&a.handIndex<static_cast<int>(hand.size())) {
+      const auto& selectedId=a.selectedTargets[static_cast<std::size_t>(a.targetIndex)];
+      const auto revived=std::find_if(a.game.players[0].graveyard.begin(),a.game.players[0].graveyard.end(),[&](const gwent::Card& c){return c.id==selectedId;});
+      const bool chooseReviveRow=hand[static_cast<std::size_t>(a.handIndex)].medic&&
+                                  revived!=a.game.players[0].graveyard.end()&&revived->agile;
+      if(chooseReviveRow&&(key==SDLK_UP||key==SDLK_DOWN))a.reviveRowIndex=1-a.reviveRowIndex;
+      else if(key==SDLK_UP||key==SDLK_LEFT)a.targetIndex=(a.targetIndex+static_cast<int>(a.selectedTargets.size())-1)%static_cast<int>(a.selectedTargets.size());
+      else if(key==SDLK_DOWN||key==SDLK_RIGHT)a.targetIndex=(a.targetIndex+1)%static_cast<int>(a.selectedTargets.size());
+    }
     else if(key==SDLK_RETURN||key==SDLK_x) {
       if(!a.selectedTargets.empty()&&a.handIndex>=0&&a.handIndex<static_cast<int>(hand.size())) {
         const auto card=hand[a.handIndex];
         const int handSizeBefore=static_cast<int>(hand.size());
-        if(gwent::playCard(a.game,0,card.id,static_cast<gwent::Row>(a.rowIndex),a.selectedTargets[a.targetIndex])) {
+        const auto& selectedId=a.selectedTargets[static_cast<std::size_t>(a.targetIndex)];
+        const auto revived=std::find_if(a.game.players[0].graveyard.begin(),a.game.players[0].graveyard.end(),[&](const gwent::Card& c){return c.id==selectedId;});
+        const auto playRow=card.medic&&revived!=a.game.players[0].graveyard.end()&&revived->agile?
+                           static_cast<gwent::Row>(a.reviveRowIndex):static_cast<gwent::Row>(a.rowIndex);
+        if(gwent::playCard(a.game,0,card.id,playRow,selectedId)) {
           animatePlayedCard(a,card,0,a.handIndex,handSizeBefore);
           playCardSound(a,card);
           a.status=card.name+" - PLAYED"; a.handIndex=std::min(a.handIndex,static_cast<int>(a.game.players[0].hand.size())-1);
@@ -1254,11 +1269,6 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
     if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x||key==SDLK_SPACE)a.screen=Screen::DeckSelect;
   } else if(a.screen==Screen::DeckSelect) {
     if(key==SDLK_ESCAPE) { a.screen=Screen::Title; return; }
-    if(key==SDLK_UP||key==SDLK_DOWN) {
-      const int direction=key==SDLK_DOWN?1:2;
-      a.aiDifficulty=static_cast<gwent::AiDifficulty>((static_cast<int>(a.aiDifficulty)+direction)%3);
-      saveSettings(a);return;
-    }
     if(key==SDLK_z) { a.language=a.language==Language::Polish?Language::English:Language::Polish;saveSettings(a);return; }
     if(key==SDLK_r) { loadSavedMatch(a);return; }
     if(key==SDLK_b) { openDeckEditor(a);return; }
@@ -1456,9 +1466,9 @@ int main(int argc,char** argv) {
     app.cardDetailsOpen=true;
     okay=okay&&normalizeMiyooKey(app,SDLK_ESCAPE)==SDLK_ESCAPE;
     app.cardDetailsOpen=false;
-    app.pauseOpen=true;app.pauseIndex=3;app.aiDifficulty=gwent::AiDifficulty::Normal;
+    app.pauseOpen=true;app.pauseIndex=3;app.language=Language::Polish;
     handleMatchKey(app,SDLK_x);
-    okay=okay&&app.aiDifficulty==gwent::AiDifficulty::Hard;
+    okay=okay&&app.language==Language::English;
     app.pauseOpen=false;
     app.game=gwent::Game{};app.screen=Screen::Match;app.miyooControls=true;
     app.game.phase=gwent::Phase::Mulligan;
@@ -1477,8 +1487,22 @@ int main(int argc,char** argv) {
     okay=okay&&app.passConfirmationOpen&&!app.game.players[0].passed;
     handleMatchKey(app,SDLK_x);
     okay=okay&&!app.passConfirmationOpen&&app.game.players[0].passed;
-    if(okay)std::cout<<"Miyoo controls, mulligan selection/skip and guarded pass passed.\n";
-    else std::cerr<<"Miyoo keyboard mapping or guarded pass failed.\n";
+    app.game=gwent::Game{};app.screen=Screen::Match;app.miyooControls=true;
+    app.game.phase=gwent::Phase::PlayerTurn;app.game.currentPlayer=0;
+    gwent::Card medic;medic.id="medic-input";medic.name="Medic";medic.kind=gwent::Kind::Unit;
+    medic.row=gwent::Row::Melee;medic.power=3;medic.medic=true;
+    gwent::Card agile;agile.id="agile-input";agile.name="Agile unit";agile.kind=gwent::Kind::Unit;
+    agile.row=gwent::Row::None;agile.power=7;agile.agile=true;agile.abilities={"agile"};
+    app.game.players[0].hand={medic};app.game.players[0].graveyard={agile};
+    app.handIndex=0;app.targetIndex=0;app.reviveRowIndex=0;app.targetMode=true;app.selectedTargets={agile.id};
+    handleMatchKey(app,SDLK_UP);
+    okay=okay&&app.reviveRowIndex==1&&app.game.players[0].graveyard.size()==1;
+    handleMatchKey(app,SDLK_x);
+    okay=okay&&app.game.players[0].board[1].size()==1&&
+         std::any_of(app.game.players[0].board[1].begin(),app.game.players[0].board[1].end(),[](const gwent::Card& card){return card.id=="agile-input";})&&
+         std::none_of(app.game.players[0].board[0].begin(),app.game.players[0].board[0].end(),[](const gwent::Card& card){return card.id=="agile-input";});
+    if(okay)std::cout<<"Miyoo controls, mulligan, guarded pass and Agile Medic row selection passed.\n";
+    else std::cerr<<"Miyoo controls, target selection, Agile revival or guarded pass failed.\n";
     app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return okay?0:10;
   }
   if(char* directory=SDL_GetPrefPath("GwentClassic","MiyooMiniPlus")) {
@@ -1539,12 +1563,12 @@ int main(int argc,char** argv) {
     }
     if(argc>6) {
       app.screen=Screen::DeckSelect;
-      app.aiDifficulty=gwent::AiDifficulty::Normal;
+      app.language=Language::Polish;
       bool smokeRunning=true;
-      handleKey(app,SDLK_DOWN,smokeRunning);
+      handleKey(app,SDLK_z,smokeRunning);
       App settingsProbe;settingsProbe.dataDirectory=app.dataDirectory;loadSettings(settingsProbe);
-      if(app.aiDifficulty!=gwent::AiDifficulty::Hard ||
-         (!app.dataDirectory.empty() && settingsProbe.aiDifficulty!=app.aiDifficulty)) {
+      if(app.language!=Language::English ||
+         (!app.dataDirectory.empty() && settingsProbe.language!=app.language)) {
         app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 6;
       }
       app.status.clear();

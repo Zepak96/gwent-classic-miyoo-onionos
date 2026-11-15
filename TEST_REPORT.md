@@ -85,3 +85,17 @@ Następnie ustandaryzowano ścieżki źródeł kompilatora, końce linii notice 
 Po kolejnym commitcie workflow #43735744971 ponownie zbudował ARM i przesłał artefakt. Paczka z tego runu ma ten sam SHA-256 `b93ea51d4ff998919e014035cf21d4306d254740b532c84630c0e0272ed9db77`. Sprawdzono ZIP, skład wszystkich plików i licencje GCC. Po instalacji najnowszego artefaktu porównano SHA-256 każdego z 599 plików na karcie z wpisami w ZIP-ie: 0 brakujących, 0 różniących się i 0 dodatkowych. Ścieżka OnionOS `~Import ports.miyoocmd`, standalone launcher i wersja `v4.3.1-1` są obecne. Składnia `launch.sh` i `.notfound` jest poprawna. Gra nie została jeszcze uruchomiona; użytkownik przeprowadzi fizyczny test po zaimportowaniu skrótu.
 
 Po kolejnym zgłoszeniu problemu z czytelnością UI powiększono podgląd ilustracji kart na planszy oraz kartę w inspektorze; karta Cirilli zajmuje teraz niemal całą dostępną wysokość, dzięki czemu jej oryginalny cytat i nazwa są wyraźniejsze. Moc na zwykłych kartach jest rysowana standardowym, kontrastowym krojem i wycentrowana w medalionie; poprawiono też kontrast/nieprzezroczystość panelu opisu. Build SDL2 w Ubuntu 24.04 i czteroklatkowy smoke render zakończyły się poprawnie. Kadry meczu i inspektora ponownie obejrzano w 640×480. To desktopowy render, a nie weryfikacja na fizycznym Miyoo.
+## Audyt źródłowy i wybór rzędu Medyka Agile — 15.11.2026
+
+Na gałęzi `codex/full-source-parity` wykonano w kontenerze `gwent-miyoo-verify`:
+
+- konfigurację i kompilację CMake desktop SDL2 z `GWENT_BUILD_TESTS=ON`;
+- CTest: `engine_rules` i `card_catalog`, oba zaliczone (2/2);
+- test sterowania `SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy gwent --input-test`,
+  który przeszedł na mapowaniu wejścia Miyoo dla wymiany kart, potwierdzenia pass
+  oraz wyboru rzędu dla wskrzeszanej karty Agile.
+
+Nie wykonano w tej gałęzi cross-builda ARM, kontroli paczki OnionOS, odczytu SD
+ani testu na fizycznym Miyoo. Testy nie dowodzą jeszcze parytetu pełnego zestawu
+kart, liderów, interfejsu ani animacji. Lista elementów otwartych jest w
+`docs/SOURCE_PARITY.md`.
