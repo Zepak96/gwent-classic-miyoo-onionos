@@ -133,3 +133,10 @@ kart, liderów, interfejsu ani animacji. Lista elementów otwartych jest w
 ## Source automatic passing — 15.11.2026
 
 Ported the reference `Player.canPlay()`, `Player.endTurn()`, and `Game.startRound()` rule: a player with no cards and no available leader action passes automatically after their action; players unable to act are also passed as a round starts. Round start deliberately does not refresh a leader already used earlier in the match. Reworked engine fixtures to retain spare actions where a test needs to continue, and added explicit last-card and empty-opening cases. Desktop build and CTest passed (2/2).
+
+## Reference ability animation targets — 15.11.2026
+
+- Compared `abilities.js` and `Card.animate()` in pinned upstream commit `08592d847f2573440a34deb9f32bc855b2544cdd`.
+- Extended the original PNG/timing overlays to each matching Bond unit, newly summoned Muster unit, revived Medic target, and each Scorch target at its pre-action board location.
+- Desktop build succeeded; CTest passed 2/2; dummy SDL `--input-test` passed.
+- This remains partial animation parity. Cross-build, physical device, and SD copy were not performed. See `docs/REFERENCE_ANIMATIONS.md` for open animation behavior.

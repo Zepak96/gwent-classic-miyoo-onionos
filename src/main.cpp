@@ -152,7 +152,7 @@ struct App {
   bool sfxEnabled{true};
   std::vector<std::string> leaderSelections;
   CardFlight cardFlight;
-  CardEffect cardEffect;
+  std::vector<CardEffect> cardEffects;
   std::array<std::array<bool,3>,2> weatherFrom{};
   std::array<std::array<bool,3>,2> weatherTo{};
   std::array<std::array<Uint32,3>,2> weatherChangedAt{};
@@ -182,6 +182,7 @@ struct App {
   Uint32 aiAt{0};
 };
 void animatePlayedCard(App& a,const gwent::Card& card,int player,int handIndex,int handSizeBefore);
+void queueTriggeredEffects(App& a,const gwent::Game& before,const gwent::Card& played,int player);
 SDL_Texture* textureFor(SDL_Renderer* renderer,const App& app,const std::string& relative) {
   if(relative.empty()||app.assetDirectory.empty())return nullptr;
   const auto found=app.textures.find(relative);
@@ -528,8 +529,10 @@ void doHumanPlay(App& a) {
     a.targetMode=true; a.selectedTargets=targets; a.targetIndex=0; a.reviveRowIndex=0; a.audio.play("open");a.status=tr(a,"target"); return;
   }
   const int handSizeBefore=static_cast<int>(hand.size());
+  const auto before=a.game;
   if(gwent::playCard(a.game,0,card.id,static_cast<gwent::Row>(a.rowIndex))) {
     animatePlayedCard(a,card,0,a.handIndex,handSizeBefore);
+    queueTriggeredEffects(a,before,card,0);
     playCardSound(a,card);
     a.status=card.name+" - PLAYED"; a.handIndex=std::min(a.handIndex,static_cast<int>(a.game.players[0].hand.size())-1);
   } else a.status="ILLEGAL PLAY";
@@ -547,8 +550,9 @@ void performAi(App& a) {
     const int cardIndex=static_cast<int>(it-aiHand.begin());
     const int handSizeBefore=static_cast<int>(aiHand.size());
     const auto card=it==aiHand.end()?gwent::Card{}:*it;
+    const auto before=a.game;
     success=gwent::playCard(a.game,1,action.cardId,action.target,action.selectedCardId);
-    if(success) { animatePlayedCard(a,card,1,cardIndex,handSizeBefore);playCardSound(a,card); }
+    if(success) { animatePlayedCard(a,card,1,cardIndex,handSizeBefore);queueTriggeredEffects(a,before,card,1);playCardSound(a,card); }
     a.status="OPPONENT PLAYED "+card.name;
   }
   if(!success) {
@@ -656,8 +660,53 @@ void animatePlayedCard(App& a,const gwent::Card& card,int player,int handIndex,i
     if(effect.empty()&&card.kind==gwent::Kind::CommanderHorn)effect="horn";
     if(effect.empty()&&card.spy)effect="spy";
     if(!effect.empty()) {
-      a.cardEffect.active=true;a.cardEffect.icon=effect;a.cardEffect.x=flight.toX;a.cardEffect.y=flight.toY;
-      a.cardEffect.startedAt=SDL_GetTicks()+499;a.cardEffect.duration=1650;
+      App::CardEffect visual;visual.active=true;visual.icon=effect;visual.x=flight.toX;visual.y=flight.toY;
+      visual.startedAt=SDL_GetTicks()+499;visual.duration=1650;a.cardEffects.push_back(std::move(visual));
+    }
+  }
+}
+void queueTargetEffect(App& a,const std::string& icon,int x,int y,Uint32 delay=0) {
+  App::CardEffect visual;visual.active=true;visual.icon=icon;visual.x=x;visual.y=y;
+  visual.startedAt=SDL_GetTicks()+delay;visual.duration=icon=="scorch"?1650:1650;
+  a.cardEffects.push_back(std::move(visual));
+}
+void queueTriggeredEffects(App& a,const gwent::Game& before,const gwent::Card& played,int player) {
+  const auto boardPosition=[](int owner,int row,int index) {
+    return std::pair<int,int>{237+index*29,owner==0?143+row*45:5+(2-row)*45};
+  };
+  const auto containsId=[](const std::vector<gwent::Card>& cards,const std::string& id) {
+    return std::any_of(cards.begin(),cards.end(),[&](const gwent::Card& c){return c.id==id;});
+  };
+  // Scorch resolves its targets simultaneously in the reference game. Keep
+  // the old row coordinates because the engine has already moved them to the grave.
+  if(played.kind==gwent::Kind::Scorch||
+     std::find(played.abilities.begin(),played.abilities.end(),"scorch_c")!=played.abilities.end()||
+     std::find(played.abilities.begin(),played.abilities.end(),"scorch_r")!=played.abilities.end()||
+     std::find(played.abilities.begin(),played.abilities.end(),"scorch_s")!=played.abilities.end()) {
+    for(int owner=0;owner<2;++owner)for(int row=0;row<3;++row) {
+      const auto& oldRow=before.players[owner].board[row];
+      for(int index=0;index<static_cast<int>(oldRow.size());++index) {
+        const auto& target=oldRow[index];
+        if(containsId(a.game.players[owner].graveyard,target.id)) {
+          const auto [x,y]=boardPosition(owner,row,index);queueTargetEffect(a,"scorch",x,y);
+        }
+      }
+    }
+  }
+  for(int owner=0;owner<2;++owner)for(int row=0;row<3;++row) {
+    const auto& current=a.game.players[owner].board[row];
+    const int bondCount=static_cast<int>(std::count_if(current.begin(),current.end(),[&](const gwent::Card& c){return c.name==played.name;}));
+    for(int index=0;index<static_cast<int>(current.size());++index) {
+      const auto& target=current[index];
+      const bool existed=std::any_of(before.players[0].board.begin(),before.players[0].board.end(),[&](const auto& r){return containsId(r,target.id);})||
+                         std::any_of(before.players[1].board.begin(),before.players[1].board.end(),[&](const auto& r){return containsId(r,target.id);});
+      const auto [x,y]=boardPosition(owner,row,index);
+      if(played.medic&&!existed&&containsId(before.players[player].graveyard,target.id))
+        queueTargetEffect(a,"medic",x,y,499);
+      else if(played.muster&&!existed&&target.id!=played.id)
+        queueTargetEffect(a,"muster",x,y,499);
+      if(played.bond&&owner==player&&containsId(current,played.id)&&bondCount>1&&target.name==played.name)
+        queueTargetEffect(a,"bond",x,y,499);
     }
   }
 }
@@ -670,19 +719,21 @@ void drawCardFlight(SDL_Renderer* r,const App& a) {
   drawSourceCard(r,a,x,y,flight.card,true);
 }
 void drawCardEffect(SDL_Renderer* r,const App& a) {
-  const auto& effect=a.cardEffect;if(!effect.active)return;
   const Uint32 now=SDL_GetTicks();
-  if(SDL_TICKS_PASSED(now,effect.startedAt+effect.duration))return;
-  const Uint32 elapsed=now-effect.startedAt;
-  Uint8 alpha=255;
-  if(elapsed<50)alpha=0;
-  else if(elapsed<350)alpha=static_cast<Uint8>(std::clamp((elapsed-50)*255/300,0u,255u));
-  else if(elapsed>=effect.duration-300)alpha=static_cast<Uint8>(std::clamp((effect.duration-elapsed)*255/300,0u,255u));
-  float size=1.0f;
-  if(effect.icon!="scorch")size=elapsed<350?1.0f:elapsed<1350?0.8f:0.4f;
-  const int width=std::max(1,static_cast<int>(std::lround(28*size)));
-  const int height=std::max(1,static_cast<int>(std::lround(43*size)));
-  drawImageAlpha(r,a,"img/icons/anim_"+effect.icon+".png",effect.x+(28-width)/2,effect.y+(43-height)/2,width,height,alpha);
+  for(const auto& effect:a.cardEffects) {
+    if(!effect.active||!SDL_TICKS_PASSED(now,effect.startedAt))continue;
+    if(SDL_TICKS_PASSED(now,effect.startedAt+effect.duration))continue;
+    const Uint32 elapsed=now-effect.startedAt;
+    Uint8 alpha=255;
+    if(elapsed<50)alpha=0;
+    else if(elapsed<350)alpha=static_cast<Uint8>(std::clamp((elapsed-50)*255/300,0u,255u));
+    else if(elapsed>=effect.duration-300)alpha=static_cast<Uint8>(std::clamp((effect.duration-elapsed)*255/300,0u,255u));
+    float size=1.0f;
+    if(effect.icon!="scorch")size=elapsed<350?1.0f:elapsed<1350?0.8f:0.4f;
+    const int width=std::max(1,static_cast<int>(std::lround(28*size)));
+    const int height=std::max(1,static_cast<int>(std::lround(43*size)));
+    drawImageAlpha(r,a,"img/icons/anim_"+effect.icon+".png",effect.x+(28-width)/2,effect.y+(43-height)/2,width,height,alpha);
+  }
 }
 std::vector<std::string> wrapDetailText(const std::string& value,std::size_t limit);
 void drawCardPreview(SDL_Renderer* r,const App& a,const gwent::Card& card) {
@@ -1315,8 +1366,10 @@ void handleMatchKey(App& a,SDL_Keycode key) {
         const auto revived=std::find_if(a.game.players[0].graveyard.begin(),a.game.players[0].graveyard.end(),[&](const gwent::Card& c){return c.id==selectedId;});
         const auto playRow=card.medic&&revived!=a.game.players[0].graveyard.end()&&revived->agile?
                            static_cast<gwent::Row>(a.reviveRowIndex):static_cast<gwent::Row>(a.rowIndex);
+        const auto before=a.game;
         if(gwent::playCard(a.game,0,card.id,playRow,selectedId)) {
           animatePlayedCard(a,card,0,a.handIndex,handSizeBefore);
+          queueTriggeredEffects(a,before,card,0);
           playCardSound(a,card);
           a.status=card.name+" - PLAYED"; a.handIndex=std::min(a.handIndex,static_cast<int>(a.game.players[0].hand.size())-1);
         } else a.status="ILLEGAL TARGET";
@@ -1759,7 +1812,10 @@ int main(int argc,char** argv) {
       app.cardDetailsOpen=true;app.selectLongPressed=true;app.audio.play("open");
     }
     if(app.cardFlight.active&&SDL_TICKS_PASSED(SDL_GetTicks(),app.cardFlight.startedAt+499))app.cardFlight.active=false;
-    if(app.cardEffect.active&&SDL_TICKS_PASSED(SDL_GetTicks(),app.cardEffect.startedAt+app.cardEffect.duration))app.cardEffect.active=false;
+    const Uint32 now=SDL_GetTicks();
+    app.cardEffects.erase(std::remove_if(app.cardEffects.begin(),app.cardEffects.end(),[&](const App::CardEffect& effect) {
+      return SDL_TICKS_PASSED(now,effect.startedAt+effect.duration);
+    }),app.cardEffects.end());
     updateWeatherTransitions(app);
     if(app.screen==Screen::Match && !app.leaderSelectionMode && !app.leaderRevealOpen && !app.pauseOpen && !app.passConfirmationOpen &&
        app.game.phase==gwent::Phase::OpponentTurn && SDL_GetTicks()>=app.aiAt)performAi(app);

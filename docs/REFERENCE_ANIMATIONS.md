@@ -9,9 +9,9 @@ files under `assets/gwent-classic/img/icons/anim_*.png`.
 | Effect | Source implementation | Source timing / behavior | Port state |
 | --- | --- | --- | --- |
 | Card movement between containers | `translateTo()` → `translate()` in `gwent.js` | 499 ms transform; row spacing and source/destination geometry affect endpoint | Native card flight now uses 499 ms; endpoint geometry still needs source-layout parity |
-| Ability overlays: Horn, Spy, Muster, Morale, Bond | `Card.animate()` in `gwent.js`; `abilities.js` calls it | 50 ms setup, 300 ms fade-in, 1000 ms hold, 300 ms fade-out; source `anim_<ability>.png` | Native overlay uses original PNG and nominal timing on the played card; Bond must animate every matching row card and Muster needs its source ordering |
-| Medic revive overlay | `abilities.js` Medic handler | `anim_medic` runs on the selected revived unit before it moves from graveyard to its combat row | Not ported; deliberately not attached to the played Medic card because that would animate the wrong card |
-| Scorch overlay | `Card.scorch()` in `gwent.js` | 50 ms setup; fade-in over 300 ms; fade-out starts 1300 ms after fade-in starts and runs 300 ms; cover sizing | Not ported; engine removes all targets immediately, so the UI must preserve target positions before mutation |
+| Ability overlays: Horn, Spy, Muster, Morale, Bond | `Card.animate()` in `gwent.js`; `abilities.js` calls it | 50 ms setup, 300 ms fade-in, 1000 ms hold, 300 ms fade-out; source `anim_<ability>.png` | Original PNG and timing are used. Newly summoned Muster copies and every matching Bond card now get their own overlay; movement/order timing is still not source-exact |
+| Medic revive overlay | `abilities.js` Medic handler | `anim_medic` runs on the selected revived unit before it moves from graveyard to its combat row | Original PNG/timing now target the revived unit; the source graveyard-to-row travel is not yet reproduced |
+| Scorch overlay | `Card.scorch()` in `gwent.js` | 50 ms setup; fade-in over 300 ms; fade-out starts 1300 ms after fade-in starts and runs 300 ms; cover sizing | Original PNG/timing now run concurrently on every unit moved to a graveyard, using pre-action row coordinates. Scorch card flight and row-transition sequencing remain incomplete |
 | Weather row overlay | `Row.addOverlay()` / `removeOverlay()` in `gwent.js` | Fade in/out over 500 ms | Native alpha transition added and previous overlay type retained for fade-out; multiple simultaneous row overlay composition still needs comparison |
 | Card preview fade | `style.css` | 300 ms opacity transition | Not ported |
 | Five-card carousel movement | `style.css` and `ui.queueCarousel()` in `gwent.js` | 250 ms base; each adjacent/outer card is staggered by −50/+50/+200 ms; center card has a separate 50 ms glow transition | Not ported |
@@ -22,8 +22,9 @@ files under `assets/gwent-classic/img/icons/anim_*.png`.
 ## Verification status
 
 This file is deliberately an inventory, not a completion claim. The native
-implementation currently reuses the source card animation PNGs and ports a
-subset of their timing. It does not yet reproduce every ability's affected
-cards, ordering, source container geometry, carousel, timed notifications,
-leader/end-screen transitions, or all CSS selection/hover states. Therefore
-the animation parity checkbox in `docs/SOURCE_PARITY.md` remains unchecked.
+implementation reuses original animation PNGs and now covers more of the
+source ability targets. It does not yet reproduce source card movement for
+every affected card, exact asynchronous sequencing, source container geometry,
+carousel, timed notifications, leader/end-screen transitions, or all CSS
+selection/hover states. Therefore the animation parity checkbox in
+`docs/SOURCE_PARITY.md` remains unchecked.

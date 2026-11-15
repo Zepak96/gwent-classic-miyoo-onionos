@@ -136,3 +136,7 @@ Przeniesiono do SDL wybrane istniejące animacje źródłowe: lot karty trwa 499
 ## Automatyczne pasowanie zgodne ze źródłem — 15.11.2026
 
 Przeniesiono reguły `Player.canPlay()`, `Player.endTurn()` i `Game.startRound()`: gracz bez kart i dostępnej zdolności lidera pasuje po swojej akcji, a przed rozpoczęciem rundy automatycznie pasują strony, które nie mogą wykonać ruchu. Zdolność lidera użyta wcześniej w meczu nie odnawia się na początku kolejnej rundy. Dodano testy ostatniej karty i pustego rozpoczęcia; desktop build i CTest 2/2 przeszły.
+
+## Uzupełnienie celów animacji kart — 15.11.2026
+
+Porównanie z `abilities.js` i `Card.animate()` wykazało, że nakładki muszą pojawiać się na kartach dotkniętych zdolnością, a nie wyłącznie na karcie zagranej. Renderer obsługuje teraz nakładkę Więzi na wszystkie pasujące karty w rzędzie, Muster na każdej nowo przywołanej kopii, Medyka na wskrzeszonej jednostce oraz Pożogę równolegle na jednostkach usuwanych z planszy, zachowując ich pozycje sprzed zmiany stanu. Build, CTest (2/2) i `--input-test` przechodzą. To nadal częściowy port animacji; pełne przejścia, kolejność ruchu, karuzela, komunikaty i ekrany końca gry są otwarte. Nie robiono builda ARM ani zapisu na SD.
