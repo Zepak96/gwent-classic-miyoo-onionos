@@ -1,6 +1,7 @@
 #include "gwent/game.hpp"
 #include "gwent/catalog.hpp"
 #include <algorithm>
+#include <limits>
 #include <map>
 
 namespace gwent {
@@ -26,21 +27,37 @@ void shuffleDeck(Game& g, std::vector<Card>& deck) {
     std::swap(deck[n - 1], deck[other]);
   }
 }
-int cardPower(const Card& c, const std::vector<Card>& row, bool weather, bool horn) {
+int cardPower(const Card& c, const std::vector<Card>& row, bool weather, bool horn,
+              bool halfWeather = false, bool doubleSpyPower = false) {
   if (c.hero) return c.power; // Heroes ignore all row effects.
-  int power = weather ? std::min(c.power, 1) : c.power;
-  const int moraleCount = static_cast<int>(std::count_if(row.begin(), row.end(), [](const Card& x) { return x.morale || hasAbility(x, "morale"); }));
-  power += std::max(0, moraleCount - ((c.morale || hasAbility(c, "morale")) ? 1 : 0));
+  const int weatherFloor = halfWeather ? c.power / 2 : 1;
+  int power = weather ? std::min(c.power, weatherFloor) : c.power;
+  if (doubleSpyPower && c.spy) power *= 2;
   if (c.bond && !c.group.empty()) {
     const auto copies = std::count_if(row.begin(), row.end(), [&](const Card& x) { return x.group == c.group; });
     if (copies > 1) power *= static_cast<int>(copies);
   }
+  const int moraleCount = static_cast<int>(std::count_if(row.begin(), row.end(), [](const Card& x) { return x.morale || hasAbility(x, "morale"); }));
+  power += std::max(0, moraleCount - ((c.morale || hasAbility(c, "morale")) ? 1 : 0));
   const int hornSources = static_cast<int>(horn) + static_cast<int>(std::count_if(row.begin(), row.end(), [](const Card& x) { return hasAbility(x, "horn"); }));
   if (hornSources > (hasAbility(c, "horn") ? 1 : 0)) power *= 2;
   return power;
 }
 void recompute(Game& g) {
   for (int owner = 0; owner < 2; ++owner) g.players[owner].score = calculateScore(g.players[owner], g.weather, g.horn[owner]);
+}
+void applyWeather(Game& g, int owner, const Card& card, Row fallback = Row::None) {
+  if (hasAbility(card, "frost")) g.weather[0] = true;
+  else if (hasAbility(card, "fog")) g.weather[1] = true;
+  else if (hasAbility(card, "rain")) g.weather[2] = true;
+  else if (hasAbility(card, "storm")) { g.weather[1] = true; g.weather[2] = true; }
+  else if (validRow(fallback)) g.weather[rowIndex(fallback)] = true;
+  g.weatherCards.push_back({card, owner});
+}
+void clearWeather(Game& g) {
+  g.weather.fill(false);
+  for (const auto& active : g.weatherCards) g.players[active.owner].graveyard.push_back(active.card);
+  g.weatherCards.clear();
 }
 void finishRound(Game& g) {
   recompute(g);
@@ -93,14 +110,17 @@ void scorchEnemyRow(Game& g, int owner, int rowIndexValue) {
   int rowTotal = 0, strongest = -1;
   for (const auto& unit : row) {
     if (unit.kind != Kind::Unit) continue;
-    const int power = cardPower(unit, row, g.weather[rowIndexValue], g.horn[1 - owner][rowIndexValue]);
+    const int power = cardPower(unit, row, g.weather[rowIndexValue], g.horn[1 - owner][rowIndexValue],
+                                g.players[1-owner].halfWeather, g.players[1-owner].doubleSpyPower);
     rowTotal += power;
     if (!unit.hero) strongest = std::max(strongest, power);
   }
   if (rowTotal < 10 || strongest < 0) return;
   std::vector<int> remove;
   for (int i = 0; i < static_cast<int>(row.size()); ++i)
-    if (row[i].kind == Kind::Unit && !row[i].hero && cardPower(row[i], row, g.weather[rowIndexValue], g.horn[1 - owner][rowIndexValue]) == strongest)
+    if (row[i].kind == Kind::Unit && !row[i].hero &&
+        cardPower(row[i], row, g.weather[rowIndexValue], g.horn[1 - owner][rowIndexValue],
+                  g.players[1-owner].halfWeather, g.players[1-owner].doubleSpyPower) == strongest)
       remove.push_back(i);
   auto& grave = g.players[1 - owner].graveyard;
   for (auto i = remove.rbegin(); i != remove.rend(); ++i) {
@@ -131,7 +151,7 @@ int calculateScore(const Player& p, const std::array<bool, 3>& weather,
   int total = 0;
   for (int r = 0; r < 3; ++r)
     for (const auto& c : p.board[r])
-      if (c.kind == Kind::Unit) total += cardPower(c, p.board[r], weather[r], horn[r]);
+      if (c.kind == Kind::Unit) total += cardPower(c, p.board[r], weather[r], horn[r], p.halfWeather, p.doubleSpyPower);
   return total;
 }
 
@@ -183,13 +203,53 @@ bool replaceMulliganCards(Game& g, int who, const std::vector<std::string>& ids)
   return true;
 }
 
+void resolveLeaderPassives(Game& g) {
+  const bool whiteFlame = hasAbility(g.players[0].leader, "emhyr_whiteflame") ||
+                          hasAbility(g.players[1].leader, "emhyr_whiteflame");
+  for (auto& player : g.players) player.leaderAbilityCancelled = whiteFlame;
+  const std::vector<std::string> passiveIds={"emhyr_whiteflame","emhyr_invader","eredin_treacherous","francesca_daisy","king_bran"};
+  for (int who = 0; who < 2; ++who) {
+    auto& player=g.players[who];
+    if (player.leader.kind != Kind::Leader) continue;
+    const bool passive=std::any_of(passiveIds.begin(),passiveIds.end(),[&](const std::string& id){return hasAbility(player.leader,id);});
+    player.leaderAbilityAvailable=!passive && !player.leaderAbilityCancelled;
+    if (player.leaderPassivesApplied) continue;
+    player.leaderPassivesApplied=true;
+    if (whiteFlame) continue;
+    if (hasAbility(player.leader,"emhyr_invader")) g.randomRespawn=true;
+    if (hasAbility(player.leader,"eredin_treacherous"))
+      for (auto& affected : g.players) affected.doubleSpyPower=true;
+    if (hasAbility(player.leader,"king_bran")) player.halfWeather=true;
+    if (hasAbility(player.leader,"francesca_daisy") && !player.deck.empty()) {
+      player.hand.push_back(player.deck.back()); player.deck.pop_back();
+    }
+  }
+}
+
+bool assignLeader(Game& g, int who, const Card& leader) {
+  if (who < 0 || who > 1 || g.phase != Phase::Mulligan || leader.kind != Kind::Leader) return false;
+  g.players[who].leader=leader;
+  g.players[who].faction=leader.faction;
+  if (g.players[0].leader.kind==Kind::Leader && g.players[1].leader.kind==Kind::Leader)
+    resolveLeaderPassives(g);
+  return true;
+}
+
+void beginMatchWithLeaders(Game& g, std::vector<Card> playerDeck, Card playerLeader,
+                           std::vector<Card> opponentDeck, Card opponentLeader,
+                           std::uint64_t seed, int firstPlayer) {
+  beginMatch(g,std::move(playerDeck),playerLeader.faction,std::move(opponentDeck),opponentLeader.faction,seed,firstPlayer);
+  assignLeader(g,0,playerLeader);
+  assignLeader(g,1,opponentLeader);
+}
+
 bool playCard(Game& g, int who, const std::string& id, Row target, const std::string& selectedId) {
   if (who < 0 || who > 1 || who != g.currentPlayer || g.players[who].passed ||
       g.phase == Phase::RoundResult || g.phase == Phase::MatchResult) return false;
   auto& p = g.players[who];
   auto it = findCard(p.hand, id);
   if (it == p.hand.end()) return false;
-  const Card c = *it;
+  Card c = *it;
   if (c.kind == Kind::Leader) return false;
   Row deployRow = c.row;
   if (c.agile && (target == Row::Melee || target == Row::Ranged)) deployRow = target;
@@ -208,24 +268,26 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
     }
     if (selectedId.empty() || targetRow < 0 || boardTarget->kind != Kind::Unit || boardTarget->hero) return false;
   }
-  auto graveTarget = findCard(p.graveyard, selectedId);
-  const bool medicCanRetrieve = c.kind == Kind::Unit && c.medic && !selectedId.empty() &&
-    graveTarget != p.graveyard.end() && graveTarget->kind == Kind::Unit && !graveTarget->hero;
-  if (c.kind == Kind::Unit && c.medic && !selectedId.empty() && !medicCanRetrieve) return false;
+  int medicIndex = -1;
+  if (c.kind == Kind::Unit && c.medic) {
+    if (g.randomRespawn) {
+      std::vector<int> units;
+      for (int i=0;i<static_cast<int>(p.graveyard.size());++i)
+        if (p.graveyard[i].kind==Kind::Unit) units.push_back(i);
+      if (!units.empty()) medicIndex=units[nextRandom(g)%units.size()];
+    } else if (!selectedId.empty()) {
+      const auto found=findCard(p.graveyard,selectedId);
+      if(found==p.graveyard.end() || found->kind!=Kind::Unit || found->hero) return false;
+      medicIndex=static_cast<int>(found-p.graveyard.begin());
+    }
+  }
 
   p.hand.erase(it);
   switch (c.kind) {
     case Kind::Weather:
-      if (hasAbility(c, "frost")) g.weather[0] = true;
-      else if (hasAbility(c, "fog")) g.weather[1] = true;
-      else if (hasAbility(c, "rain")) g.weather[2] = true;
-      else if (hasAbility(c, "storm")) { g.weather[1] = true; g.weather[2] = true; }
-      else g.weather[rowIndex(target)] = true;
-      g.weatherCards.push_back({c, who}); break;
+      applyWeather(g, who, c, target); break;
     case Kind::ClearWeather:
-      g.weather.fill(false);
-      for (const auto& active : g.weatherCards) g.players[active.owner].graveyard.push_back(active.card);
-      g.weatherCards.clear(); p.graveyard.push_back(c); break;
+      clearWeather(g); p.graveyard.push_back(c); break;
     case Kind::Mardroeme:
       transformBerserkers(p, rowIndex(target)); p.graveyard.push_back(c); break;
     case Kind::Scorch: {
@@ -234,13 +296,13 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
       for (int owner = 0; owner < 2; ++owner) for (int r = 0; r < 3; ++r)
         for (int n = 0; n < static_cast<int>(g.players[owner].board[r].size()); ++n) {
           const auto& unit = g.players[owner].board[r][n];
-          const int power = unit.kind == Kind::Unit ? cardPower(unit, g.players[owner].board[r], g.weather[r], g.horn[owner][r]) : -1;
+          const int power = unit.kind == Kind::Unit ? cardPower(unit, g.players[owner].board[r], g.weather[r], g.horn[owner][r], g.players[owner].halfWeather, g.players[owner].doubleSpyPower) : -1;
           if (!unit.hero) strongest = std::max(strongest, power);
         }
       for (int owner = 0; owner < 2; ++owner) for (int r = 0; r < 3; ++r)
         for (int n = 0; n < static_cast<int>(g.players[owner].board[r].size()); ++n) {
           const auto& unit = g.players[owner].board[r][n];
-          if (unit.kind == Kind::Unit && !unit.hero && cardPower(unit, g.players[owner].board[r], g.weather[r], g.horn[owner][r]) == strongest)
+          if (unit.kind == Kind::Unit && !unit.hero && cardPower(unit, g.players[owner].board[r], g.weather[r], g.horn[owner][r], g.players[owner].halfWeather, g.players[owner].doubleSpyPower) == strongest)
             remove[owner][r].push_back(n);
         }
       for (int owner = 0; owner < 2; ++owner) for (int r = 0; r < 3; ++r) {
@@ -265,10 +327,11 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
         for (int i = 0; i < 2 && !p.deck.empty(); ++i) { p.hand.push_back(p.deck.back()); p.deck.pop_back(); }
       } else p.board[rowIndex(deployRow)].push_back(c);
       if (c.muster) applyMuster(p, c);
-      if (medicCanRetrieve) {
-        const Card revived = *graveTarget;
-        p.graveyard.erase(graveTarget);
-        const int reviveRow = rowIndex(revived.row);
+      if (medicIndex >= 0) {
+        const Card revived = p.graveyard[medicIndex];
+        p.graveyard.erase(p.graveyard.begin()+medicIndex);
+        int reviveRow = rowIndex(revived.row);
+        if (revived.agile && !validRow(revived.row)) reviveRow = 0;
         if (reviveRow >= 0 && reviveRow < 3) p.board[reviveRow].push_back(revived);
       }
       if (hasAbility(c, "scorch_c")) scorchEnemyRow(g, who, 0);
@@ -292,6 +355,119 @@ bool pass(Game& g, int who) {
   return true;
 }
 
+bool activateLeader(Game& g, int who, Row target, const std::vector<std::string>& selectedIds) {
+  if (who<0 || who>1 || who!=g.currentPlayer || g.players[who].passed ||
+      (g.phase!=Phase::PlayerTurn && g.phase!=Phase::OpponentTurn)) return false;
+  auto& player=g.players[who];
+  if (!player.leaderAbilityAvailable || player.leaderAbilityCancelled) return false;
+  const auto ability=std::find_if(player.leader.abilities.begin(),player.leader.abilities.end(),[](const std::string& id){
+    return id.rfind("foltest_",0)==0 || id.rfind("emhyr_",0)==0 || id.rfind("eredin_",0)==0 ||
+           id.rfind("francesca_",0)==0 || id=="crach_an_craite" || id=="king_bran";
+  });
+  if (ability==player.leader.abilities.end()) return false;
+  const std::string& id=*ability;
+  const std::string selected=selectedIds.empty()?std::string{}:selectedIds.front();
+  bool canActivate=true;
+  auto playWeatherFromDeck=[&](const std::string& weatherAbility, bool anyWeather) {
+    auto found=player.deck.end();
+    if (!selected.empty()) found=findCard(player.deck,selected);
+    if (found==player.deck.end()) found=std::find_if(player.deck.begin(),player.deck.end(),[&](const Card& c){
+      const bool weather=c.kind==Kind::Weather;
+      return weather && (anyWeather || hasAbility(c,weatherAbility));
+    });
+    if(found==player.deck.end() || found->kind!=Kind::Weather || (!anyWeather && !hasAbility(*found,weatherAbility))) return false;
+    Card weather=*found; player.deck.erase(found); applyWeather(g,who,weather); return true;
+  };
+  if (id=="foltest_king") playWeatherFromDeck("fog",false);
+  else if (id=="foltest_lord") clearWeather(g);
+  else if (id=="foltest_siegemaster") { if(g.horn[who][2]) canActivate=false; else g.horn[who][2]=true; }
+  else if (id=="foltest_steelforged") scorchEnemyRow(g,who,2);
+  else if (id=="foltest_son") scorchEnemyRow(g,who,1);
+  else if (id=="emhyr_imperial") playWeatherFromDeck("rain",false);
+  else if (id=="emhyr_emperor") {
+    auto& known=g.revealedCards[who]; known.clear();
+    std::vector<int> indices(g.players[1-who].hand.size());
+    for(int i=0;i<static_cast<int>(indices.size());++i) indices[i]=i;
+    for(int i=0;i<3 && !indices.empty();++i) {
+      const int pick=static_cast<int>(nextRandom(g)%indices.size());
+      known.push_back(g.players[1-who].hand[indices[pick]]);
+      indices.erase(indices.begin()+pick);
+    }
+  }
+  else if (id=="emhyr_relentless") {
+    auto& grave=g.players[1-who].graveyard;
+    auto found=selected.empty()?std::find_if(grave.begin(),grave.end(),[](const Card& c){return c.kind==Kind::Unit;}):findCard(grave,selected);
+    if(found==grave.end() || found->kind!=Kind::Unit) canActivate=false;
+    else { player.hand.push_back(*found); grave.erase(found); }
+  }
+  else if (id=="emhyr_whiteflame" || id=="emhyr_invader" || id=="eredin_treacherous" || id=="francesca_daisy" || id=="king_bran") canActivate=false;
+  else if (id=="eredin_commander") { if(g.horn[who][0]) canActivate=false; else g.horn[who][0]=true; }
+  else if (id=="eredin_bringer_of_death") {
+    auto& grave=player.graveyard;
+    auto found=selected.empty()?std::find_if(grave.begin(),grave.end(),[](const Card& c){return c.kind==Kind::Unit;}):findCard(grave,selected);
+    if(found==grave.end() || found->kind!=Kind::Unit) canActivate=false;
+    else { player.hand.push_back(*found); grave.erase(found); }
+  }
+  else if (id=="eredin_destroyer") {
+    if(player.hand.size()<2 || player.deck.empty()) canActivate=false;
+    else {
+      std::vector<std::string> discardIds;
+      if(selectedIds.size()>=2) discardIds={selectedIds[0],selectedIds[1]};
+      else {
+        std::vector<Card> ordered=player.hand;
+        std::sort(ordered.begin(),ordered.end(),[](const Card& a,const Card& b){return a.power<b.power;});
+        discardIds={ordered[0].id,ordered[1].id};
+      }
+      auto first=findCard(player.hand,discardIds[0]); auto second=findCard(player.hand,discardIds[1]);
+      if(first==player.hand.end() || second==player.hand.end() || first==second) canActivate=false;
+      else {
+        std::string drawId=selectedIds.size()>=3?selectedIds[2]:player.deck.back().id;
+        auto draw=findCard(player.deck,drawId);
+        if(draw==player.deck.end()) canActivate=false;
+        else {
+          Card a=*first, b=*second;
+          player.hand.erase(std::remove_if(player.hand.begin(),player.hand.end(),[&](const Card& c){return c.id==a.id||c.id==b.id;}),player.hand.end());
+          player.graveyard.push_back(a); player.graveyard.push_back(b);
+          player.hand.push_back(*draw); player.deck.erase(draw);
+        }
+      }
+    }
+  }
+  else if (id=="eredin_king") playWeatherFromDeck("",true);
+  else if (id=="eredin_treacherous") canActivate=false;
+  else if (id=="francesca_queen") scorchEnemyRow(g,who,0);
+  else if (id=="francesca_beautiful") { if(g.horn[who][1]) canActivate=false; else g.horn[who][1]=true; }
+  else if (id=="francesca_pureblood") playWeatherFromDeck("frost",false);
+  else if (id=="francesca_hope") {
+    std::vector<Card> agile;
+    for(int r=0;r<2;++r) for(const auto& c:player.board[r]) if(c.agile) agile.push_back(c);
+    if(agile.size()>20) canActivate=false;
+    else if(!agile.empty()) {
+      std::array<std::vector<Card>,2> base;
+      for(int r=0;r<2;++r) for(const auto& c:player.board[r]) if(!c.agile) base[r].push_back(c);
+      int bestScore=std::numeric_limits<int>::min();
+      std::array<std::vector<Card>,2> bestRows=base;
+      const std::uint64_t arrangements=std::uint64_t{1}<<agile.size();
+      for(std::uint64_t mask=0;mask<arrangements;++mask) {
+        Player virtualPlayer=player; virtualPlayer.board[0]=base[0]; virtualPlayer.board[1]=base[1];
+        for(std::size_t n=0;n<agile.size();++n) virtualPlayer.board[(mask>>n)&1].push_back(agile[n]);
+        const int score=calculateScore(virtualPlayer,g.weather,g.horn[who]);
+        if(score>bestScore) { bestScore=score; bestRows={virtualPlayer.board[0],virtualPlayer.board[1]}; }
+      }
+      player.board[0]=std::move(bestRows[0]); player.board[1]=std::move(bestRows[1]);
+    }
+  }
+  else if (id=="francesca_daisy" || id=="king_bran") canActivate=false;
+  else if (id=="crach_an_craite") {
+    for(auto& p:g.players) { p.deck.insert(p.deck.end(),p.graveyard.begin(),p.graveyard.end()); p.graveyard.clear(); shuffleDeck(g,p.deck); }
+  } else canActivate=false;
+
+  if (!canActivate) return false;
+  player.leaderAbilityAvailable=false;
+  endTurn(g);
+  return true;
+}
+
 bool startNextRound(Game& g) {
   if (g.phase != Phase::RoundResult) return false;
   const int previousStarter = g.firstPlayer;
@@ -302,8 +478,7 @@ bool startNextRound(Game& g) {
   if (winner < 0 && g.players[1].faction == Faction::Nilfgaard && g.players[0].faction != Faction::Nilfgaard) winner = 1;
   g.firstPlayer = winner >= 0 ? winner : previousStarter;
   ++g.round;
-  for (const auto& active : g.weatherCards) g.players[active.owner].graveyard.push_back(active.card);
-  g.weatherCards.clear();
+  clearWeather(g);
   g.weather.fill(false);
   for (auto& ownerHorn : g.horn) ownerHorn.fill(false);
   for (int owner = 0; owner < 2; ++owner) {

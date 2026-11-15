@@ -35,8 +35,14 @@ struct ActiveWeather { Card card; int owner{0}; };
 struct Player {
   std::vector<Card> deck, hand, graveyard;
   std::array<std::vector<Card>, 3> board;
+  Card leader;
   bool passed{false};
   bool mulliganDone{false};
+  bool leaderAbilityAvailable{false};
+  bool leaderAbilityCancelled{false};
+  bool leaderPassivesApplied{false};
+  bool halfWeather{false};
+  bool doubleSpyPower{false};
   int score{0};
   int roundWins{0};
   int roundLosses{0};
@@ -52,6 +58,8 @@ struct Game {
   std::array<bool, 3> weather{false, false, false};
   std::array<std::array<bool, 3>, 2> horn{{{false, false, false}, {false, false, false}}};
   std::vector<ActiveWeather> weatherCards;
+  bool randomRespawn{false};
+  std::array<std::vector<Card>, 2> revealedCards;
   std::uint64_t rngState{1};
   std::string lastError;
 };
@@ -63,6 +71,13 @@ bool playCard(Game&, int playerIndex, const std::string& cardId, Row target = Ro
 void beginMatch(Game&, std::vector<Card> playerDeck, Faction playerFaction,
                 std::vector<Card> opponentDeck, Faction opponentFaction,
                 std::uint64_t seed, int firstPlayer = -1);
+void beginMatchWithLeaders(Game&, std::vector<Card> playerDeck, Card playerLeader,
+                           std::vector<Card> opponentDeck, Card opponentLeader,
+                           std::uint64_t seed, int firstPlayer = -1);
+bool assignLeader(Game&, int playerIndex, const Card& leader);
+void resolveLeaderPassives(Game&);
+bool activateLeader(Game&, int playerIndex, Row target = Row::None,
+                    const std::vector<std::string>& selectedCardIds = {});
 bool replaceMulliganCards(Game&, int playerIndex, const std::vector<std::string>& cardIds);
 bool pass(Game&, int playerIndex);
 bool startNextRound(Game&);

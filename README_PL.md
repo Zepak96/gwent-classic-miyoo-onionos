@@ -1,6 +1,6 @@
 # Gwent Classic dla Miyoo Mini Plus / OnionOS
 
-Natywny port Gwinta jako minigry z **Wiedźmina 3: Dziki Gon** — obejmujący podstawkę, Hearts of Stone, Blood and Wine oraz dodatki/zmiany Gwinta z aktualizacji next-gen Wiedźmina 3. Projekt nie odtwarza samodzielnej gry `GWENT: The Witcher Card Game` ani jej zasad online. Projekt jest na wczesnym etapie: obecny kod to szkielet silnika i prosty frontend SDL2, a nie kompletna grywalna implementacja.
+Natywny port 1:1 Gwinta jako minigry z **Wiedźmina 3: Dziki Gon** na Miyoo Mini Plus — bazujący na wskazanym repozytorium Gwent Classic oraz obejmujący docelowo podstawkę, Hearts of Stone, Blood and Wine i zmiany/karty z aktualizacji next-gen Wiedźmina 3. Repo referencyjne określa zachowanie gry; nie zastępujemy go zasadami samodzielnej gry `GWENT: The Witcher Card Game`. Projekt jest na wczesnym etapie: obecny kod nie jest kompletną grywalną implementacją ani gotowym portem OnionOS.
 
 ## Stan
 

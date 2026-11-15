@@ -2,11 +2,11 @@
 
 ## Status: aktywna implementacja — 15.11.2026
 
-Repozytorium wejściowe było puste. Powstał szkielet C++17/CMake, minimalny model silnika oraz pierwsze testy reguł. To nie jest ukończona gra ani wydanie dla Miyoo.
+Repozytorium wejściowe było puste. Powstał szkielet C++17/CMake, model silnika i prosty frontend SDL2. To nie jest ukończona gra ani wydanie dla Miyoo.
 
 ### Zakres wersji przyjęty po doprecyzowaniu
 
-Docelowa gra to wyłącznie Gwint jako minigra w Wiedźminie 3: Wild Hunt, z zawartością podstawki, Hearts of Stone, Blood and Wine oraz zmianami/kartami dodanymi przez aktualizację next-gen Wiedźmina 3. Nie implementujemy samodzielnej gry `GWENT: The Witcher Card Game` ani jej późniejszych zasad. Repozytoria Gwent Classic służą jako punkt odniesienia dla mechaniki i pokrycia kart, po sprawdzeniu różnic względem gry Wiedźmin 3.
+Docelowa gra to wyłącznie Gwint jako minigra w Wiedźminie 3: Wild Hunt, z zawartością podstawki, Hearts of Stone, Blood and Wine oraz zmianami/kartami dodanymi przez aktualizację next-gen Wiedźmina 3. Nie implementujemy samodzielnej gry `GWENT: The Witcher Card Game` ani jej późniejszych zasad. Przypięte repozytorium Gwent Classic jest źródłem docelowego zachowania i zakresu portu. Celem jest przeniesienie tej gry 1:1 na Miyoo Mini Plus, a nie samodzielne korygowanie jej według innej wersji Gwinta. Różnice względem gry referencyjnej należy traktować jako braki portu.
 
 ### Etap 1 — audyt
 
@@ -26,7 +26,8 @@ Docelowa gra to wyłącznie Gwint jako minigra w Wiedźminie 3: Wild Hunt, z zaw
 - [~] Rozdanie 10 kart z deterministycznie tasowanej talii oraz jednorazowa wymiana do 2 kart dla każdego gracza.
 - [~] Zaimportowany katalog 216 rekordów; generator kompiluje go jako 258 instancji/rekordów do natywnego builda.
 - [~] Zaimportowano 10 referencyjnych talii przeciwników wraz z liderami i listami kart; budowanie talii z tych przepisów jest spięte z katalogiem.
-- [~] Dodatkowe zdolności z danych: row-specific Scorch, Mardroeme/Berserker, Dandelion oraz obsługa leaderów w katalogu.
+- [~] Dodatkowe zdolności z danych: row-specific Scorch, Mardroeme/Berserker, Dandelion oraz 22 liderów w katalogu.
+- [~] Rozpoczęto natywną obsługę zdolności liderów: pasywów, aktywacji, pogody z talii, rogów, row Scorch, odrzucania/dobierania i przenoszenia kart. Implementacja nie jest jeszcze zweryfikowana względem pełnej referencji.
 - [x] CI kompiluje wygenerowany katalog i zalicza walidację wszystkich 10 talii z leaderami.
 - [ ] Wczytywanie kart z katalogu w menu, pełny zestaw zdolności i wszystkich liderów.
 - [~] Rozdanie 10 kart z deterministycznie tasowanej talii oraz jednorazowa wymiana do 2 kart dla każdego gracza.
@@ -35,7 +36,7 @@ Docelowa gra to wyłącznie Gwint jako minigra w Wiedźminie 3: Wild Hunt, z zaw
 - [ ] Wszystkie zdolności jednostek, dowódców i frakcji oraz prawidłowa kolejność ich rozstrzygania.
 - [ ] Pełna walidacja talii, mulligan, medyk, manekin i zapis odrzuconych kart.
 - [ ] AI Easy/Normal/Hard bez informacji ukrytej.
-- [ ] Porównawcze testy sekwencji ze źródłem referencyjnym.
+- [ ] Porównawcza weryfikacja wszystkich sekwencji względem źródła referencyjnego.
 
 ### Etapy 3–8 — port, UI, lokalizacja, audio, integracja, QA i release
 
@@ -63,7 +64,7 @@ Nie zmienia to bieżącego celu: najpierw kompletna rozgrywka Gwinta z Wiedźmin
 - Lokalnie nie znaleziono CMake ani kompilatora C++; build desktop wykonał GitHub Actions na Ubuntu.
 - Docker Desktop nie ma uruchomionego daemonu; brak lokalnego obrazu/toolchaina ARM.
 - Brak potwierdzonego fizycznego Miyoo Mini Plus.
-- Brak aktywnej autoryzacji GitHub CLI może uniemożliwić stworzenie zdalnego repozytorium.
+- GitHub CLI nie ma workflow scope; zmiany workflow publikujemy przez integrację GitHub.
 
 ## Zasada raportowania
 

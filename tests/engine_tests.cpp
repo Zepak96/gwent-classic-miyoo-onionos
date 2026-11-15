@@ -42,6 +42,13 @@ static void scoreRules() {
   auto c = unit("bond-c", 4); c.bond = true; c.group = "commando";
   bond.board[0] = {a,b,c};
   assert(calculateScore(bond, {false,false,false}, {false,false,false}) == 36); // three same-name copies each score 4 x 3
+
+  Player orderedEffects;
+  auto bondedA=unit("bonded-a",4); bondedA.bond=true; bondedA.group="same-name";
+  auto bondedB=unit("bonded-b",4); bondedB.bond=true; bondedB.group="same-name";
+  auto rally=unit("rally",1); rally.morale=true;
+  orderedEffects.board[0]={bondedA,bondedB,rally};
+  assert(calculateScore(orderedEffects,{false,false,false},{false,false,false})==19); // Bond multiplies before Morale is added.
 }
 static void turnsAndRounds() {
   Game g; g.players[0].hand.push_back(unit("a", 8)); g.players[1].hand.push_back(unit("b", 3));
@@ -188,4 +195,78 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
   }
   assert(game.phase==Phase::MatchResult && actions<500);
 }
-int main() { scoreRules(); turnsAndRounds(); abilitiesAndValidation(); openingHandAndMulligan(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); }
+static Card leader(std::string id) {
+  Card card; card.id=id; card.name=id; card.kind=Kind::Leader; card.faction=Faction::NorthernRealms; card.abilities={id}; return card;
+}
+static void leaderAbilities() {
+  std::vector<Card> deck;
+  for(int i=0;i<24;++i) deck.push_back(unit("leader-test-"+std::to_string(i),1));
+  Game passives;
+  beginMatchWithLeaders(passives,deck,leader("francesca_daisy"),deck,leader("king_bran"),0x1234,0);
+  assert(passives.players[0].hand.size()==11 && passives.players[0].deck.size()==13);
+  passives.players[1].board[0].push_back(unit("bran-weather",9));
+  assert(calculateScore(passives.players[1],{true,false,false},{false,false,false})==4);
+
+  Game cancellation;
+  beginMatchWithLeaders(cancellation,deck,leader("foltest_lord"),deck,leader("emhyr_whiteflame"),0x4321,0);
+  assert(!cancellation.players[0].leaderAbilityAvailable && cancellation.players[0].leaderAbilityCancelled);
+  assert(!cancellation.players[1].leaderAbilityAvailable && cancellation.players[1].leaderAbilityCancelled);
+
+  Game spies;
+  beginMatchWithLeaders(spies,deck,leader("eredin_treacherous"),deck,leader("emhyr_emperor"),0x5678,0);
+  auto spyA=unit("spy-a",3); spyA.spy=true;
+  auto spyB=unit("spy-b",4); spyB.spy=true;
+  spies.players[0].board[0].push_back(spyA); spies.players[1].board[0].push_back(spyB);
+  assert(calculateScore(spies.players[0],spies.weather,spies.horn[0])==6 &&
+         calculateScore(spies.players[1],spies.weather,spies.horn[1])==8);
+  assert(spies.players[0].board[0][0].power==3); // Passive modifies scoring, not base card data.
+
+  Game cancelledPassive;
+  beginMatchWithLeaders(cancelledPassive,deck,leader("eredin_treacherous"),deck,leader("emhyr_whiteflame"),0x789a,0);
+  cancelledPassive.players[0].board[0].push_back(spyA);
+  assert(!cancelledPassive.players[0].doubleSpyPower &&
+         calculateScore(cancelledPassive.players[0],cancelledPassive.weather,cancelledPassive.horn[0])==3);
+
+  Game weather;
+  weather.phase=Phase::PlayerTurn; weather.players[0].leader=leader("foltest_king");
+  weather.players[0].leaderAbilityAvailable=true;
+  Card fog; fog.id="deck-fog"; fog.kind=Kind::Weather; fog.abilities={"fog"};
+  weather.players[0].deck.push_back(fog);
+  assert(activateLeader(weather,0));
+  assert(weather.weather[1] && weather.weatherCards.size()==1 && weather.players[0].deck.empty());
+
+  Game horn;
+  horn.players[0].leader=leader("foltest_siegemaster"); horn.players[0].leaderAbilityAvailable=true;
+  horn.players[0].board[2].push_back(unit("siege",5));
+  assert(activateLeader(horn,0));
+  assert(horn.players[0].score==10 && !horn.players[0].leaderAbilityAvailable);
+
+  Game rowScorch;
+  rowScorch.players[0].leader=leader("foltest_steelforged"); rowScorch.players[0].leaderAbilityAvailable=true;
+  rowScorch.players[1].board[2]={unit("siege-6",6,Row::Siege),unit("siege-4",4,Row::Siege)};
+  assert(activateLeader(rowScorch,0));
+  assert(rowScorch.players[1].board[2].size()==1 && rowScorch.players[1].graveyard.size()==1);
+
+  Game draw;
+  draw.players[0].leader=leader("emhyr_relentless"); draw.players[0].leaderAbilityAvailable=true;
+  draw.players[1].graveyard.push_back(unit("stolen-unit",7));
+  assert(activateLeader(draw,0,Row::None,{"stolen-unit"}));
+  assert(draw.players[0].hand.size()==1 && draw.players[1].graveyard.empty());
+
+  Game discard;
+  discard.players[0].leader=leader("eredin_destroyer"); discard.players[0].leaderAbilityAvailable=true;
+  discard.players[0].hand={unit("discard-a",1),unit("discard-b",2)};
+  discard.players[0].deck={unit("draw-a",3),unit("draw-b",4)};
+  assert(activateLeader(discard,0,Row::None,{"discard-a","discard-b","draw-a"}));
+  assert(discard.players[0].hand.size()==1 && discard.players[0].hand[0].id=="draw-a");
+  assert(discard.players[0].graveyard.size()==2 && discard.players[0].deck.size()==1);
+
+  Game crach;
+  crach.players[0].leader=leader("crach_an_craite"); crach.players[0].leaderAbilityAvailable=true;
+  crach.players[0].graveyard.push_back(unit("own-grave",1));
+  crach.players[1].graveyard.push_back(unit("enemy-grave",1));
+  assert(activateLeader(crach,0));
+  assert(crach.players[0].deck.size()==1 && crach.players[1].deck.size()==1);
+  assert(crach.players[0].graveyard.empty() && crach.players[1].graveyard.empty());
+}
+int main() { scoreRules(); turnsAndRounds(); abilitiesAndValidation(); openingHandAndMulligan(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); leaderAbilities(); }
