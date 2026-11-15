@@ -377,7 +377,6 @@ std::string validateDeck(const std::vector<Card>& deck, Faction faction) {
 std::string validateDeck(const std::vector<Card>& deck, const Card& leader, Faction faction) {
   if (leader.kind != Kind::Leader) return "deck must have exactly one leader card";
   if (leader.faction != Faction::Neutral && leader.faction != faction) return "leader belongs to another faction";
-  if (leader.deckCopies == 0) return "leader is not available in the deck pool";
   return validateDeck(deck, faction);
 }
 
@@ -407,7 +406,7 @@ std::vector<Card> makeReferenceDeck(const ReferenceDeck& recipe) {
 bool referenceLeader(int sourceIndex, Card& leader) {
   const auto& catalog = referenceCardCatalog();
   const auto found = std::find_if(catalog.begin(), catalog.end(), [&](const Card& card) {
-    return card.referenceIndex == sourceIndex && card.kind == Kind::Leader && card.deckCopies > 0;
+    return card.referenceIndex == sourceIndex && card.kind == Kind::Leader;
   });
   if (found == catalog.end()) return false;
   leader = *found;
