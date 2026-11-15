@@ -77,7 +77,6 @@ enum class Language { Polish, English };
 struct App {
   Screen screen{Screen::Title};
   Language language{Language::Polish};
-  gwent::Difficulty difficulty{gwent::Difficulty::Normal};
   std::size_t deckIndex{0};
   gwent::Game game;
   int handIndex{0};
@@ -96,9 +95,9 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="start")return pl?"ENTER - ROZPOCZNIJ":"ENTER - START";
   if(key=="choose")return pl?"WYBIERZ TALIE":"CHOOSE A DECK";
   if(key=="opponent")return pl?"PRZECIWNIK":"OPPONENT";
-  if(key=="difficulty")return pl?"POZIOM":"DIFFICULTY";
+  if(key=="ai")return pl?"PRZECIWNIK AI":"AI OPPONENT";
   if(key=="language")return pl?"JEZYK":"LANGUAGE";
-  if(key=="instructions")return pl?"LEWO/PRAWO - TALIA   GORA/DOL - POZIOM":"LEFT/RIGHT - DECK   UP/DOWN - LEVEL";
+  if(key=="instructions")return pl?"LEWO/PRAWO - TALIA":"LEFT/RIGHT - DECK";
   if(key=="confirm")return pl?"ENTER - GRA   Z - JEZYK":"ENTER - PLAY   Z - LANGUAGE";
   if(key=="mulligan")return pl?"WYBIERZ DO 2 KART DO WYMIANY":"CHOOSE UP TO 2 CARDS TO MULLIGAN";
   if(key=="confirm_mulligan")return pl?"SPACJA - ZAZNACZ   ENTER - ZATWIERDZ":"SPACE - MARK   ENTER - CONFIRM";
@@ -172,7 +171,7 @@ void doHumanPlay(App& a) {
 }
 void performAi(App& a) {
   if(a.game.phase!=gwent::Phase::OpponentTurn) return;
-  const auto action=gwent::chooseAiAction(a.game,1,a.difficulty);
+  const auto action=gwent::chooseAiAction(a.game,1);
   bool success=false;
   if(action.pass) { success=gwent::pass(a.game,1); a.status=tr(a,"ai_turn")+" - PASS"; }
   else if(action.activateLeader) {
@@ -246,9 +245,8 @@ void drawDeckSelect(SDL_Renderer* r,const App& a) {
   box(r,73,174,493,1,Color{65,72,67});
   text(r,74,193,tr(a,"opponent"),muted,1);
   text(r,74,215,factionName(opponent.faction,a.language==Language::Polish)+" / "+opponentLeader.name,paper,1);
-  text(r,74,251,tr(a,"difficulty"),muted,1);
-  const char* levels[]={"EASY","NORMAL","HARD"};
-  text(r,226,251,levels[static_cast<int>(a.difficulty)],gold,1);
+  text(r,74,251,tr(a,"ai"),muted,1);
+  text(r,226,251,"CLASSIC",gold,1);
   text(r,74,276,tr(a,"language"),muted,1); text(r,226,276,a.language==Language::Polish?"POLSKI":"ENGLISH",gold,1);
   text(r,25,332,tr(a,"instructions"),paper,1);
   text(r,119,370,tr(a,"confirm"),gold,1);
@@ -387,8 +385,6 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
     if(key==SDLK_z) { a.language=a.language==Language::Polish?Language::English:Language::Polish; return; }
     if(key==SDLK_LEFT||key==SDLK_a)a.deckIndex=(a.deckIndex+recipes().size()-1)%recipes().size();
     else if(key==SDLK_RIGHT||key==SDLK_d)a.deckIndex=(a.deckIndex+1)%recipes().size();
-    else if(key==SDLK_UP)a.difficulty=static_cast<gwent::Difficulty>((static_cast<int>(a.difficulty)+2)%3);
-    else if(key==SDLK_DOWN)a.difficulty=static_cast<gwent::Difficulty>((static_cast<int>(a.difficulty)+1)%3);
     else if(key==SDLK_l)a.language=a.language==Language::Polish?Language::English:Language::Polish;
     else if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x)startMatch(a);
   } else handleMatchKey(a,key);

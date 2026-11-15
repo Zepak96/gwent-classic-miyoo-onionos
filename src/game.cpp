@@ -171,6 +171,11 @@ int calculateScore(const Player& p, const std::array<bool, 3>& weather,
   return total;
 }
 
+int calculateCardPower(const Card& card, const std::vector<Card>& row, bool weather, bool horn,
+                       bool halfWeather, bool doubleSpyPower) {
+  return cardPower(card,row,weather,horn,halfWeather,doubleSpyPower);
+}
+
 void beginMatch(Game& g, std::vector<Card> playerDeck, Faction playerFaction,
                 std::vector<Card> opponentDeck, Faction opponentFaction,
                 std::uint64_t seed, int firstPlayer) {

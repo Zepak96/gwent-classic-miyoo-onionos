@@ -35,12 +35,12 @@ Docelowa gra to wyłącznie Gwint jako minigra w Wiedźminie 3: Wild Hunt, z zaw
 - [ ] Pełny katalog kart zweryfikowany z ustalonym profilem wersji.
 - [ ] Wszystkie zdolności jednostek, dowódców i frakcji oraz prawidłowa kolejność ich rozstrzygania.
 - [ ] Pełna walidacja talii, mulligan, medyk, manekin i zapis odrzuconych kart.
-- [~] AI Easy/Normal/Hard: sprawdzono brak zależności decyzji od ukrytej zawartości ręki przeciwnika, pełny mecz Hard kontra Hard oraz wybór aktywnej zdolności lidera. Strategia i obsługa doboru opcji nie pokrywają jeszcze wszystkich interakcji referencji.
+- [~] AI „Classic”: zastąpiono sztuczne poziomy Easy/Normal/Hard pojedynczym wyborem ważonym inspirowanym `ControllerAI` z przypiętego repozytorium. Obejmuje ważenie kart, pasowania i liderów oraz wybór części celów/odrzuceń; zgodność wag i wszystkich interakcji z referencją nadal wymaga porównania.
 - [ ] Porównawcza weryfikacja wszystkich sekwencji względem źródła referencyjnego.
 
 ### Etapy 3–8 — port, UI, lokalizacja, audio, integracja, QA i release
 
-- [~] Prototyp SDL2 640×480 ma menu, wybór talii i poziomu AI, mecz, mulligan, planszę, rękę, cele Manekina/Medyków, lidera i pasowanie; CI buduje frontend i wykonuje startowy smoke test. Kompletność UI, lokalizacja i mapowanie fizycznych przycisków wymagają dalszej pracy/testów.
+- [~] Prototyp SDL2 640×480 ma menu, wybór talii, mecz, mulligan, planszę, rękę, cele Manekina/Medyków, lidera i pasowanie; CI buduje frontend i wykonuje startowy smoke test. Kompletność UI, lokalizacja i mapowanie fizycznych przycisków wymagają dalszej pracy/testów.
 - [ ] Pełne PL/EN, tutorial, deck builder, ustawienia, zapis i odtwarzanie.
 - [ ] Legalne i udokumentowane grafiki, muzyka oraz efekty dźwiękowe.
 - [ ] ARM toolchain, binarka, launcher OnionOS i archiwum instalacyjne.

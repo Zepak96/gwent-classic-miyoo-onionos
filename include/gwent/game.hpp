@@ -66,6 +66,8 @@ struct Game {
 
 int calculateScore(const Player&, const std::array<bool,3>& weather,
                    const std::array<bool,3>& horn);
+int calculateCardPower(const Card&, const std::vector<Card>& row, bool weather, bool horn,
+                       bool halfWeather = false, bool doubleSpyPower = false);
 bool playCard(Game&, int playerIndex, const std::string& cardId, Row target = Row::None,
               const std::string& selectedCardId = {});
 void beginMatch(Game&, std::vector<Card> playerDeck, Faction playerFaction,
