@@ -1,6 +1,6 @@
 # Gwent Classic for Miyoo Mini Plus / OnionOS
 
-A native port of the Gwent minigame from **The Witcher 3: Wild Hunt** is the project goal, covering the base game, Hearts of Stone, Blood and Wine, and the Gwent additions/changes from the Witcher 3 next-gen update. This is not the standalone `GWENT: The Witcher Card Game` or its online rules. The repository is at an early stage: current code is an engine scaffold and a minimal SDL2 frontend, not a complete playable implementation.
+A native 1:1 port of the Gwent minigame from **The Witcher 3: Wild Hunt** to Miyoo Mini Plus is the project goal, covering the base game, Hearts of Stone, Blood and Wine, and the Gwent additions/changes from the Witcher 3 next-gen update. The pinned Gwent Classic repository is the gameplay reference; this is not the standalone `GWENT: The Witcher Card Game` or its online rules. A playable 640x480 SDL match prototype now has reference decks, mulligan, and AI, but the project is not a complete implementation or OnionOS release.
 
 ## Status
 
@@ -16,4 +16,4 @@ This project does not include code or assets from the reference repositories. Se
 
 ## Controls
 
-The SDL2 frontend does not yet have the game UI or complete Miyoo button mapping. SDL_QUIT/Escape closes the desktop window; target controls have not been verified.
+At the title screen, Enter/X opens deck selection. In deck selection, left/right changes your deck, up/down changes AI difficulty, Z changes language, and Enter/X starts a match. During mulligan, left/right selects a card, Space/X marks it, and Enter confirms. In a match, left/right selects a card, up/down selects a row, Enter/X plays, L uses the leader, and Backspace passes. Arrows and Enter select Decoy/Medic targets. Escape returns to the menu. These are SDL key bindings; physical Miyoo controls and device behavior still need verification.

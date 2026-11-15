@@ -14,3 +14,17 @@ jobs:
         run: cmake --build build --parallel
       - name: Test
         run: ctest --test-dir build --output-on-failure
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SDL2 development files
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev
+      - name: Configure frontend
+        run: cmake -S . -B build-sdl -DGWENT_WITH_SDL=ON -DGWENT_BUILD_TESTS=ON
+      - name: Build frontend and engine
+        run: cmake --build build-sdl --parallel
+      - name: Test
+        run: ctest --test-dir build-sdl --output-on-failure
+      - name: Frontend smoke test
+        run: SDL_VIDEODRIVER=dummy ./build-sdl/gwent --smoke-test

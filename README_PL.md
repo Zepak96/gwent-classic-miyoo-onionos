@@ -1,6 +1,6 @@
 # Gwent Classic dla Miyoo Mini Plus / OnionOS
 
-Natywny port 1:1 Gwinta jako minigry z **Wiedźmina 3: Dziki Gon** na Miyoo Mini Plus — bazujący na wskazanym repozytorium Gwent Classic oraz obejmujący docelowo podstawkę, Hearts of Stone, Blood and Wine i zmiany/karty z aktualizacji next-gen Wiedźmina 3. Repo referencyjne określa zachowanie gry; nie zastępujemy go zasadami samodzielnej gry `GWENT: The Witcher Card Game`. Projekt jest na wczesnym etapie: obecny kod nie jest kompletną grywalną implementacją ani gotowym portem OnionOS.
+Natywny port 1:1 Gwinta jako minigry z **Wiedźmina 3: Dziki Gon** na Miyoo Mini Plus — bazujący na wskazanym repozytorium Gwent Classic oraz obejmujący docelowo podstawkę, Hearts of Stone, Blood and Wine i zmiany/karty z aktualizacji next-gen Wiedźmina 3. Repo referencyjne określa zachowanie gry; nie zastępujemy go zasadami samodzielnej gry `GWENT: The Witcher Card Game`. Jest już grywalny prototyp meczu SDL 640×480 z taliami referencyjnymi, mulliganem i AI, ale projekt nie jest kompletną implementacją ani gotowym portem OnionOS.
 
 ## Stan
 
@@ -16,4 +16,4 @@ Ten projekt nie dołącza kodu ani zasobów z repozytoriów referencyjnych. Zoba
 
 ## Sterowanie
 
-Frontend SDL2 nie ma jeszcze interfejsu gry ani kompletnego mapowania przycisków Miyoo. Samo zamknięcie okna działa przez SDL_QUIT/Escape w środowisku desktopowym; sterowanie docelowe nie zostało zweryfikowane.
+Na ekranie tytułowym Enter/X otwiera wybór talii. W wyborze talii lewo/prawo zmienia talię, góra/dół poziom AI, Z język, Enter/X rozpoczyna mecz. Podczas mulliganu lewo/prawo wybiera kartę, spacja/X ją zaznacza, Enter zatwierdza. W meczu lewo/prawo wybiera kartę, góra/dół rząd, Enter/X zagrywa, L używa lidera, Backspace pasuje; dla Manekina/Medyków strzałki i Enter wybierają cel. Escape wraca do menu. Są to skróty SDL; mapowanie fizycznych przycisków Miyoo i działanie na urządzeniu pozostają do sprawdzenia.

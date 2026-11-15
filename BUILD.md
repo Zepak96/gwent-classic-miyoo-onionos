@@ -14,6 +14,12 @@ cmake --build build --config Release
 ctest --test-dir build --output-on-failure
 ```
 
+When SDL2 is available, the `gwent` executable opens the 640×480 match UI. The desktop CI also runs a renderer smoke check without a display server:
+
+```sh
+SDL_VIDEODRIVER=dummy ./build/gwent --smoke-test
+```
+
 Bez SDL2 można budować same testy i silnik: ustaw `-DGWENT_WITH_SDL=OFF`.
 
 ## Miyoo Mini Plus / OnionOS
