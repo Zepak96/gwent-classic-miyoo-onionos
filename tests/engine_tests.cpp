@@ -42,16 +42,28 @@ static void scoreRules() {
   assert(calculateScore(dandelion,{false,false,false},{false,false,false})==10);
 
   Player bond;
-  auto a = unit("bond-a", 4); a.bond = true; a.group = "commando";
-  auto b = unit("bond-b", 4); b.bond = true; b.group = "commando";
-  auto c = unit("bond-c", 4); c.bond = true; c.group = "commando";
+  auto a = referenceCard("Blue Stripes Commando"); a.id="bond-a";
+  auto b = referenceCard("Blue Stripes Commando"); b.id="bond-b";
+  auto c = referenceCard("Blue Stripes Commando"); c.id="bond-c";
   bond.board[0] = {a,b,c};
-  assert(calculateScore(bond, {false,false,false}, {false,false,false}) == 36); // three same-name copies each score 4 x 3
+  assert(calculateScore(bond, {false,false,false}, {false,false,false}) == 24); // three same-name copies each score 4 x 2
+
+  Player distinctBondNames;
+  auto differentA=unit("bond-a",4); differentA.name="Blue Stripes Commando"; differentA.bond=true; differentA.group="shared";
+  auto differentB=unit("bond-b",4); differentB.name="Blue Stripes Scout"; differentB.bond=true; differentB.group="shared";
+  distinctBondNames.board[0]={differentA,differentB};
+  assert(calculateScore(distinctBondNames,{false,false,false},{false,false,false})==8); // shared metadata alone does not create a bond
+
+  Player sameNameDifferentGroups;
+  auto sameNameA=unit("bond-a",4); sameNameA.name="Blue Stripes Commando"; sameNameA.bond=true; sameNameA.group="one";
+  auto sameNameB=unit("bond-b",4); sameNameB.name="Blue Stripes Commando"; sameNameB.bond=true; sameNameB.group="two";
+  sameNameDifferentGroups.board[0]={sameNameA,sameNameB};
+  assert(calculateScore(sameNameDifferentGroups,{false,false,false},{false,false,false})==16); // printed name, not catalog group, defines the bond
 
   Player orderedEffects;
-  auto bondedA=unit("bonded-a",4); bondedA.bond=true; bondedA.group="same-name";
-  auto bondedB=unit("bonded-b",4); bondedB.bond=true; bondedB.group="same-name";
-  auto rally=unit("rally",1); rally.morale=true;
+  auto bondedA=referenceCard("Blue Stripes Commando"); bondedA.id="bonded-a";
+  auto bondedB=referenceCard("Blue Stripes Commando"); bondedB.id="bonded-b";
+  auto rally=unit("rally",1); rally.name="Morale unit"; rally.morale=true;
   orderedEffects.board[0]={bondedA,bondedB,rally};
   assert(calculateScore(orderedEffects,{false,false,false},{false,false,false})==19); // Bond multiplies before Morale is added.
 }

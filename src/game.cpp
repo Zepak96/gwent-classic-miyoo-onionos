@@ -33,9 +33,12 @@ int cardPower(const Card& c, const std::vector<Card>& row, bool weather, bool ho
   const int weatherFloor = halfWeather ? c.power / 2 : 1;
   int power = weather ? std::min(c.power, weatherFloor) : c.power;
   if (doubleSpyPower && c.spy) power *= 2;
-  if (c.bond && !c.group.empty()) {
-    const auto copies = std::count_if(row.begin(), row.end(), [&](const Card& x) { return x.group == c.group; });
-    if (copies > 1) power *= static_cast<int>(copies);
+  if (c.bond) {
+    // Tight Bond is a binary multiplier: two or more cards with the same
+    // printed name double each other's strength. Extra copies do not turn
+    // this into x3/x4, and catalog grouping metadata is not part of the rule.
+    const auto copies = std::count_if(row.begin(), row.end(), [&](const Card& x) { return x.name == c.name; });
+    if (copies > 1) power *= 2;
   }
   const int moraleCount = static_cast<int>(std::count_if(row.begin(), row.end(), [](const Card& x) { return x.morale || hasAbility(x, "morale"); }));
   power += std::max(0, moraleCount - ((c.morale || hasAbility(c, "morale")) ? 1 : 0));

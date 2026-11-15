@@ -2,6 +2,13 @@
 
 Data raportu: 2026-11-15.
 
+## Regresja Więzi i aktualizacja karty — 15.11.2026
+
+- Naprawiono błędne liczenie Tight Bond: zgodnie z opisem w referencyjnym `abilities.js`, dwie lub więcej kart o identycznej nazwie podwajają siłę; trzecia i kolejna kopia nie zwiększa mnożnika. Poprzedni test oczekiwał niepoprawnego mnożenia x3 i został skorygowany.
+- Nowe przypadki sprawdzają trzy prawdziwe kopie „Blue Stripes Commando” z katalogu (wynik 24), brak Więzi pomiędzy różnymi nazwami mającymi tę samą metadaną grupy oraz działanie identycznej nazwy przy różnych grupach metadanych.
+- Weryfikacja: desktop CMake build; CTest 2/2; `--audio-test` dekoduje 35 efektów; `--input-test` sprawdza mapę klawiszy i potwierdzone pasowanie; build ARM hard-float zakończony poprawnie.
+- Paczka OnionOS SHA-256 `8cef487eba7ae0f632476c216afdbb06e179d86db17b8ecf1d8d6c867e7de4e`, binarka ARM SHA-256 `f37d866471e5f8d66ba2724dd290bea24fca48fe479eae1d7e5b990365afb5fb`. Zainstalowano na `E:`; 598 plików porównano SHA-256, 0 różnic, skrót `.port` zachowany. Fizyczny start na Miyoo nie został wykonany.
+
 ## Wynik
 
 ### Najnowsza weryfikacja — 15.11.2026

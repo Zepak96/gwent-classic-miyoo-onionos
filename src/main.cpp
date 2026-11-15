@@ -137,8 +137,13 @@ struct App {
   bool userDeckSelected{false};
   bool editingLeader{false};
   bool cardDetailsOpen{false};
+  bool miyooControls{false};
   bool leaderSelectionMode{false};
   bool leaderRevealOpen{false};
+  bool passConfirmationOpen{false};
+  bool pauseOpen{false};
+  int pauseIndex{0};
+  bool sfxEnabled{true};
   std::vector<std::string> leaderSelections;
   CardFlight cardFlight;
   Uint32 selectDownAt{0};
@@ -233,8 +238,8 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="skellige_agile")return pl?"ZWINNA: GORA/DOL WYBIERA RZAD":"AGILE: UP/DOWN SELECTS ROW";
   if(key=="melee")return pl?"WALKA WRECZ":"MELEE";
   if(key=="ranged")return pl?"DYSTANSOWY":"RANGED";
-  if(key=="controls")return pl?"STRZALKI - RUCH   ENTER/X - GRAJ   L - LIDER":"ARROWS - MOVE   ENTER/X - PLAY   L - LEADER";
-  if(key=="pass")return pl?"BACKSPACE - PASUJ   ESC - MENU":"BACKSPACE - PASS   ESC - MENU";
+  if(key=="controls")return pl?"A GRAJ  B WROC  X PODGLAD  Y LIDER":"A PLAY  B BACK  X INSPECT  Y LEADER";
+  if(key=="pass")return pl?"SELECT - PASUJ (POTWIERDZ)":"SELECT - PASS (CONFIRM)";
   if(key=="round")return pl?"RUNDA":"ROUND";
   if(key=="your_turn")return pl?"TWOJ RUCH":"YOUR TURN";
   if(key=="ai_turn")return pl?"RUCH PRZECIWNIKA":"OPPONENT TURN";
@@ -267,6 +272,19 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="leader_selected")return pl?"ODRZUCONE":"DISCARD SELECTION";
   if(key=="leader_controls")return pl?"LEWO/PRAWO: KARTA  A: WYBIERZ  B: WROC":"LEFT/RIGHT: CARD  A: SELECT  B: BACK";
   if(key=="leader_cancel")return pl?"B / ESC - ANULUJ":"B / ESC - CANCEL";
+  if(key=="pause")return pl?"PAUZA / USTAWIENIA":"PAUSE / SETTINGS";
+  if(key=="pause_resume")return pl?"WROC DO GRY":"RESUME GAME";
+  if(key=="pause_save")return pl?"ZAPISZ MECZ":"SAVE MATCH";
+  if(key=="pause_load")return pl?"WCZYTAJ MECZ":"LOAD MATCH";
+  if(key=="pause_difficulty")return pl?"POZIOM AI":"AI DIFFICULTY";
+  if(key=="pause_language")return pl?"JEZYK":"LANGUAGE";
+  if(key=="pause_sfx")return pl?"EFEKTY DZWIEKOWE":"SOUND EFFECTS";
+  if(key=="pause_exit")return pl?"WROC DO MENU TALII":"RETURN TO DECK MENU";
+  if(key=="pause_controls")return pl?"GORA/DOL: WYBOR  A: ZMIEN  B: WROC":"UP/DOWN: SELECT  A: CHANGE  B: BACK";
+  if(key=="pass_confirm")return pl?"SPASOWAC TE RUNDE?":"PASS THIS ROUND?";
+  if(key=="pass_confirm_controls")return pl?"A: POTWIERDZ  B: ANULUJ":"A: CONFIRM  B: CANCEL";
+  if(key=="on")return "ON";
+  if(key=="off")return "OFF";
   if(key=="power")return pl?"SILA":"POWER";
   if(key=="row")return pl?"RZAD":"ROW";
   if(key=="special")return pl?"SPECJALNA":"SPECIAL";
@@ -314,15 +332,16 @@ std::string difficultyName(gwent::AiDifficulty difficulty) {
 void saveSettings(const App& a) {
   if(a.dataDirectory.empty())return;
   std::ofstream settings(a.dataDirectory+"settings-v1.cfg",std::ios::trunc);
-  if(settings)settings<<static_cast<int>(a.language)<<' '<<static_cast<int>(a.aiDifficulty)<<'\n';
+  if(settings)settings<<static_cast<int>(a.language)<<' '<<static_cast<int>(a.aiDifficulty)<<' '<<static_cast<int>(a.sfxEnabled)<<'\n';
 }
 void loadSettings(App& a) {
   if(a.dataDirectory.empty())return;
   std::ifstream settings(a.dataDirectory+"settings-v1.cfg");
-  int language=0,difficulty=1;
+  int language=0,difficulty=1,sfx=1;
   if(!(settings>>language>>difficulty))return;
   if(language>=0&&language<=1)a.language=static_cast<Language>(language);
   if(difficulty>=0&&difficulty<=2)a.aiDifficulty=static_cast<gwent::AiDifficulty>(difficulty);
+  if(settings>>sfx)a.sfxEnabled=sfx!=0;
 }
 void playCardSound(App& a,const gwent::Card& card) {
   std::string key;
@@ -1015,6 +1034,34 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     }
     centeredTextInBox(r,20,STAGE_H-35,W-40,16,tr(a,"leader_continue"),muted,1);
   }
+  if(a.passConfirmationOpen) {
+    box(r,0,0,W,STAGE_H,Color{0,0,0,220});
+    frame(r,150,115,340,112,gold);
+    box(r,152,117,336,108,panel);
+    centeredTextInBox(r,166,137,308,20,tr(a,"pass_confirm"),gold,2);
+    centeredTextInBox(r,166,185,308,16,tr(a,"pass_confirm_controls"),paper,1);
+  }
+  if(a.pauseOpen) {
+    box(r,0,0,W,STAGE_H,Color{0,0,0,230});
+    frame(r,120,22,400,316,gold);
+    box(r,122,24,396,312,panel);
+    centeredTextInBox(r,142,35,356,20,tr(a,"pause"),gold,2);
+    const std::array<std::string,7> options={
+      tr(a,"pause_resume"),tr(a,"pause_save"),tr(a,"pause_load"),
+      tr(a,"pause_difficulty")+": "+difficultyName(a.aiDifficulty),
+      tr(a,"pause_language")+": "+(a.language==Language::Polish?"POLSKI":"ENGLISH"),
+      tr(a,"pause_sfx")+": "+tr(a,a.sfxEnabled?"on":"off"),tr(a,"pause_exit")
+    };
+    for(std::size_t i=0;i<options.size();++i) {
+      const int y=76+static_cast<int>(i)*31;
+      if(static_cast<int>(i)==a.pauseIndex) {
+        box(r,146,y-4,348,24,panelLight);
+        frame(r,146,y-4,348,24,gold);
+      }
+      text(r,160,y,options[i],static_cast<int>(i)==a.pauseIndex?gold:paper,1);
+    }
+    centeredTextInBox(r,140,304,360,16,tr(a,"pause_controls"),muted,1);
+  }
 }
 void drawMatchOnScreen(SDL_Renderer* r,const App& a) {
   // The reference match board is 16:9 (640x360); center it on Miyoo's 4:3
@@ -1025,6 +1072,42 @@ void drawMatchOnScreen(SDL_Renderer* r,const App& a) {
   SDL_RenderSetViewport(r,nullptr);
 }
 void handleMatchKey(App& a,SDL_Keycode key) {
+  if(a.pauseOpen) {
+    constexpr int optionCount=7;
+    if(key==SDLK_ESCAPE||key==SDLK_z||key==SDLK_BACKSPACE) { a.pauseOpen=false;return; }
+    if(key==SDLK_UP||key==SDLK_LEFT) { a.pauseIndex=(a.pauseIndex+optionCount-1)%optionCount;return; }
+    if(key==SDLK_DOWN||key==SDLK_RIGHT) { a.pauseIndex=(a.pauseIndex+1)%optionCount;return; }
+    if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x||key==SDLK_SPACE) {
+      switch(a.pauseIndex) {
+        case 0:a.pauseOpen=false;break;
+        case 1:saveCurrentMatch(a);break;
+        case 2:a.pauseOpen=false;loadSavedMatch(a);break;
+        case 3:a.aiDifficulty=static_cast<gwent::AiDifficulty>((static_cast<int>(a.aiDifficulty)+1)%3);saveSettings(a);break;
+        case 4:a.language=a.language==Language::Polish?Language::English:Language::Polish;saveSettings(a);break;
+        case 5:a.sfxEnabled=!a.sfxEnabled;a.audio.setEnabled(a.sfxEnabled);saveSettings(a);break;
+        case 6:saveCurrentMatch(a);a.pauseOpen=false;a.screen=Screen::DeckSelect;break;
+      }
+    }
+    return;
+  }
+  if(a.passConfirmationOpen) {
+    if(key==SDLK_ESCAPE||key==SDLK_z||key==SDLK_BACKSPACE) { a.passConfirmationOpen=false;return; }
+    if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x||key==SDLK_SPACE) {
+      a.passConfirmationOpen=false;
+      if(gwent::pass(a.game,0)) { a.audio.play("pass");a.status="YOU PASSED";if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+400; }
+      return;
+    }
+    return;
+  }
+  if(key==SDLK_p) { a.pauseOpen=true;a.pauseIndex=0;return; }
+  if(key==SDLK_BACKQUOTE) {
+    if(a.game.phase==gwent::Phase::PlayerTurn&&!a.leaderSelectionMode&&!a.leaderRevealOpen&&!a.targetMode)a.passConfirmationOpen=true;
+    else if(a.game.phase==gwent::Phase::Mulligan)handleMatchKey(a,SDLK_RETURN);
+    else if(a.game.phase==gwent::Phase::RoundSetup)handleMatchKey(a,SDLK_x);
+    else if(a.game.phase==gwent::Phase::RoundResult)handleMatchKey(a,SDLK_RETURN);
+    else if(a.game.phase==gwent::Phase::MatchResult)a.screen=Screen::DeckSelect;
+    return;
+  }
   if(a.leaderRevealOpen) {
     if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x||key==SDLK_SPACE||key==SDLK_ESCAPE||key==SDLK_z||key==SDLK_BACKSPACE) {
       a.leaderRevealOpen=false;
@@ -1048,7 +1131,10 @@ void handleMatchKey(App& a,SDL_Keycode key) {
     }
     return;
   }
-  if(key==SDLK_ESCAPE) { a.screen=Screen::DeckSelect; a.targetMode=false; return; }
+  if(key==SDLK_ESCAPE) {
+    if(a.targetMode) { a.targetMode=false;a.selectedTargets.clear();a.status=tr(a,"your_turn");return; }
+    saveCurrentMatch(a);a.screen=Screen::DeckSelect;return;
+  }
   if(key==SDLK_s||key==SDLK_F5) { saveCurrentMatch(a);return; }
   if(key==SDLK_o||key==SDLK_F9) { loadSavedMatch(a);return; }
   if(a.game.phase==gwent::Phase::MatchResult) {
@@ -1126,6 +1212,8 @@ void handleMatchKey(App& a,SDL_Keycode key) {
   }
   if(key==SDLK_LEFT||key==SDLK_a) { if(!hand.empty())a.handIndex=(a.handIndex+static_cast<int>(hand.size())-1)%static_cast<int>(hand.size());a.audio.play("ui_card"); }
   else if(key==SDLK_RIGHT||key==SDLK_d) { if(!hand.empty())a.handIndex=(a.handIndex+1)%static_cast<int>(hand.size());a.audio.play("ui_card"); }
+  else if(key==SDLK_PAGEUP) { if(!hand.empty())a.handIndex=(a.handIndex+static_cast<int>(hand.size())-(5%static_cast<int>(hand.size())))%static_cast<int>(hand.size()); }
+  else if(key==SDLK_PAGEDOWN) { if(!hand.empty())a.handIndex=(a.handIndex+5)%static_cast<int>(hand.size()); }
   else if(key==SDLK_UP) a.rowIndex=(a.rowIndex+2)%3;
   else if(key==SDLK_DOWN) a.rowIndex=(a.rowIndex+1)%3;
   else if(key==SDLK_l) {
@@ -1137,7 +1225,11 @@ void handleMatchKey(App& a,SDL_Keycode key) {
   else if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x) doHumanPlay(a);
 }
 void handleKey(App& a,SDL_Keycode key,bool& running) {
-  if(a.screen==Screen::Match&&(a.leaderSelectionMode||a.leaderRevealOpen)) { handleMatchKey(a,key);return; }
+  if(key==SDLK_HOME) {
+    if(a.screen==Screen::Match)saveCurrentMatch(a);
+    running=false;return;
+  }
+  if(a.screen==Screen::Match&&(a.leaderSelectionMode||a.leaderRevealOpen||a.passConfirmationOpen||a.pauseOpen)) { handleMatchKey(a,key);return; }
   if(a.cardDetailsOpen) {
     if(key==SDLK_i||key==SDLK_ESCAPE||key==SDLK_BACKSPACE||key==SDLK_z)a.cardDetailsOpen=false;
     return;
@@ -1223,13 +1315,38 @@ SDL_Keycode controllerKey(const SDL_ControllerButtonEvent& button,Screen screen)
     case SDL_CONTROLLER_BUTTON_DPAD_LEFT:return SDLK_LEFT;
     case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:return SDLK_RIGHT;
     case SDL_CONTROLLER_BUTTON_A:return SDLK_x;
-    case SDL_CONTROLLER_BUTTON_B:return screen==Screen::DeckSelect?SDLK_b:SDLK_BACKSPACE;
-    case SDL_CONTROLLER_BUTTON_X:return screen==Screen::DeckSelect?SDLK_b:SDLK_l;
-    case SDL_CONTROLLER_BUTTON_Y:return screen==Screen::DeckBuilder?SDLK_f:SDLK_z;
-    case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:return (screen==Screen::DeckBuilder||screen==Screen::DeckSelect)?SDLK_PAGEUP:SDLK_v;
-    case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER:return (screen==Screen::DeckBuilder||screen==Screen::DeckSelect)?SDLK_PAGEDOWN:SDLK_UNKNOWN;
-    case SDL_CONTROLLER_BUTTON_START:return SDLK_RETURN;
+    case SDL_CONTROLLER_BUTTON_B:return SDLK_ESCAPE;
+    case SDL_CONTROLLER_BUTTON_X:return screen==Screen::DeckSelect?SDLK_b:SDLK_i;
+    case SDL_CONTROLLER_BUTTON_Y:return screen==Screen::Match?SDLK_l:screen==Screen::DeckBuilder?SDLK_f:SDLK_z;
+    case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:return screen==Screen::Match?SDLK_UP:SDLK_PAGEUP;
+    case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER:return screen==Screen::Match?SDLK_DOWN:SDLK_PAGEDOWN;
+    case SDL_CONTROLLER_BUTTON_START:return screen==Screen::Match?SDLK_p:SDLK_RETURN;
     default:return SDLK_UNKNOWN;
+  }
+}
+SDL_Keycode normalizeMiyooKey(const App& app,SDL_Keycode key) {
+  if(!app.miyooControls)return key;
+  switch(key) {
+    case SDLK_LCTRL:return SDLK_x;       // A
+    case SDLK_LALT:return app.screen==Screen::DeckBuilder&&app.editorPane==1?SDLK_BACKSPACE:SDLK_ESCAPE; // B
+    case SDLK_LSHIFT:return app.screen==Screen::DeckSelect?SDLK_b:SDLK_i; // X
+    case SDLK_SPACE:
+      if(app.screen==Screen::Match)return SDLK_l; // Y = leader
+      if(app.screen==Screen::DeckBuilder)return SDLK_f;
+      return SDLK_z;                     // Y = language in deck menu
+    case SDLK_TAB:return app.screen==Screen::Match?SDLK_UP:SDLK_TAB; // L1
+    case SDLK_BACKSPACE:
+      if(app.screen==Screen::Match||app.screen==Screen::DeckBuilder)return SDLK_DOWN; // R1
+      return SDLK_PAGEDOWN;
+    case SDLK_RETURN:return app.screen==Screen::Match?SDLK_p:SDLK_RETURN; // START
+    case SDLK_ESCAPE:
+      if(app.screen==Screen::Match&&app.cardDetailsOpen)return SDLK_ESCAPE;
+      if(app.screen==Screen::Match&&(app.game.phase==gwent::Phase::PlayerTurn||app.game.phase==gwent::Phase::Mulligan||
+         app.game.phase==gwent::Phase::RoundSetup||app.game.phase==gwent::Phase::RoundResult||app.game.phase==gwent::Phase::MatchResult))
+        return SDLK_BACKQUOTE; // SELECT = guarded pass / advance
+      if(app.screen==Screen::DeckBuilder)return SDLK_s; // SELECT saves the deck
+      return SDLK_ESCAPE;
+    default:return key;                  // D-pad, L2/R2 and system MENU
   }
 }
 }
@@ -1282,6 +1399,8 @@ int main(int argc,char** argv) {
   SDL_RenderSetLogicalSize(renderer,W,H);
   SDL_SetRenderDrawBlendMode(renderer,SDL_BLENDMODE_BLEND);
   App app; bool running=true;
+  app.miyooControls=(presentationInfo.name&&std::string(presentationInfo.name)=="Miyoo Mini");
+  if(const char* mimic=SDL_getenv("GWENT_MIMIC_MIYOO_INPUT"))app.miyooControls=app.miyooControls||std::string(mimic)=="1";
   if(const char* configured=SDL_getenv("GWENT_ASSET_DIR"))app.assetDirectory=configured;
   if(app.assetDirectory.empty())if(char* base=SDL_GetBasePath()) {
     auto path=std::filesystem::path(base)/"assets"/"gwent-classic";
@@ -1299,14 +1418,48 @@ int main(int argc,char** argv) {
     } else std::cout<<"Decoded every reference SFX file.\n";
     app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return okay?0:5;
   }
-  app.audio.play("menu_opening");
+  if(argc>1&&std::string(argv[1])=="--input-test") {
+    app.miyooControls=true;
+    app.screen=Screen::Match;
+    bool okay=normalizeMiyooKey(app,SDLK_LCTRL)==SDLK_x&&
+              normalizeMiyooKey(app,SDLK_LALT)==SDLK_ESCAPE&&
+              normalizeMiyooKey(app,SDLK_LSHIFT)==SDLK_i&&
+              normalizeMiyooKey(app,SDLK_SPACE)==SDLK_l&&
+              normalizeMiyooKey(app,SDLK_TAB)==SDLK_UP&&
+              normalizeMiyooKey(app,SDLK_BACKSPACE)==SDLK_DOWN&&
+              normalizeMiyooKey(app,SDLK_RETURN)==SDLK_p&&
+              normalizeMiyooKey(app,SDLK_ESCAPE)==SDLK_BACKQUOTE;
+    app.game.phase=gwent::Phase::PlayerTurn;
+    handleMatchKey(app,SDLK_BACKQUOTE);
+    okay=okay&&app.passConfirmationOpen&&!app.game.players[0].passed;
+    app.passConfirmationOpen=false;app.targetMode=true;
+    handleMatchKey(app,SDLK_BACKQUOTE);
+    okay=okay&&!app.passConfirmationOpen;
+    app.targetMode=false;
+    app.cardDetailsOpen=true;
+    okay=okay&&normalizeMiyooKey(app,SDLK_ESCAPE)==SDLK_ESCAPE;
+    app.cardDetailsOpen=false;
+    app.pauseOpen=true;app.pauseIndex=3;app.aiDifficulty=gwent::AiDifficulty::Normal;
+    handleMatchKey(app,SDLK_x);
+    okay=okay&&app.aiDifficulty==gwent::AiDifficulty::Hard;
+    app.pauseOpen=false;
+    handleMatchKey(app,SDLK_BACKQUOTE);
+    okay=okay&&app.passConfirmationOpen&&!app.game.players[0].passed;
+    handleMatchKey(app,SDLK_x);
+    okay=okay&&!app.passConfirmationOpen&&app.game.players[0].passed;
+    if(okay)std::cout<<"Miyoo keyboard mapping and guarded pass passed.\n";
+    else std::cerr<<"Miyoo keyboard mapping or guarded pass failed.\n";
+    app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return okay?0:10;
+  }
   if(char* directory=SDL_GetPrefPath("GwentClassic","MiyooMiniPlus")) {
     app.dataDirectory=directory;app.savePath=app.dataDirectory+"match-v1.gws";
     loadSettings(app);
+    app.audio.setEnabled(app.sfxEnabled);
     if(gwent::loadUserDeck(userDeckPath(app,app.deckSlot),app.editDeck))app.userDeckSelected=true;
     else if(!recipes().empty()) { const auto& recipe=recipes().front();app.editDeck={"Deck 1",recipe.faction,recipe.leaderReferenceIndex,recipe.cardCounts};app.userDeckSelected=true; }
     SDL_free(directory);
   }
+  app.audio.play("menu_opening");
   if(argc>1 && std::string(argv[1])=="--smoke-test") {
     const auto clearFrame=[&](){SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);};
     const auto saveFrame=[&](const char* path){
@@ -1409,6 +1562,13 @@ int main(int argc,char** argv) {
       handleMatchKey(app,SDLK_x);
       if(app.leaderRevealOpen) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 9; }
     }
+    if(argc>10) {
+      app.screen=Screen::Match;app.game=gwent::Game{};app.game.phase=gwent::Phase::PlayerTurn;
+      app.pauseOpen=true;app.pauseIndex=3;
+      clearFrame();drawMatchOnScreen(renderer,app);
+      if(!saveFrame(argv[10])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
+      presentFrame();
+    }
     presentFrame();
     for(auto& image:app.textures)if(image.second)SDL_DestroyTexture(image.second);
     app.audio.shutdown();destroyRenderers(); SDL_DestroyWindow(window); SDL_Quit(); return 0;
@@ -1418,16 +1578,25 @@ int main(int argc,char** argv) {
     SDL_Event event;
     while(SDL_PollEvent(&event)) {
       if(event.type==SDL_QUIT)running=false;
-      else if(event.type==SDL_KEYDOWN&&!event.key.repeat)handleKey(app,event.key.keysym.sym,running);
+      else if(event.type==SDL_KEYDOWN&&!event.key.repeat) {
+        if(app.miyooControls&&event.key.keysym.sym==SDLK_ESCAPE) {
+          app.selectDownAt=SDL_GetTicks();app.selectLongPressed=false;
+        } else handleKey(app,normalizeMiyooKey(app,event.key.keysym.sym),running);
+      } else if(event.type==SDL_KEYUP&&app.miyooControls&&event.key.keysym.sym==SDLK_ESCAPE) {
+        if(app.selectDownAt&&!app.selectLongPressed)handleKey(app,normalizeMiyooKey(app,event.key.keysym.sym),running);
+        app.selectDownAt=0;app.selectLongPressed=false;
+      }
       else if(event.type==SDL_CONTROLLERBUTTONDOWN) {
         if(event.cbutton.button==SDL_CONTROLLER_BUTTON_BACK) {
           app.selectDownAt=SDL_GetTicks();app.selectLongPressed=false;
-        } else if(event.cbutton.button==SDL_CONTROLLER_BUTTON_START&&app.screen==Screen::Match)loadSavedMatch(app);
-        else { const auto mapped=controllerKey(event.cbutton,app.screen);if(mapped!=SDLK_UNKNOWN)handleKey(app,mapped,running); }
+        } else { const auto mapped=controllerKey(event.cbutton,app.screen);if(mapped!=SDLK_UNKNOWN)handleKey(app,mapped,running); }
       } else if(event.type==SDL_CONTROLLERBUTTONUP&&event.cbutton.button==SDL_CONTROLLER_BUTTON_BACK) {
         if(app.selectDownAt&&!app.selectLongPressed) {
           if(app.cardDetailsOpen)handleKey(app,SDLK_BACKSPACE,running);
-          else if(app.screen==Screen::Match||app.screen==Screen::DeckBuilder)handleKey(app,SDLK_s,running);
+          else if(app.screen==Screen::Match&&app.game.phase==gwent::Phase::PlayerTurn)app.passConfirmationOpen=true;
+          else if(app.screen==Screen::Match&&app.game.phase==gwent::Phase::RoundResult)handleMatchKey(app,SDLK_RETURN);
+          else if(app.screen==Screen::Match&&app.game.phase==gwent::Phase::MatchResult)app.screen=Screen::DeckSelect;
+          else if(app.screen==Screen::DeckBuilder)handleKey(app,SDLK_s,running);
           else handleKey(app,SDLK_ESCAPE,running);
         }
         app.selectDownAt=0;app.selectLongPressed=false;
@@ -1439,7 +1608,7 @@ int main(int argc,char** argv) {
       app.cardDetailsOpen=true;app.selectLongPressed=true;app.audio.play("open");
     }
     if(app.cardFlight.active&&SDL_TICKS_PASSED(SDL_GetTicks(),app.cardFlight.startedAt+500))app.cardFlight.active=false;
-    if(app.screen==Screen::Match && !app.leaderSelectionMode && !app.leaderRevealOpen &&
+    if(app.screen==Screen::Match && !app.leaderSelectionMode && !app.leaderRevealOpen && !app.pauseOpen && !app.passConfirmationOpen &&
        app.game.phase==gwent::Phase::OpponentTurn && SDL_GetTicks()>=app.aiAt)performAi(app);
     if(app.screen==Screen::Match&&app.game.phase!=observedPhase) {
       if(app.game.phase==gwent::Phase::Mulligan)app.audio.play("redraw");

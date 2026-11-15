@@ -77,3 +77,18 @@ Nie zmienia to bieżącego celu: najpierw kompletna rozgrywka Gwinta z Wiedźmin
 
 Funkcja pozostaje nieukończona, dopóki nie ma implementacji i testu. Kompatybilność urządzenia nie będzie oznaczana jako potwierdzona bez testu fizycznego.
 - [~] Po ponownym zgłoszeniu czytelności powiększono podgląd kart na stole i grafikę w inspektorze (w tym cytat Cirilli), zmieniono kolor oraz centrowanie liczb siły i zwiększono kontrast panelu opisu. Lokalny frontend SDL zbudował się i wygenerował cztery klatki smoke 640×480; fizyczny test Miyoo pozostaje otwarty.
+
+## Renderer i mapowanie fizycznego wejścia — kontynuacja 15.11.2026
+
+- Renderer Mini zgłasza nazwę `Miyoo Mini`; jego SDL wymaga kopiowania tekstur i nie wykonuje rysowania prymitywów. Frontend składa teraz całą scenę w SDL software 640×480, a renderer sprzętowy otrzymuje jedną teksturę. Oversized textures są skalowane przed utworzeniem, a cache ma limit 48 tekstur.
+- `SDL_event_mini.c` odpytuje `/dev/input/event0` i mapuje linuksowe klawisze na SDL keyboard events. Wdrożono translację A=Left Ctrl, B=Left Alt, X=Left Shift, Y=Space, Start=Return, Select=Escape, L=Tab, R=Backspace, L2/R2=PageDown/PageUp. Mimo że pomiar społecznościowy podaje MENU=Home, przypięty backend Mini nie mapuje `KEY_HOME`; wyjście przyciskiem MENU wymaga poprawki SDL i testu urządzenia. Dokumentacja: `docs/MIYOO_INPUT.md`.
+- Dodano ekran pauzy z kontynuacją, ręcznym save/load, poziomem AI, wyborem PL/EN, przełącznikiem SFX i powrotem do menu talii. Select wymaga potwierdzenia przed pasowaniem; przytrzymanie Select otwiera inspektor. Aplikacja reaguje na `SDLK_HOME`, ale obecny SDL Mini nie dostarcza mapowania fizycznego MENU.
+- Lokalny build SDL2 i CTest (2/2) przeszły; smoke dekoduje 35/35 SFX, sprawdza translację fizycznych klawiszy, tryb pauzy, potwierdzanie pasowania i ochronę aktywnego wyboru celu. Wygenerowano oraz obejrzano klatki w trybie compositingu 640×480. Pełny cross-build i paczka ARM przechodzą w tym przebiegu; nową paczkę należy jeszcze skopiować i porównać z kartą.
+- Weryfikacja na urządzeniu nadal otwarta: fizyczne przyciski, start, dźwięk, RAM, stabilność i prawdziwa wydajność nie są potwierdzone. Referencyjny frontend 1:1, tutorial, pełne PL/EN, muzyka i kompletna zgodność reguł również pozostają do wdrożenia.
+
+## Regresja punktowania Więzi — 15.11.2026
+
+- Audyt wykazał błąd przeniesiony do testu: silnik mnożył siłę przez liczbę kopii i porównywał metadane `group`, a nie nazwę karty. Referencyjny opis zdolności mówi o podwojeniu siły obu kart przy co najmniej dwóch kartach o tej samej nazwie.
+- Punktowanie zmieniono na mnożnik ×2 niezależny od liczby nadmiarowych kopii; dopasowanie odbywa się po nazwie karty. Test korzysta z prawdziwego katalogowego „Blue Stripes Commando”: 3 egzemplarze mają razem 24 punkty (3 × 4 × 2), różne nazwy ze wspólną grupą nie łączą się, a ta sama nazwa działa przy różnych grupach metadanych. Kolejność Więzi przed Morale pozostaje pokryta osobnym przypadkiem.
+- Desktop build, CTest (2/2), smoke translacji wejścia, dekodowanie 35 SFX i cross-build ARM hard-float zakończone powodzeniem. Paczka SHA-256 `8cef487ebaa7ae0f632476c216afdbb06e179d86db17b8ecf1d8d6c867e7de4e` została skopiowana na kartę `E:`; 598/598 plików zgodnych, skrót OnionOS zachowany, hash binarki `f37d866471e5f8d66ba2724dd290bea24fca48fe479eae1d7e5b990365afb5fb`.
+- To naprawia jeden rozpoznany błąd zasad. Pełne porównanie wszystkich efektów, sekwencji i rozszerzeń next-gen oraz test fizyczny nadal są otwarte.
