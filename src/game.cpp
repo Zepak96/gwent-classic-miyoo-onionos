@@ -47,17 +47,36 @@ void recompute(Game& g) {
   for (int owner = 0; owner < 2; ++owner) g.players[owner].score = calculateScore(g.players[owner], g.weather, g.horn[owner]);
 }
 void applyWeather(Game& g, int owner, const Card& card, Row fallback = Row::None) {
-  if (hasAbility(card, "frost")) g.weather[0] = true;
-  else if (hasAbility(card, "fog")) g.weather[1] = true;
-  else if (hasAbility(card, "rain")) g.weather[2] = true;
-  else if (hasAbility(card, "storm")) { g.weather[1] = true; g.weather[2] = true; }
-  else if (validRow(fallback)) g.weather[rowIndex(fallback)] = true;
+  bool typed=false;
+  if (hasAbility(card, "frost")) { g.weather[0] = true; typed=true; }
+  if (hasAbility(card, "fog")) { g.weather[1] = true; typed=true; }
+  if (hasAbility(card, "rain")) { g.weather[2] = true; typed=true; }
+  if (hasAbility(card, "storm")) { g.weather[1] = true; g.weather[2] = true; typed=true; }
+  if (!typed && validRow(fallback)) g.weather[rowIndex(fallback)] = true;
   g.weatherCards.push_back({card, owner});
 }
 void clearWeather(Game& g) {
   g.weather.fill(false);
   for (const auto& active : g.weatherCards) g.players[active.owner].graveyard.push_back(active.card);
   g.weatherCards.clear();
+}
+void triggerAvenger(Game& g, int owner, const Card& removed) {
+  const std::string summonName=hasAbility(removed,"avenger")?"Bovine Defense Force":
+                               hasAbility(removed,"avenger_kambi")?"Hemdall":"";
+  if(summonName.empty()) return;
+  const auto& catalog=referenceCardCatalog();
+  const auto summoned=std::find_if(catalog.begin(),catalog.end(),[&](const Card& c){return c.name==summonName;});
+  if(summoned==catalog.end()) return;
+  Card unit=*summoned;
+  unit.id="summoned_"+removed.id;
+  g.players[owner].board[rowIndex(unit.row)].push_back(std::move(unit));
+}
+void removeBoardCard(Game& g, int owner, int row, int index) {
+  auto& cards=g.players[owner].board[row];
+  Card removed=cards[index];
+  cards.erase(cards.begin()+index);
+  g.players[owner].graveyard.push_back(removed);
+  triggerAvenger(g,owner,removed);
 }
 void finishRound(Game& g) {
   recompute(g);
@@ -122,11 +141,8 @@ void scorchEnemyRow(Game& g, int owner, int rowIndexValue) {
         cardPower(row[i], row, g.weather[rowIndexValue], g.horn[1 - owner][rowIndexValue],
                   g.players[1-owner].halfWeather, g.players[1-owner].doubleSpyPower) == strongest)
       remove.push_back(i);
-  auto& grave = g.players[1 - owner].graveyard;
-  for (auto i = remove.rbegin(); i != remove.rend(); ++i) {
-    grave.push_back(row[*i]);
-    row.erase(row.begin() + *i);
-  }
+  for (auto i = remove.rbegin(); i != remove.rend(); ++i)
+    removeBoardCard(g,1-owner,rowIndexValue,*i);
 }
 void transformBerserkers(Player& player, int rowNumber) {
   if (rowNumber < 0 || rowNumber > 2) return;
@@ -273,13 +289,13 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
     if (g.randomRespawn) {
       std::vector<int> units;
       for (int i=0;i<static_cast<int>(p.graveyard.size());++i)
-        if (p.graveyard[i].kind==Kind::Unit) units.push_back(i);
+        if (p.graveyard[i].kind==Kind::Unit && !p.graveyard[i].hero) units.push_back(i);
       if (!units.empty()) medicIndex=units[nextRandom(g)%units.size()];
     } else if (!selectedId.empty()) {
       const auto found=findCard(p.graveyard,selectedId);
       if(found==p.graveyard.end() || found->kind!=Kind::Unit || found->hero) return false;
       medicIndex=static_cast<int>(found-p.graveyard.begin());
-    }
+    } else if(std::any_of(p.graveyard.begin(),p.graveyard.end(),[](const Card& card){return card.kind==Kind::Unit && !card.hero;})) return false;
   }
 
   p.hand.erase(it);
@@ -306,21 +322,21 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
             remove[owner][r].push_back(n);
         }
       for (int owner = 0; owner < 2; ++owner) for (int r = 0; r < 3; ++r) {
-        auto& row = g.players[owner].board[r];
-        for (auto n = remove[owner][r].rbegin(); n != remove[owner][r].rend(); ++n) {
-          g.players[owner].graveyard.push_back(row[*n]);
-          row.erase(row.begin() + *n);
-        }
+        for (auto n = remove[owner][r].rbegin(); n != remove[owner][r].rend(); ++n)
+          removeBoardCard(g,owner,r,*n);
       }
       p.graveyard.push_back(c); break;
     }
     case Kind::CommanderHorn:
       if (g.horn[who][rowIndex(target)]) { p.hand.push_back(c); return false; }
       g.horn[who][rowIndex(target)] = true; p.graveyard.push_back(c); break;
-    case Kind::Decoy:
-      p.hand.push_back(*boardTarget);
+    case Kind::Decoy: {
+      const Card returned=*boardTarget;
+      p.hand.push_back(returned);
       *boardTarget = c; // The zero-strength Decoy stays in the replaced unit's battlefield slot.
+      triggerAvenger(g,who,returned);
       break;
+    }
     case Kind::Unit:
       if (c.spy) {
         g.players[1 - who].board[rowIndex(deployRow)].push_back(c);
@@ -368,22 +384,22 @@ bool activateLeader(Game& g, int who, Row target, const std::vector<std::string>
   const std::string& id=*ability;
   const std::string selected=selectedIds.empty()?std::string{}:selectedIds.front();
   bool canActivate=true;
-  auto playWeatherFromDeck=[&](const std::string& weatherAbility, bool anyWeather) {
+  auto playWeatherFromDeck=[&](const std::string& weatherName, bool anyWeather) {
     auto found=player.deck.end();
     if (!selected.empty()) found=findCard(player.deck,selected);
     if (found==player.deck.end()) found=std::find_if(player.deck.begin(),player.deck.end(),[&](const Card& c){
       const bool weather=c.kind==Kind::Weather;
-      return weather && (anyWeather || hasAbility(c,weatherAbility));
+      return weather && (anyWeather || c.name==weatherName);
     });
-    if(found==player.deck.end() || found->kind!=Kind::Weather || (!anyWeather && !hasAbility(*found,weatherAbility))) return false;
+    if(found==player.deck.end() || found->kind!=Kind::Weather || (!anyWeather && found->name!=weatherName)) return false;
     Card weather=*found; player.deck.erase(found); applyWeather(g,who,weather); return true;
   };
-  if (id=="foltest_king") playWeatherFromDeck("fog",false);
+  if (id=="foltest_king") playWeatherFromDeck("Impenetrable Fog",false);
   else if (id=="foltest_lord") clearWeather(g);
   else if (id=="foltest_siegemaster") { if(g.horn[who][2]) canActivate=false; else g.horn[who][2]=true; }
   else if (id=="foltest_steelforged") scorchEnemyRow(g,who,2);
   else if (id=="foltest_son") scorchEnemyRow(g,who,1);
-  else if (id=="emhyr_imperial") playWeatherFromDeck("rain",false);
+  else if (id=="emhyr_imperial") playWeatherFromDeck("Torrential Rain",false);
   else if (id=="emhyr_emperor") {
     auto& known=g.revealedCards[who]; known.clear();
     std::vector<int> indices(g.players[1-who].hand.size());
@@ -396,16 +412,16 @@ bool activateLeader(Game& g, int who, Row target, const std::vector<std::string>
   }
   else if (id=="emhyr_relentless") {
     auto& grave=g.players[1-who].graveyard;
-    auto found=selected.empty()?std::find_if(grave.begin(),grave.end(),[](const Card& c){return c.kind==Kind::Unit;}):findCard(grave,selected);
-    if(found==grave.end() || found->kind!=Kind::Unit) canActivate=false;
+    auto found=selected.empty()?std::find_if(grave.begin(),grave.end(),[](const Card& c){return c.kind==Kind::Unit && !c.hero;}):findCard(grave,selected);
+    if(found==grave.end() || found->kind!=Kind::Unit || found->hero) canActivate=false;
     else { player.hand.push_back(*found); grave.erase(found); }
   }
   else if (id=="emhyr_whiteflame" || id=="emhyr_invader" || id=="eredin_treacherous" || id=="francesca_daisy" || id=="king_bran") canActivate=false;
   else if (id=="eredin_commander") { if(g.horn[who][0]) canActivate=false; else g.horn[who][0]=true; }
   else if (id=="eredin_bringer_of_death") {
     auto& grave=player.graveyard;
-    auto found=selected.empty()?std::find_if(grave.begin(),grave.end(),[](const Card& c){return c.kind==Kind::Unit;}):findCard(grave,selected);
-    if(found==grave.end() || found->kind!=Kind::Unit) canActivate=false;
+    auto found=selected.empty()?std::find_if(grave.begin(),grave.end(),[](const Card& c){return c.kind==Kind::Unit && !c.hero;}):findCard(grave,selected);
+    if(found==grave.end() || found->kind!=Kind::Unit || found->hero) canActivate=false;
     else { player.hand.push_back(*found); grave.erase(found); }
   }
   else if (id=="eredin_destroyer") {
@@ -437,7 +453,7 @@ bool activateLeader(Game& g, int who, Row target, const std::vector<std::string>
   else if (id=="eredin_treacherous") canActivate=false;
   else if (id=="francesca_queen") scorchEnemyRow(g,who,0);
   else if (id=="francesca_beautiful") { if(g.horn[who][1]) canActivate=false; else g.horn[who][1]=true; }
-  else if (id=="francesca_pureblood") playWeatherFromDeck("frost",false);
+  else if (id=="francesca_pureblood") playWeatherFromDeck("Biting Frost",false);
   else if (id=="francesca_hope") {
     std::vector<Card> agile;
     for(int r=0;r<2;++r) for(const auto& c:player.board[r]) if(c.agile) agile.push_back(c);
@@ -488,18 +504,18 @@ bool startNextRound(Game& g) {
     int keepRow = -1, keepIndex = -1;
     if (player.faction == Faction::Monsters) {
       int count = 0;
-      for (int r = 0; r < 3; ++r) for (const auto& unit : player.board[r]) if (unit.kind == Kind::Unit) ++count;
+      for (int r = 0; r < 3; ++r) for (const auto& unit : player.board[r])
+        if (unit.kind == Kind::Unit && !unit.hero) ++count;
       if (count) {
         int pick = static_cast<int>(nextRandom(g) % static_cast<std::uint32_t>(count));
         for (int r = 0; r < 3 && keepRow < 0; ++r) for (int n = 0; n < static_cast<int>(player.board[r].size()); ++n)
-          if (player.board[r][n].kind == Kind::Unit && pick-- == 0) { keepRow = r; keepIndex = n; break; }
+          if (player.board[r][n].kind == Kind::Unit && !player.board[r][n].hero && pick-- == 0) { keepRow = r; keepIndex = n; break; }
       }
     }
     for (int r = 0; r < 3; ++r) {
       for (int n = static_cast<int>(player.board[r].size()) - 1; n >= 0; --n) {
         if (r == keepRow && n == keepIndex) continue;
-        player.graveyard.push_back(player.board[r][n]);
-        player.board[r].erase(player.board[r].begin() + n);
+        removeBoardCard(g,owner,r,n);
       }
     }
     if (winner >= 0 && owner == winner && player.faction == Faction::NorthernRealms && !player.deck.empty()) {
@@ -511,7 +527,7 @@ bool startNextRound(Game& g) {
       for (int resurrected = 0; resurrected < 2; ++resurrected) {
         std::vector<int> units;
         for (int i = 0; i < static_cast<int>(player.graveyard.size()); ++i)
-          if (player.graveyard[i].kind == Kind::Unit) units.push_back(i);
+          if (player.graveyard[i].kind == Kind::Unit && !player.graveyard[i].hero) units.push_back(i);
         if (units.empty()) break;
         const int chosen = units[nextRandom(g) % units.size()];
         Card unit = player.graveyard[chosen]; player.graveyard.erase(player.graveyard.begin() + chosen);

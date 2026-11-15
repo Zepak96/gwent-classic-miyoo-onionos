@@ -9,6 +9,7 @@ using namespace gwent;
 static Card unit(std::string id, int power, Row row = Row::Melee) {
   Card c; c.id = std::move(id); c.kind = Kind::Unit; c.power = power; c.row = row; return c;
 }
+static Card referenceCard(const std::string& name);
 static void scoreRules() {
   Player p;
   auto plain = unit("plain", 8);
@@ -84,8 +85,14 @@ static void abilitiesAndValidation() {
 
   Game medic; auto m=unit("medic",2); m.medic=true; medic.players[0].hand.push_back(m);
   medic.players[0].graveyard.push_back(unit("revive",6));
+  assert(!playCard(medic,0,"medic")); // A valid target must be selected before committing the play.
   assert(playCard(medic,0,"medic",Row::None,"revive"));
   assert(medic.players[0].board[0].size()==2 && medic.players[0].graveyard.empty());
+
+  Game medicHero; auto mh=unit("medic-hero",2); mh.medic=true; medicHero.players[0].hand.push_back(mh);
+  auto forbiddenHero=unit("forbidden-hero",10); forbiddenHero.hero=true;
+  medicHero.players[0].graveyard.push_back(forbiddenHero);
+  assert(!playCard(medicHero,0,"medic-hero",Row::None,"forbidden-hero"));
 
   Game muster; auto leader=unit("muster1",4); leader.muster=true; leader.group="crone";
   auto copy=unit("muster2",4,Row::Ranged); copy.muster=true; copy.group="crone";
@@ -101,6 +108,10 @@ static void abilitiesAndValidation() {
   assert(playCard(weather,1,"clear"));
   assert(!weather.weather[0] && weather.weatherCards.empty());
   assert(weather.players[0].graveyard.size()==1 && weather.players[1].graveyard.size()==1);
+
+  Game storm; storm.players[0].hand.push_back(referenceCard("Skellige Storm"));
+  assert(playCard(storm,0,storm.players[0].hand[0].id));
+  assert(!storm.weather[0] && storm.weather[1] && storm.weather[2]);
 
   Game horns; Card commanderHorn; commanderHorn.id="horn"; commanderHorn.kind=Kind::CommanderHorn;
   horns.players[0].hand.push_back(commanderHorn);
@@ -210,6 +221,34 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
 static Card leader(std::string id) {
   Card card; card.id=id; card.name=id; card.kind=Kind::Leader; card.faction=Faction::NorthernRealms; card.abilities={id}; return card;
 }
+static Card referenceCard(const std::string& name) {
+  const auto& catalog=referenceCardCatalog();
+  const auto found=std::find_if(catalog.begin(),catalog.end(),[&](const Card& card){return card.name==name;});
+  assert(found!=catalog.end());
+  return *found;
+}
+static void avengerCards() {
+  Game decoy;
+  decoy.players[0].hand.push_back(referenceCard("Decoy"));
+  decoy.players[0].board[1].push_back(referenceCard("Cow"));
+  assert(playCard(decoy,0,decoy.players[0].hand[0].id,Row::None,decoy.players[0].board[1][0].id));
+  assert(decoy.players[0].hand.back().name=="Cow");
+  assert(std::any_of(decoy.players[0].board[0].begin(),decoy.players[0].board[0].end(),[](const Card& card){return card.name=="Bovine Defense Force";}));
+
+  Game scorch;
+  Card globalScorch; globalScorch.id="global-scorch"; globalScorch.kind=Kind::Scorch;
+  scorch.players[0].hand.push_back(globalScorch);
+  scorch.players[1].board[0].push_back(referenceCard("Kambi"));
+  assert(playCard(scorch,0,"global-scorch"));
+  assert(std::any_of(scorch.players[1].board[0].begin(),scorch.players[1].board[0].end(),[](const Card& card){return card.name=="Hemdall";}));
+  assert(std::any_of(scorch.players[1].graveyard.begin(),scorch.players[1].graveyard.end(),[](const Card& card){return card.name=="Kambi";}));
+
+  Game roundEnd;
+  roundEnd.players[0].board[0].push_back(referenceCard("Kambi"));
+  assert(pass(roundEnd,0)); assert(pass(roundEnd,1));
+  assert(roundEnd.phase==Phase::RoundResult && startNextRound(roundEnd));
+  assert(std::any_of(roundEnd.players[0].board[0].begin(),roundEnd.players[0].board[0].end(),[](const Card& card){return card.name=="Hemdall";}));
+}
 static void leaderAbilities() {
   std::vector<Card> deck;
   for(int i=0;i<24;++i) deck.push_back(unit("leader-test-"+std::to_string(i),1));
@@ -243,9 +282,16 @@ static void leaderAbilities() {
   weather.phase=Phase::PlayerTurn; weather.players[0].leader=leader("foltest_king");
   weather.players[0].leaderAbilityAvailable=true;
   Card fog; fog.id="deck-fog"; fog.kind=Kind::Weather; fog.abilities={"fog"};
+  fog.name="Impenetrable Fog";
   weather.players[0].deck.push_back(fog);
   assert(activateLeader(weather,0));
   assert(weather.weather[1] && weather.weatherCards.size()==1 && weather.players[0].deck.empty());
+
+  Game exactWeather;
+  exactWeather.players[0].leader=leader("foltest_king"); exactWeather.players[0].leaderAbilityAvailable=true;
+  exactWeather.players[0].deck={referenceCard("Skellige Storm"),referenceCard("Impenetrable Fog")};
+  assert(activateLeader(exactWeather,0));
+  assert(exactWeather.weather[1] && !exactWeather.weather[2] && exactWeather.weatherCards[0].card.name=="Impenetrable Fog");
 
   Game horn;
   horn.players[0].leader=leader("foltest_siegemaster"); horn.players[0].leaderAbilityAvailable=true;
@@ -281,4 +327,4 @@ static void leaderAbilities() {
   assert(crach.players[0].deck.size()==1 && crach.players[1].deck.size()==1);
   assert(crach.players[0].graveyard.empty() && crach.players[1].graveyard.empty());
 }
-int main() { scoreRules(); turnsAndRounds(); abilitiesAndValidation(); openingHandAndMulligan(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); leaderAbilities(); }
+int main() { scoreRules(); turnsAndRounds(); abilitiesAndValidation(); openingHandAndMulligan(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); avengerCards(); leaderAbilities(); }

@@ -38,6 +38,7 @@ void addCandidate(std::vector<Candidate>& out, const Game& state, int who, const
     if (card->spy) value += 4.5; // two replacement draws are a large resource swing
     if (card->medic && !action.selectedCardId.empty()) value += 1.0;
     if (card->muster) value += 0.35 * static_cast<double>(beforePlayer.deck.size());
+    if (has(*card,"avenger") || has(*card,"avenger_kambi")) value += 50.0;
   }
   if (!action.selectedCardId.empty() && card != beforePlayer.hand.end() && card->kind == Kind::Decoy) {
     for (const auto& row : beforePlayer.board) for (const auto& target : row)
@@ -74,14 +75,15 @@ void addLeaderCandidates(std::vector<Candidate>& out, const Game& state, int who
   if(it==player.leader.abilities.end()) return;
   const auto& id=*it;
   if(id=="foltest_king" || id=="emhyr_imperial" || id=="eredin_king" || id=="francesca_pureblood") {
-    const std::string wanted=id=="foltest_king"?"fog":id=="emhyr_imperial"?"rain":id=="francesca_pureblood"?"frost":"";
-    for(const auto& card:player.deck) if(card.kind==Kind::Weather && (wanted.empty() || has(card,wanted)))
+    const bool anyWeather=id=="eredin_king";
+    const std::string wanted=id=="foltest_king"?"Impenetrable Fog":id=="emhyr_imperial"?"Torrential Rain":id=="francesca_pureblood"?"Biting Frost":"";
+    for(const auto& card:player.deck) if(card.kind==Kind::Weather && (anyWeather || card.name==wanted))
       addLeaderCandidate(out,state,who,Row::None,{card.id});
   } else if(id=="emhyr_relentless") {
-    for(const auto& card:state.players[1-who].graveyard) if(card.kind==Kind::Unit)
+    for(const auto& card:state.players[1-who].graveyard) if(card.kind==Kind::Unit && !card.hero)
       addLeaderCandidate(out,state,who,Row::None,{card.id});
   } else if(id=="eredin_bringer_of_death") {
-    for(const auto& card:player.graveyard) if(card.kind==Kind::Unit)
+    for(const auto& card:player.graveyard) if(card.kind==Kind::Unit && !card.hero)
       addLeaderCandidate(out,state,who,Row::None,{card.id});
   } else if(id=="eredin_destroyer") {
     if(player.hand.size()<2 || player.deck.empty()) return;
