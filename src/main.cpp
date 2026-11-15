@@ -89,6 +89,28 @@ void narrowText(SDL_Renderer* r,int x,int y,const std::string& value,Color c,int
 }
 int textWidth(const std::string& s,int scale=1) { return static_cast<int>(ascii(s).size())*6*scale; }
 std::string shortName(std::string s,int n) { if(static_cast<int>(ascii(s).size())>n) s=ascii(s).substr(0,n); return ascii(s); }
+void tallTextInBox(SDL_Renderer* r,int x,int y,int width,int height,const std::string& value,Color c,bool shadow=false) {
+  const std::string s=ascii(value);
+  if(s.empty())return;
+  const int advance=std::max(1,std::min(6,width/static_cast<int>(s.size())));
+  const int textWidthPx=advance*static_cast<int>(s.size());
+  const int startX=x+(width-textWidthPx)/2,startY=y+std::max(0,(height-14)/2);
+  const auto draw=[&](int offsetX,int offsetY,Color c) {
+    color(r,c);int cx=startX+offsetX;
+    for(char ch:s) {
+      const auto it=font().find(ch);const Glyph g=it==font().end()?font().at('?'):it->second;
+      for(int row=0;row<7;++row)for(int col=0;col<5;++col)if(g[row]&(1u<<(4-col))) {
+        SDL_Rect p{cx+(col*advance)/5,startY+row*2+offsetY,1,2};SDL_RenderFillRect(r,&p);
+      }
+      cx+=advance;
+    }
+  };
+  if(shadow&&height>14)draw(1,1,Color{229,218,186,210});
+  draw(0,0,c);
+}
+void rowScoreText(SDL_Renderer* r,int x,int y,const std::string& value) {
+  tallTextInBox(r,x,y,17,44,value,ink,true);
+}
 
 enum class Screen { Title, DeckSelect, DeckBuilder, Match };
 enum class Language { Polish, English };
@@ -157,6 +179,7 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="start")return pl?"ENTER - ROZPOCZNIJ":"ENTER - START";
   if(key=="choose")return pl?"WYBIERZ TALIE":"CHOOSE A DECK";
   if(key=="opponent")return pl?"PRZECIWNIK":"OPPONENT";
+  if(key=="opponent_short")return pl?"RYWAL":"OPPONENT";
   if(key=="ai")return pl?"PRZECIWNIK AI":"AI OPPONENT";
   if(key=="language")return pl?"JEZYK":"LANGUAGE";
   if(key=="instructions")return pl?"LEWO/PRAWO - TALIA":"LEFT/RIGHT - DECK";
@@ -509,10 +532,9 @@ void drawRow(SDL_Renderer* r,const App& a,int owner,int row,int y) {
   const bool chosen=player&&a.game.phase==gwent::Phase::PlayerTurn&&a.rowIndex==row;
   if(chosen)box(r,left,y,width,rowHeight,Color{255,255,0,20});
   const int total=rowScore(a.game,owner,row);
-  // Match the original panel-mid row proportions: 5.1% score, 14.25% special,
-  // then cards beginning at 20% of the panel width.
-  text(r,left+1,y+13,std::to_string(total),ink,1);
-  if(!a.game.players[owner].board[row].empty())drawImage(r,a,"img/icons/icon_high_score.png",left+17,y+3,17,25);
+  // The source row score occupies a centered 5.1% column; high-score laurels
+  // belong to the overall score medallion, not to every populated row.
+  rowScoreText(r,left,y,std::to_string(total));
   if(a.game.horn[owner][row])drawImage(r,a,"img/icons/power_horn.png",left+20,y+8,27,28);
   const auto& cards=a.game.players[owner].board[row];
   const int start=left+67,shown=std::min(9,static_cast<int>(cards.size()));
@@ -675,12 +697,22 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     const int statsY=owner==1?87:222;
     drawImage(r,a,"img/icons/profile.png",48,statsY+4,32,32);
     drawImage(r,a,"img/icons/icon_player_border.png",44,statsY+1,39,39);
-    text(r,91,statsY+7,owner==0?"GERALT":shortName(player.leader.name,18),paper,1);
-    drawImage(r,a,"img/icons/icon_card_count.png",91,statsY+22,14,14);
-    text(r,107,statsY+24,std::to_string(player.hand.size()),paper,1);
-    drawImage(r,a,"img/icons/score_total_"+std::string(owner==0?"me":"op")+".png",142,statsY+12,24,24);
-    text(r,149,statsY+19,std::to_string(player.score),ink,1);
-    for(int gem=0;gem<2;++gem)drawImage(r,a,"img/icons/icon_gem_"+std::string(gem<2-player.roundLosses?"on":"off")+".png",91+gem*18,statsY+2,13,15);
+    if(owner==0)text(r,91,statsY+27,"GERALT",paper,1);
+    else text(r,91,statsY+3,tr(a,"opponent_short"),paper,1);
+    const int gemY=statsY+(owner==1?25:6);
+    for(int gem=0;gem<2;++gem)
+      drawImage(r,a,"img/icons/icon_gem_"+std::string(gem<2-player.roundLosses?"on":"off")+".png",109+gem*18,gemY,13,15);
+    const int handY=statsY+(owner==1?26:8);
+    // Keep the hand counter in its own narrow column, clear of the two gems.
+    drawImage(r,a,"img/icons/icon_card_count.png",84,handY+1,11,12);
+    tallTextInBox(r,96,handY,12,14,std::to_string(player.hand.size()),paper);
+    const int scoreX=142,scoreY=statsY+12,scoreSize=24;
+    const bool leading=owner==0?me.score>op.score:op.score>me.score;
+    if(leading)drawImage(r,a,"img/icons/icon_high_score.png",131,statsY+4,47,41);
+    drawImage(r,a,"img/icons/score_total_"+std::string(owner==0?"me":"op")+".png",scoreX,scoreY,scoreSize,scoreSize);
+    const std::string score=std::to_string(player.score);
+    const int scale=score.size()>=3?1:2;
+    text(r,scoreX+(scoreSize-textWidth(score,scale))/2,scoreY+(scoreSize-7*scale)/2,score,ink,scale);
   };
   drawSide(op,1);drawSide(me,0);
   drawImage(r,a,"img/icons/icon_leader_active.png",79,43,13,13);
@@ -700,7 +732,8 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     const int x=grave?514:572;
     if(grave&&!pile.empty())drawImage(r,a,"img/sm/"+gwent::referenceCardImage(pile.back().referenceIndex),x,y,28,43);
     else drawImage(r,a,"img/icons/deck_back_"+std::string(factionKey(a.game.players[owner].faction))+".jpg",x,y,28,43);
-    text(r,x+11,y+31,std::to_string(pile.size()),paper,1);
+    const std::string count=std::to_string(pile.size());
+    text(r,x+(28-textWidth(count))/2,y+31,count,paper,1);
   };
   drawPile(1,true,23);drawPile(1,false,23);drawPile(0,true,275);drawPile(0,false,275);
   box(r,107,295,34,15,Color{20,20,20,230});frame(r,107,295,34,15,Color{143,108,54});text(r,112,299,"PASS",paper,1);
@@ -996,6 +1029,7 @@ int main(int argc,char** argv) {
     if(argc>4) { app.cardDetailsOpen=true;drawDeckBuilder(renderer,app);SDL_RenderPresent(renderer);if(!saveFrame(argv[4])) { app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 4; }app.cardDetailsOpen=false; }
     startMatch(app);
     gwent::replaceMulliganCards(app.game,0,{}); gwent::replaceMulliganCards(app.game,1,gwent::chooseAiMulligan(app.game,1));
+    app.game.phase=gwent::Phase::PlayerTurn;app.game.currentPlayer=0;
     drawMatch(renderer,app);
     if(argc>2&&!saveFrame(argv[2])) { app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 4; }
     if(argc>5) {
