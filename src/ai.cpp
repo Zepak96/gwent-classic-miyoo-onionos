@@ -184,6 +184,12 @@ std::vector<Card> discardOrder(const Player& player) {
   std::vector<Card> cards;
   std::map<std::string,std::vector<Card>> groups;
   std::vector<Card> musters;
+  const auto isMusterTargetInHand=[&](const Card& candidate) {
+    return std::any_of(player.hand.begin(),player.hand.end(),[&](const Card& card) {
+      if(!(card.muster||has(card,"muster"))||card.group.empty())return false;
+      return card.group==candidate.name || candidate.name.rfind(card.group+" - ",0)==0;
+    });
+  };
   for(const auto& card:player.hand)if(card.muster||has(card,"muster"))musters.push_back(card);
   while(!musters.empty()) {
     Card current=musters.back(); musters.pop_back();
@@ -208,7 +214,7 @@ std::vector<Card> discardOrder(const Player& player) {
     cards.insert(cards.end(),weather.begin(),weather.end());
   }
   std::vector<Card> normal;
-  for(const auto& card:player.hand)if(card.abilities.empty())normal.push_back(card);
+  for(const auto& card:player.hand)if(card.abilities.empty()&&!isMusterTargetInHand(card))normal.push_back(card);
   std::sort(normal.begin(),normal.end(),[](const Card& a,const Card& b){return a.power<b.power;});
   cards.insert(cards.end(),normal.begin(),normal.end());
   return cards;

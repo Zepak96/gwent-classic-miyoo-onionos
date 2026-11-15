@@ -6,6 +6,8 @@ Natywny port 1:1 Gwinta jako minigry z **Wiedźmina 3: Dziki Gon** na Miyoo Mini
 
 Aktualny postęp, zakres audytu i braki opisuje [PROGRESS.md](PROGRESS.md). Obecny kod nie jest kompletną implementacją gry ani gotowym portem OnionOS.
 
+Aktualne klatki smoke 640×480: [menu tytułowe](docs/screenshots/current-title-smoke.png), [wybór talii i poziomu AI](docs/screenshots/current-deck-select-smoke.png), [mecz](docs/screenshots/current-match-smoke.png), [inspektor karty](docs/screenshots/current-card-details-smoke.png), [edytor talii](docs/screenshots/current-deck-smoke.png) i [animacja zagrania](docs/screenshots/current-card-flight-smoke.png). To zrzuty z desktopowego smoke testu, nie z fizycznego Miyoo.
+
 ## Budowanie
 
 Wymagania i polecenia opisuje [BUILD.md](BUILD.md). Projekt wymaga CMake oraz kompilatora C++17; frontend wymaga SDL2.

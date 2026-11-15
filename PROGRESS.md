@@ -35,7 +35,7 @@ Docelowa gra to wyłącznie Gwint jako minigra w Wiedźminie 3: Wild Hunt, z zaw
 - [ ] Pełny katalog kart zweryfikowany z ustalonym profilem wersji.
 - [ ] Wszystkie zdolności jednostek, dowódców i frakcji oraz prawidłowa kolejność ich rozstrzygania.
 - [ ] Pełna walidacja talii, mulligan, medyk, manekin i zapis odrzuconych kart.
-- [~] AI ma teraz poziomy Łatwy/Normalny/Trudny wybierane na ekranie talii i zapamiętywane w ustawieniach. Łatwy losuje wyłącznie ruchy legalne według silnika (z możliwością błędnego pasowania), Normalny zachowuje ważony wybór `ControllerAI` z repozytorium, a Trudny bierze legalny ruch o najwyższej wartości tej samej heurystyki. Testy pełnych meczów AI kontra AI przechodzą dla wszystkich poziomów; trudny nie ma jeszcze wielorundowego przeszukiwania ani osobnej heurystyki planowania zasobów.
+- [~] AI ma teraz poziomy Łatwy/Normalny/Trudny wybierane na ekranie talii i zapamiętywane w ustawieniach. Łatwy losuje wyłącznie ruchy legalne według silnika (z możliwością błędnego pasowania), Normalny zachowuje ważony wybór `ControllerAI` z repozytorium, a Trudny bierze legalny ruch o najwyższej wartości tej samej heurystyki. Mulligan chroni Roacha, gdy w ręce jest Geralt/Cirilla z odpowiadającą mu Zbiórką. Testy pełnych meczów AI kontra AI przechodzą dla wszystkich poziomów; trudny nie ma jeszcze wielorundowego przeszukiwania ani osobnej heurystyki planowania zasobów.
 - [ ] Porównawcza weryfikacja wszystkich sekwencji względem źródła referencyjnego.
 
 ### Etapy 3–8 — port, UI, lokalizacja, audio, integracja, QA i release
@@ -50,7 +50,7 @@ Docelowa gra to wyłącznie Gwint jako minigra w Wiedźminie 3: Wild Hunt, z zaw
 - [~] Przeniesiono podstawowy lot zagrywanej karty z ręki do rzędu/pogody w 500 ms dla gracza i AI. Audyt CSS/JS wskazał też kaskadowe przesunięcia karuzeli i przejścia/fade; te animacje oraz zmiany układu są nadal niezaimplementowane.
 - [~] Przypięte grafiki kart, plansza, ikony SVG i SFX z repo są w `assets/gwent-classic/`; sześć SVG ma rastrowe odpowiedniki PNG dla SDL. Dodano dekodowanie/odtwarzanie wszystkich 35 referencyjnych MP3 przez SDL Audio i `dr_mp3`, z odgłosami menu, nawigacji, kart, rund i pasowania; CI dekoduje cały zestaw. Muzyki w repo wzorcowym nie ma; jej odtworzenie i test audio na Miyoo są otwarte.
 - [x] Zgodność pogody: ponowne zagranie już aktywnej karty pogodowej odrzuca duplikat na cmentarz właściciela bez ponownego aktywowania efektu. Dodano regresję dla duplikatu Biting Frost i późniejszego Czystego Nieba; lokalne CTest 2/2 oraz dekodowanie 35 MP3 przechodzą.
-- [~] Zbudowano frontend armhf oficjalnym toolchainem Miyoo GCC 8.2.1 i przypiętym SDL2; ZIP OnionOS z bibliotekami, zasobami, launcherem i licencjami został zweryfikowany i skopiowany na kartę SD z OnionOS v4.3.1-1. Ostatni audyt przed zmianami poziomów AI porównał wszystkie 599 plików względem CI bez różnic; nowsza paczka wymaga ponownego wgrania po kolejnym buildzie CI. Shortcut `.notfound` wymaga uruchomienia `~Import ports.miyoocmd`; start gry, wejście, audio i wydajność czekają na fizyczny test.
+- [~] Zbudowano frontend armhf oficjalnym toolchainem Miyoo GCC 8.2.1 i przypiętym SDL2; ZIP OnionOS z bibliotekami, zasobami, launcherem i licencjami został zweryfikowany i skopiowany na kartę SD z OnionOS v4.3.1-1. Po zmianach AI paczkę z commita `22cf14b` porównano na karcie plik po pliku: 599/599 zgodnych SHA-256, bez braków i zmian. Shortcut `.notfound` wymaga uruchomienia `~Import ports.miyoocmd`; start gry, wejście, audio i wydajność czekają na fizyczny test.
 - [~] Desktop/ARM build i smoke; regresja silnika istnieje dla wybranych reguł. Pełne pokrycie, pomiar zasobów i test uruchomienia na sprzęcie nadal otwarte.
 
 ## Rozszerzenie po ukończeniu wiernego silnika — kampania arcade
@@ -68,9 +68,9 @@ Nie zmienia to bieżącego celu: najpierw kompletna rozgrywka Gwinta z Wiedźmin
 
 ## Znane blokady środowiska
 
-- Lokalnie nie znaleziono CMake ani kompilatora C++; build desktop został wykonany w Dockerze Ubuntu.
-- Karta OnionOS jest widoczna w Windows jako `E:` (`MIYOO MINI`, FAT32); nie ma jeszcze binarki ARM do instalacji ani uruchomienia.
-- Samo Miyoo nie było testowane bezpośrednio po USB; test konsoli pozostaje niewykonany.
+- Lokalnie kompilator C++ działa w Dockerze Ubuntu; build desktop i ARM wykonują też workflow GitHub Actions.
+- Karta OnionOS jest widoczna w Windows jako `E:` (`MIYOO MINI`, FAT32); aktualna paczka armhf jest na karcie, ale nie została jeszcze uruchomiona na Miyoo.
+- Urządzenie/karta nie udostępnia z Windows kanału do automatycznego sterowania konsolą; fizyczny test startu, przycisków, audio i wydajności pozostaje niewykonany.
 - Workflow GitHub Actions publikuje wynik kompilacji/testów przy każdym pushu.
 
 ## Zasada raportowania

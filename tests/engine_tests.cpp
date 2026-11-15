@@ -362,6 +362,12 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
            playCard(preview,1,action.cardId,action.target,action.selectedCardId));
   }
 
+  Game roachMulligan;roachMulligan.phase=Phase::Mulligan;
+  roachMulligan.players[1].hand={referenceCard("Roach"),referenceCard("Geralt of Rivia"),unit("low-priority",2)};
+  roachMulligan.players[1].deck={unit("replacement-a",4),unit("replacement-b",5)};
+  const auto roachDiscard=chooseAiMulligan(roachMulligan,1);
+  assert(std::find(roachDiscard.begin(),roachDiscard.end(),roachMulligan.players[1].hand[0].id)==roachDiscard.end());
+
   Game leaderChoice;
   leaderChoice.players[0].leader.id="foltest_siegemaster";
   leaderChoice.players[0].leader.kind=Kind::Leader;
