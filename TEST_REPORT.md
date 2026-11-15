@@ -47,3 +47,7 @@ Mały panel opisu przeniesiono z jednopikselowego, sztucznie ściśniętego teks
 ## Regresja duplikatów pogody
 
 Porównanie z `Weather.addCard` w przypiętym `gwent.js` wykazało, że aktywny może pozostać tylko jeden egzemplarz danego rodzaju karty pogodowej; kolejny trafia do cmentarza bez zmiany aktywnego efektu. `applyWeather` teraz zachowuje tę regułę, a test silnika zagrywa Biting Frost po obu stronach, potwierdza pojedynczy efekt i odrzucenie drugiej karty, a następnie sprawdza usunięcie pogody przez Czyste Niebo. Build SDL2 w Ubuntu 24.04, CTest (2/2) i dekodowanie wszystkich 35 SFX zakończyły się powodzeniem. Zmiana nie stanowi potwierdzenia pełnej zgodności zasad ani testu Miyoo.
+
+## Korekta klatek i czytelności liczb/kart
+
+Oględziny smoke frame meczu ujawniły, że renderer nie czyścił bufora po edytorze talii; w dolnej części kadru pozostawała stara grafika karty. Dodano czyszczenie renderera w pętli gry i przed każdą klatką smoke. Dwucyfrowa siła mieści się teraz w power medallion, a wynik rundy jest wycentrowany. Panel opisu karty pokazuje pełny tekst (bez limitu trzech linii) w wyższej czcionce. Klatka inspektora została ustawiona na Cirillę, by sprawdzić długą nazwę, cytat w oryginalnej ilustracji i pełny opis Muster. Build SDL2 Ubuntu 24.04, CTest (2/2) i czteroklatkowy smoke test zakończone powodzeniem; kadry sprawdzono wizualnie. Nadal wymagane są test na Miyoo i porównanie całego UI ze źródłem.

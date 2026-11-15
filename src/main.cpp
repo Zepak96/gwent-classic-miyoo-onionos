@@ -89,6 +89,11 @@ void narrowText(SDL_Renderer* r,int x,int y,const std::string& value,Color c,int
 }
 int textWidth(const std::string& s,int scale=1) { return static_cast<int>(ascii(s).size())*6*scale; }
 std::string shortName(std::string s,int n) { if(static_cast<int>(ascii(s).size())>n) s=ascii(s).substr(0,n); return ascii(s); }
+void centeredTextInBox(SDL_Renderer* r,int x,int y,int width,int height,const std::string& value,Color c,int scale=1) {
+  const int visibleWidth=std::max(0,(static_cast<int>(ascii(value).size())*6-1)*scale);
+  const int visibleHeight=7*scale;
+  text(r,x+std::max(0,(width-visibleWidth)/2),y+std::max(0,(height-visibleHeight)/2),value,c,scale);
+}
 void tallTextInBox(SDL_Renderer* r,int x,int y,int width,int height,const std::string& value,Color c,bool shadow=false) {
   const std::string s=ascii(value);
   if(s.empty())return;
@@ -412,8 +417,21 @@ void drawSourceCard(SDL_Renderer* r,const App& a,int x,int y,const gwent::Card& 
   if(card.hero)powerIcon="hero";
   else if(!card.abilities.empty()&&(card.kind==gwent::Kind::Weather||card.kind==gwent::Kind::ClearWeather||card.kind==gwent::Kind::Scorch||card.kind==gwent::Kind::CommanderHorn||card.kind==gwent::Kind::Mardroeme||card.kind==gwent::Kind::Decoy))powerIcon=card.abilities.front();
   if(powerIcon.rfind("scorch",0)==0)powerIcon="scorch";
-  drawImage(r,a,"img/icons/power_"+powerIcon+".png",x-1,y-2,20,21);
-  if(card.kind==gwent::Kind::Unit||card.kind==gwent::Kind::Leader)text(r,x+2,y+2,std::to_string(card.power),card.hero?paper:ink,1);
+  drawImage(r,a,"img/icons/power_"+powerIcon+".png",x-1,y-2,24,25);
+  if(card.kind==gwent::Kind::Unit||card.kind==gwent::Kind::Leader) {
+    const std::string power=std::to_string(card.power);
+    if(card.hero) {
+      const int scale=power.size()>1?1:2;
+      centeredTextInBox(r,x-1,y-2,24,25,power,paper,scale);
+    } else {
+      const int advance=std::min(6,12/static_cast<int>(power.size()));
+      const int numberX=x+1+(12-advance*static_cast<int>(power.size()))/2;
+      // Normal medallions are only about 12 px wide at this render scale.
+      // Fit two digit strengths inside that inner circle and center them.
+      narrowText(r,numberX,y+3,power,Color{28,21,13,220},advance);
+      narrowText(r,numberX,y+2,power,ink,advance);
+    }
+  }
   if(card.row!=gwent::Row::None) {
     const char* rowIcon=card.agile?"agile":card.row==gwent::Row::Ranged?"ranged":card.row==gwent::Row::Siege?"siege":"close";
     drawImage(r,a,"img/icons/card_row_"+std::string(rowIcon)+".png",x+18,y+32,9,9);
@@ -466,9 +484,9 @@ void drawCardPreview(SDL_Renderer* r,const App& a,const gwent::Card& card) {
   const std::string& title=gwent::referenceCardAbilityTitle(card.referenceIndex);
   const std::string& description=gwent::referenceCardDescription(card.referenceIndex);
   if(title.empty()&&description.empty())return;
-  box(r,435,276,186,50,Color{20,20,20,242});
+  box(r,435,276,186,80,Color{20,20,20,242});
   box(r,435,276,186,1,Color{255,255,255,87});
-  box(r,435,325,186,1,Color{255,255,255,87});
+  box(r,435,355,186,1,Color{255,255,255,87});
   std::string icon;
   if(card.kind!=gwent::Kind::Leader&&!card.abilities.empty()&&
      !(card.hero&&card.abilities.size()==1&&card.abilities.front()=="hero")) {
@@ -478,11 +496,26 @@ void drawCardPreview(SDL_Renderer* r,const App& a,const gwent::Card& card) {
     if(icon.rfind("scorch",0)==0)icon="scorch";
     if(icon=="hero")icon.clear();
   } else if(card.agile)icon="agile";
-  if(!icon.empty())drawImage(r,a,"img/icons/card_ability_"+icon+".png",441,282,12,12);
+  if(!icon.empty())drawImage(r,a,"img/icons/card_ability_"+icon+".png",441,281,14,14);
   text(r,465,282,title,Color{210,180,120},1);
   const auto lines=wrapDetailText(description,29);
-  for(std::size_t i=0;i<std::min<std::size_t>(3,lines.size());++i)
-    text(r,444,295+static_cast<int>(i)*9,lines[i],Color{220,210,190},1);
+  for(std::size_t i=0;i<lines.size();++i) {
+    const auto& line=lines[i];
+    const auto drawTall=[&](int ox,int oy,Color c) {
+      color(r,c);
+      for(std::size_t n=0;n<line.size();++n) {
+        const auto it=font().find(line[n]);const Glyph g=it==font().end()?font().at('?'):it->second;
+        for(int row=0;row<7;++row)for(int col=0;col<5;++col)if(g[row]&(1u<<(4-col))) {
+          const int top=(row*3)/2,bottom=((row+1)*3)/2;
+          const int renderedWidth=static_cast<int>(line.size())*6-1;
+          const int startX=435+(186-renderedWidth)/2;
+          SDL_Rect p{startX+static_cast<int>(n)*6+col+ox,289+static_cast<int>(i)*11+top+oy,1,bottom-top};SDL_RenderFillRect(r,&p);
+        }
+      }
+    };
+    drawTall(1,1,Color{0,0,0,230});
+    drawTall(0,0,Color{235,223,198});
+  }
 }
 std::vector<std::string> wrapDetailText(const std::string& value,std::size_t limit) {
   std::vector<std::string> lines;
@@ -636,7 +669,7 @@ void drawDeckBuilder(SDL_Renderer* r,const App& a) {
       drawImage(r,a,"img/lg/"+gwent::referenceCardImage(card->referenceIndex),cx,cy,63,118);
       drawImage(r,a,"img/icons/preview_count.png",cx+45,cy+96,16,16);
       const auto countLabel=std::to_string(count);
-      text(r,cx+45+(16-textWidth(countLabel))/2,cy+100,countLabel,Color{95,73,35},1);
+      centeredTextInBox(r,cx+45,cy+96,16,16,countLabel,Color{95,73,35},1);
       if(pane==a.editorPane&&i==cursor)frame(r,cx-2,cy-2,67,122,paper);
     }
     const int trackX=x+210;
@@ -711,8 +744,8 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     if(leading)drawImage(r,a,"img/icons/icon_high_score.png",131,statsY+4,47,41);
     drawImage(r,a,"img/icons/score_total_"+std::string(owner==0?"me":"op")+".png",scoreX,scoreY,scoreSize,scoreSize);
     const std::string score=std::to_string(player.score);
-    const int scale=score.size()>=3?1:2;
-    text(r,scoreX+(scoreSize-textWidth(score,scale))/2,scoreY+(scoreSize-7*scale)/2,score,ink,scale);
+    const int scale=score.size()>=2?1:2;
+    centeredTextInBox(r,scoreX,scoreY,scoreSize,scoreSize,score,ink,scale);
   };
   drawSide(op,1);drawSide(me,0);
   drawImage(r,a,"img/icons/icon_leader_active.png",79,43,13,13);
@@ -733,7 +766,7 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     if(grave&&!pile.empty())drawImage(r,a,"img/sm/"+gwent::referenceCardImage(pile.back().referenceIndex),x,y,28,43);
     else drawImage(r,a,"img/icons/deck_back_"+std::string(factionKey(a.game.players[owner].faction))+".jpg",x,y,28,43);
     const std::string count=std::to_string(pile.size());
-    text(r,x+(28-textWidth(count))/2,y+31,count,paper,1);
+    centeredTextInBox(r,x,y+29,28,13,count,paper,1);
   };
   drawPile(1,true,23);drawPile(1,false,23);drawPile(0,true,275);drawPile(0,false,275);
   box(r,107,295,34,15,Color{20,20,20,230});frame(r,107,295,34,15,Color{143,108,54});text(r,112,299,"PASS",paper,1);
@@ -1018,18 +1051,29 @@ int main(int argc,char** argv) {
     SDL_free(directory);
   }
   if(argc>1 && std::string(argv[1])=="--smoke-test") {
+    const auto clearFrame=[&](){SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);};
     const auto saveFrame=[&](const char* path){
       SDL_Surface* surface=SDL_CreateRGBSurfaceWithFormat(0,W,H,32,SDL_PIXELFORMAT_ARGB8888);
       if(!surface)return false;
       const bool okay=SDL_RenderReadPixels(renderer,nullptr,SDL_PIXELFORMAT_ARGB8888,surface->pixels,surface->pitch)==0&&SDL_SaveBMP(surface,path)==0;
       SDL_FreeSurface(surface);return okay;
     };
+    clearFrame();
     app.screen=Screen::DeckBuilder;drawDeckBuilder(renderer,app);SDL_RenderPresent(renderer);
     if(argc>3&&!saveFrame(argv[3])) { app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 4; }
-    if(argc>4) { app.cardDetailsOpen=true;drawDeckBuilder(renderer,app);SDL_RenderPresent(renderer);if(!saveFrame(argv[4])) { app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 4; }app.cardDetailsOpen=false; }
+    if(argc>4) {
+      clearFrame();
+      const auto& catalog=gwent::referenceCardCatalog();
+      const auto ciri=std::find_if(catalog.begin(),catalog.end(),[](const gwent::Card& card){return card.name=="Cirilla Fiona Elen Riannon";});
+      if(ciri!=catalog.end())drawCardDetails(renderer,app,*ciri);
+      else { app.cardDetailsOpen=true;drawDeckBuilder(renderer,app);app.cardDetailsOpen=false; }
+      SDL_RenderPresent(renderer);
+      if(!saveFrame(argv[4])) { app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 4; }
+    }
     startMatch(app);
     gwent::replaceMulliganCards(app.game,0,{}); gwent::replaceMulliganCards(app.game,1,gwent::chooseAiMulligan(app.game,1));
     app.game.phase=gwent::Phase::PlayerTurn;app.game.currentPlayer=0;
+    clearFrame();
     drawMatch(renderer,app);
     if(argc>2&&!saveFrame(argv[2])) { app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 4; }
     if(argc>5) {
@@ -1043,7 +1087,7 @@ int main(int argc,char** argv) {
       if(!gwent::playCard(app.game,0,card.id,row)) { app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 5; }
       animatePlayedCard(app,card,0,index,before);
       app.cardFlight.startedAt=SDL_GetTicks()>250?SDL_GetTicks()-250:0;
-      drawMatch(renderer,app);SDL_RenderPresent(renderer);
+      clearFrame();drawMatch(renderer,app);SDL_RenderPresent(renderer);
       if(!saveFrame(argv[5])) { app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 4; }
     }
     SDL_RenderPresent(renderer);
@@ -1085,6 +1129,7 @@ int main(int argc,char** argv) {
       else if(app.game.phase==gwent::Phase::MatchResult)app.audio.play(app.game.matchWinner==0?"game_win":"game_lose");
       observedPhase=app.game.phase;
     }
+    SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);
     if(app.screen==Screen::Title)drawTitle(renderer,app);
     else if(app.screen==Screen::DeckSelect)drawDeckSelect(renderer,app);
     else if(app.screen==Screen::DeckBuilder)drawDeckBuilder(renderer,app);
