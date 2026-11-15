@@ -545,7 +545,7 @@ void drawDeckBuilder(SDL_Renderer* r,const App& a) {
   narrowText(r,300,343,factionName(opponent.faction,pl),paper);
   drawImage(r,a,"img/icons/deck_back_"+std::string(opponent.faction==gwent::Faction::Monsters?"monsters":opponent.faction==gwent::Faction::Nilfgaard?"nilfgaard":opponent.faction==gwent::Faction::Scoiatael?"scoiatael":opponent.faction==gwent::Faction::Skellige?"skellige":"realms")+".jpg",354,330,23,28);
   const int toggleY=290;
-  drawImage(r,a,"svg/music.svg",299,toggleY,16,16);drawImage(r,a,"svg/sfx.svg",321,toggleY,16,16);
+  drawImage(r,a,"img/icons/ui_music.png",299,toggleY,16,16);drawImage(r,a,"img/icons/ui_sfx.png",321,toggleY,16,16);
   if(!shownCards.empty())drawCardPreview(r,a,*shownCards[static_cast<std::size_t>(cursor)]);
 }
 void drawMatch(SDL_Renderer* r,const App& a) {
@@ -588,7 +588,7 @@ void drawMatch(SDL_Renderer* r,const App& a) {
   box(r,107,295,34,15,Color{20,20,20,230});frame(r,107,295,34,15,Color{143,108,54});text(r,112,299,"PASS",paper,1);
   if(me.passed)text(r,110,282,"PASSED",paper,1);
   if(op.passed)text(r,110,80,"PASSED",paper,1);
-  drawImage(r,a,"svg/music.svg",90,313,16,16);drawImage(r,a,"svg/sfx.svg",110,313,16,16);drawImage(r,a,"svg/notification.svg",128,313,16,16);
+  drawImage(r,a,"img/icons/ui_music.png",90,313,16,16);drawImage(r,a,"img/icons/ui_sfx.png",110,313,16,16);drawImage(r,a,"img/icons/ui_notification.png",128,313,16,16);
   const int count=static_cast<int>(me.hand.size());
   if(count) {
     const int start=std::clamp(a.handIndex-5,0,std::max(0,count-11));

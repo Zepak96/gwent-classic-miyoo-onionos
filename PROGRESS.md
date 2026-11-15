@@ -45,7 +45,7 @@ Docelowa gra to wyłącznie Gwint jako minigra w Wiedźminie 3: Wild Hunt, z zaw
 - [~] Zapis i odtwarzanie stanu meczu: dodano wersjonowany, sumowany kontrolnie format binarny, atomowy zapis oraz bezpieczne odrzucanie uszkodzonych plików; UI ma ręczny zapis/wczytanie i wznowienie z menu. Autosave i test na Miyoo pozostają do zrobienia; przepis talii ma już zapis silnikowy, ale nie jest jeszcze podłączony do UI.
 - [~] Dodano format talii użytkownika `.gwd` i podłączono go do SDL: trzy sloty, edycja puli frakcji/neutrali, lidera i kopii, walidacja, zapis atomowy z sumą kontrolną oraz użycie talii przy starcie meczu. Silnik testuje round-trip i odrzucanie uszkodzeń. CI #43717386389 zbudował frontend, zaliczył CTest i wyrenderował ekrany edytora i meczu; brakuje zmiany nazwy talii, automatycznej QA sekwencji przycisków i testu na urządzeniu.
 - [~] Edytor talii jest wstępnie podłączony w PL/EN; pełne PL/EN całego UI, tutorial i ustawienia nadal do zrobienia.
-- [~] Przypięte grafiki kart, plansza, ikony SVG i SFX z repo są w `assets/gwent-classic/`; obrazy kart są użyte w prototypowych ekranach. Muzyki nie ma w repo wzorcowym. Odtwarzanie audio w porcie nie jest zaimplementowane.
+- [~] Przypięte grafiki kart, plansza, ikony SVG i SFX z repo są w `assets/gwent-classic/`; obrazy kart i UI są użyte w prototypowych ekranach, a sześć SVG ma rastrowe odpowiedniki PNG dla SDL. Muzyki nie ma w repo wzorcowym. Odtwarzanie audio w porcie nie jest zaimplementowane.
 - [~] Przygotowano pliki launchera/pakowania OnionOS; ARM binarka i instalacja na karcie czekają na wierne UI oraz build docelowy.
 - [ ] Desktop/ARM build, regresja, pomiar zasobów oraz test sprzętowy.
 

@@ -7,6 +7,11 @@ These files are copied from `asundr/gwent-classic` at commit
   images, faction backs, interface icons, overlays, and notifications.
 - `sfx/`: 35 MP3 sound effects included in the reference repository.
 - `svg/`: 6 interface icons.
+- `img/icons/ui_*.png`: 6 transparent 256x256 PNG renderings of the six SVG
+  icons, generated with CairoSVG 2.9.1. The source SVG files remain included;
+  PNGs are used by the SDL renderer, which does not decode SVG at runtime.
+  Regenerate them with `python tools/convert_svg_icons.py` after installing
+  CairoSVG.
 
 The reference README credits RandomPianist for many of its edited sound
 effects. This attribution is preserved here. Its music is streamed from
