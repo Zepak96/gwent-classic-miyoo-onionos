@@ -525,14 +525,24 @@ void drawCardPreview(SDL_Renderer* r,const App& a,const gwent::Card& card) {
   const auto titleLines=wrapDetailText(title,26);
   int textY=271;
   for(const auto& line:titleLines) { text(r,459,textY,line,Color{255,220,153},1);textY+=9; }
-  const auto lines=wrapDetailText(description,29);
-  for(std::size_t i=0;i<lines.size();++i) {
+  // The board preview is only 186x90 px on a 640x480 screen. Render fewer
+  // characters at 2x scale so the visible rules can be read on Miyoo; the
+  // fullscreen card inspector remains the place for the complete description.
+  const auto lines=wrapDetailText(description,14);
+  constexpr int descriptionLineHeight=14;
+  const std::size_t visibleLines=std::min<std::size_t>(4,lines.size());
+  for(std::size_t i=0;i<visibleLines;++i) {
     const auto& line=lines[i];
-    const int lineY=textY+static_cast<int>(i)*11;
-    if(lineY+7>354)break;
-    const int lineX=435+(186-textWidth(line))/2;
-    text(r,lineX+1,lineY+1,line,Color{0,0,0,255},1);
-    text(r,lineX,lineY,line,Color{255,243,219,255},1);
+    const int lineY=textY+static_cast<int>(i)*descriptionLineHeight;
+    if(lineY+14>354)break;
+    const int lineX=435+(186-textWidth(line,2))/2;
+    text(r,lineX+1,lineY+1,line,Color{0,0,0,255},2);
+    text(r,lineX,lineY,line,Color{255,243,219,255},2);
+  }
+  if(lines.size()>visibleLines) {
+    const int hintY=textY+static_cast<int>(visibleLines)*descriptionLineHeight;
+    const std::string hint=a.language==Language::Polish?"I - PELNY OPIS":"I - FULL TEXT";
+    text(r,441,hintY,hint,Color{205,182,137,255},1);
   }
 }
 std::vector<std::string> wrapDetailText(const std::string& value,std::size_t limit) {

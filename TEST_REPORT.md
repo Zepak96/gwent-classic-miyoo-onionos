@@ -6,6 +6,7 @@ Data raportu: 2026-11-15.
 
 ### Najnowsza weryfikacja — 15.11.2026
 
+- Po ponownym audycie wizualnym podgląd zdolności w meczu zmieniono na czcionkę 2×, ograniczono do czterech wierszy, a dłuższy tekst otrzymuje widoczną wskazówkę `I - PELNY OPIS` / `I - FULL TEXT`. Pełny inspektor pokazuje cały opis Cirilli i cytat. Świeży render 640×480 obejrzano w natywnej skali; testy CTest 2/2 i dekodowanie 35 SFX przeszły. Długie opisy pozostają w inspektorze, a wizualna zgodność 1:1 i test na fizycznym Miyoo nadal są otwarte.
 - Lokalny frontend SDL2 i silnik skompilowały się w Ubuntu 24.04/Dockerze. CTest: 2/2; dodatkowo dekoder audio sprawdził wszystkie 35 MP3, a smoke test zapisał sześć obrazów 640×480 w `docs/screenshots/`. Planszę meczu wycentrowano w ekranie 4:3, zachowując jej źródłowe 16:9; inspektor karty Cirilli pokazuje cały opis i cytat.
 - Regresja Zbiórki sprawdza Geralta i Roacha. Test AI uruchamia pełne mecze AI kontra AI na poziomach Łatwy, Normalny i Trudny; osobny przypadek sprawdza, że trudny wybiera silniejszy ruch w prostym stanie.
 - ARM workflow i desktop workflow zakończyły się sukcesem dla commita `1571642`; test obejmuje trzy poziomy AI, ochronę Roacha przy wymianie oraz sześć klatek smoke dla menu. Paczkę ARM z tego commita skopiowano na kartę i porównano 599 plików SHA-256 bez różnic. SHA-256 ZIP: `df3405e58c6700d6295959db0af68e85c1ab21820aa05af6822fff9d69ff11bf`.
