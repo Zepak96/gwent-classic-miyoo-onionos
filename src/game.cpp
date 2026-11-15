@@ -33,13 +33,12 @@ int cardPower(const Card& c, const std::vector<Card>& row, bool weather, bool ho
   const int weatherFloor = halfWeather ? c.power / 2 : 1;
   int power = weather ? std::min(c.power, weatherFloor) : c.power;
   if (doubleSpyPower && c.spy) power *= 2;
-  if (c.bond) {
-    // Tight Bond is a binary multiplier: two or more cards with the same
-    // printed name double each other's strength. Extra copies do not turn
-    // this into x3/x4, and catalog grouping metadata is not part of the rule.
-    const auto copies = std::count_if(row.begin(), row.end(), [&](const Card& x) { return x.name == c.name; });
-    if (copies > 1) power *= 2;
-  }
+  // Source Row.updateState() counts Bond-bearing cards by printed name;
+  // Row.calcCardScore() multiplies every card with that name by that count.
+  const auto bondCount = std::count_if(row.begin(), row.end(), [&](const Card& x) {
+    return x.name == c.name && (x.bond || hasAbility(x, "bond"));
+  });
+  if (bondCount > 1) power *= static_cast<int>(bondCount);
   const int moraleCount = static_cast<int>(std::count_if(row.begin(), row.end(), [](const Card& x) { return x.morale || hasAbility(x, "morale"); }));
   power += std::max(0, moraleCount - ((c.morale || hasAbility(c, "morale")) ? 1 : 0));
   const int hornSources = static_cast<int>(horn) + static_cast<int>(std::count_if(row.begin(), row.end(), [](const Card& x) { return hasAbility(x, "horn"); }));
@@ -353,7 +352,7 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
       auto found = findCard(p.board[r], selectedId);
       if (found != p.board[r].end()) { boardTarget = found; targetRow = r; break; }
     }
-    if (selectedId.empty() || targetRow < 0 || boardTarget->kind != Kind::Unit || boardTarget->hero) return false;
+    if (selectedId.empty() || targetRow < 0 || !isCombatUnit(*boardTarget)) return false;
   }
   int medicIndex = -1;
   int medicReviveRow = -1;
@@ -361,13 +360,13 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
     if (g.randomRespawn) {
       std::vector<int> units;
       for (int i=0;i<static_cast<int>(p.graveyard.size());++i)
-        if (p.graveyard[i].kind==Kind::Unit && !p.graveyard[i].hero) units.push_back(i);
+        if (isCombatUnit(p.graveyard[i])) units.push_back(i);
       if (!units.empty()) medicIndex=units[nextRandom(g)%units.size()];
     } else if (!selectedId.empty()) {
       const auto found=findCard(p.graveyard,selectedId);
-      if(found==p.graveyard.end() || found->kind!=Kind::Unit || found->hero) return false;
+      if(found==p.graveyard.end() || !isCombatUnit(*found)) return false;
       medicIndex=static_cast<int>(found-p.graveyard.begin());
-    } else if(std::any_of(p.graveyard.begin(),p.graveyard.end(),[](const Card& card){return card.kind==Kind::Unit && !card.hero;})) return false;
+    } else if(std::any_of(p.graveyard.begin(),p.graveyard.end(),isCombatUnit)) return false;
     if(medicIndex>=0 && p.graveyard[static_cast<std::size_t>(medicIndex)].agile) {
       if(target!=Row::Melee && target!=Row::Ranged)return false;
       medicReviveRow=rowIndex(target);
@@ -496,7 +495,7 @@ bool activateLeader(Game& g, int who, Row target, const std::vector<std::string>
   else if (id=="emhyr_relentless") {
     auto& grave=g.players[1-who].graveyard;
     auto found=selected.empty()?grave.end():findCard(grave,selected);
-    if(found==grave.end() || found->kind!=Kind::Unit) canActivate=false;
+    if(found==grave.end() || !isCombatUnit(*found)) canActivate=false;
     else { player.hand.push_back(*found); grave.erase(found); }
   }
   else if (id=="emhyr_whiteflame" || id=="emhyr_invader" || id=="eredin_treacherous" || id=="francesca_daisy" || id=="king_bran") canActivate=false;
@@ -504,7 +503,7 @@ bool activateLeader(Game& g, int who, Row target, const std::vector<std::string>
   else if (id=="eredin_bringer_of_death") {
     auto& grave=player.graveyard;
     auto found=selected.empty()?grave.end():findCard(grave,selected);
-    if(found==grave.end() || found->kind!=Kind::Unit) canActivate=false;
+    if(found==grave.end() || !isCombatUnit(*found)) canActivate=false;
     else { player.hand.push_back(*found); grave.erase(found); }
   }
   else if (id=="eredin_destroyer") {

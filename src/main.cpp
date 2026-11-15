@@ -664,9 +664,9 @@ std::vector<std::string> legalCardTargets(const App& a,const gwent::Card& card) 
   const auto& p=a.game.players[0];
   if(card.kind==gwent::Kind::Decoy) {
     for(const auto& row:p.board) for(const auto& target:row)
-      if(target.kind==gwent::Kind::Unit && !target.hero) ids.push_back(target.id);
+      if(target.kind==gwent::Kind::Unit && !target.hero && (target.row!=gwent::Row::None||target.agile)) ids.push_back(target.id);
   } else if(card.kind==gwent::Kind::Unit && card.medic) {
-    for(const auto& target:p.graveyard) if(target.kind==gwent::Kind::Unit && !target.hero) ids.push_back(target.id);
+    for(const auto& target:p.graveyard) if(target.kind==gwent::Kind::Unit && !target.hero && (target.row!=gwent::Row::None||target.agile)) ids.push_back(target.id);
     const auto graveCard=[&](const std::string& id)->const gwent::Card* {
       const auto it=std::find_if(p.graveyard.begin(),p.graveyard.end(),[&](const gwent::Card& item){return item.id==id;});
       return it==p.graveyard.end()?nullptr:&*it;
@@ -699,7 +699,7 @@ std::vector<gwent::Card> leaderChoiceCards(const App& a) {
   std::vector<gwent::Card> cards;
   if(ability=="emhyr_relentless"||ability=="eredin_bringer_of_death") {
     const auto& grave=ability=="emhyr_relentless"?a.game.players[1].graveyard:player.graveyard;
-    for(const auto& card:grave)if(card.kind==gwent::Kind::Unit)cards.push_back(card);
+    for(const auto& card:grave)if(card.kind==gwent::Kind::Unit&&!card.hero&&(card.row!=gwent::Row::None||card.agile))cards.push_back(card);
   } else if(ability=="eredin_destroyer"&&a.leaderSelections.size()<2) {
     for(const auto& card:player.hand)
       if(std::find(a.leaderSelections.begin(),a.leaderSelections.end(),card.id)==a.leaderSelections.end())cards.push_back(card);
@@ -1909,6 +1909,27 @@ int main(int argc,char** argv) {
       gwent::Card sourceMedic;sourceMedic.kind=gwent::Kind::Unit;sourceMedic.medic=true;
       const auto sortedTargets=legalCardTargets(medicOrder,sourceMedic);
       okay=okay&&sortedTargets.size()==2&&sortedTargets[0]==low.id&&sortedTargets[1]==high.id;
+    } else okay=false;
+    if(lowBase) {
+      App picker;auto valid=*lowBase;valid.id="valid-picker-target";
+      auto hero=valid;hero.id="hero-picker-target";hero.hero=true;
+      auto nonCombat=valid;nonCombat.id="noncombat-picker-target";nonCombat.row=gwent::Row::None;nonCombat.agile=false;
+      picker.game.players[0].graveyard={hero,nonCombat,valid};
+      gwent::Card medicPicker;medicPicker.kind=gwent::Kind::Unit;medicPicker.medic=true;
+      const auto medicTargets=legalCardTargets(picker,medicPicker);
+      okay=okay&&medicTargets==std::vector<std::string>{"valid-picker-target"};
+      picker.game.players[0].graveyard.clear();picker.game.players[0].board[0]={hero,nonCombat,valid};
+      gwent::Card decoyPicker;decoyPicker.kind=gwent::Kind::Decoy;
+      const auto decoyTargets=legalCardTargets(picker,decoyPicker);
+      okay=okay&&decoyTargets==std::vector<std::string>{"valid-picker-target"};
+      picker.game.players[0].leader.abilities={"emhyr_relentless"};
+      picker.game.players[1].graveyard={hero,nonCombat,valid};
+      auto relentlessChoices=leaderChoiceCards(picker);
+      okay=okay&&relentlessChoices.size()==1&&relentlessChoices.front().id=="valid-picker-target";
+      picker.game.players[0].leader.abilities={"eredin_bringer_of_death"};
+      picker.game.players[0].graveyard={hero,nonCombat,valid};
+      auto bringerChoices=leaderChoiceCards(picker);
+      okay=okay&&bringerChoices.size()==1&&bringerChoices.front().id=="valid-picker-target";
     } else okay=false;
     App notificationProbe;
     queueNotification(notificationProbe,"round-start");

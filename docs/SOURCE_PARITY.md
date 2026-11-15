@@ -104,6 +104,14 @@ items above:
   eased movement stagger (200/300/450 ms) with a 100 ms center highlight.
   Medic/Decoy targets, leader choices and Skellige revival use this shared
   view. Broader screen and animation parity remains open.
+- Medic, Decoy, Emhyr Relentless and Eredin Bringer of Death now apply the
+  source `Card.isUnit()` restriction consistently: Heroes and noncombat cards
+  cannot appear in the picker or be accepted by the rules engine. Regression
+  coverage checks both picker lists and engine rejection.
+- Tight Bond now matches the source row effect exactly: its multiplier is the
+  number of same-name Bond cards when that count exceeds one, and the source
+  name-keyed multiplier applies to every same-name card. Two- and three-copy
+  cases plus differing catalog group metadata have regression coverage.
 
 Verification for the current source tree: SDL2 desktop build, CTest 2/2, and
 `gwent --input-test` with dummy SDL video/audio; target-carousel smoke image

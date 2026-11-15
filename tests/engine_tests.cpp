@@ -45,8 +45,10 @@ static void scoreRules() {
   auto a = referenceCard("Blue Stripes Commando"); a.id="bond-a";
   auto b = referenceCard("Blue Stripes Commando"); b.id="bond-b";
   auto c = referenceCard("Blue Stripes Commando"); c.id="bond-c";
+  Player singleBond;singleBond.board[0]={a};
+  assert(calculateScore(singleBond,{false,false,false},{false,false,false})==4); // one source Bond card has no multiplier
   bond.board[0] = {a,b,c};
-  assert(calculateScore(bond, {false,false,false}, {false,false,false}) == 24); // three same-name copies each score 4 x 2
+  assert(calculateScore(bond, {false,false,false}, {false,false,false}) == 36); // source multiplies each by the three-copy Bond count
 
   Player distinctBondNames;
   auto differentA=unit("bond-a",4); differentA.name="Blue Stripes Commando"; differentA.bond=true; differentA.group="shared";
@@ -59,6 +61,12 @@ static void scoreRules() {
   auto sameNameB=unit("bond-b",4); sameNameB.name="Blue Stripes Commando"; sameNameB.bond=true; sameNameB.group="two";
   sameNameDifferentGroups.board[0]={sameNameA,sameNameB};
   assert(calculateScore(sameNameDifferentGroups,{false,false,false},{false,false,false})==16); // printed name, not catalog group, defines the bond
+  Player sourceBondCount;
+  auto bondOne=unit("bond-one",4);bondOne.name="Bond Name";bondOne.bond=true;
+  auto bondTwo=bondOne;bondTwo.id="bond-two";
+  auto sameNameAlly=unit("same-name-ally",3);sameNameAlly.name="Bond Name";sameNameAlly.bond=false;
+  sourceBondCount.board[0]={bondOne,bondTwo,sameNameAlly};
+  assert(calculateScore(sourceBondCount,{false,false,false},{false,false,false})==22); // source row effect is keyed by name and applies its x2 count to each card with that name
 
   Player orderedEffects;
   auto bondedA=referenceCard("Blue Stripes Commando"); bondedA.id="bonded-a";
@@ -292,6 +300,12 @@ static void abilitiesAndValidation() {
   assert(playCard(decoy,0,"decoy",Row::None,"return"));
   assert(decoy.players[0].board[0].size()==1 && decoy.players[0].board[0][0].kind==Kind::Decoy);
   assert(decoy.players[0].hand.size()==1 && decoy.players[0].hand[0].id=="return");
+  Game decoyRejectsNonCombat;
+  decoyRejectsNonCombat.players[0].hand.push_back(Card{"decoy-noncombat","Decoy",Kind::Decoy});
+  auto nonCombat=unit("noncombat-decoy-target",5);nonCombat.row=Row::None;nonCombat.agile=false;
+  decoyRejectsNonCombat.players[0].board[0].push_back(nonCombat);
+  assert(!playCard(decoyRejectsNonCombat,0,"decoy-noncombat",Row::None,nonCombat.id));
+  assert(decoyRejectsNonCombat.players[0].hand.size()==1&&decoyRejectsNonCombat.players[0].board[0].size()==1);
 
   Game medic; auto m=unit("medic",2); m.medic=true; medic.players[0].hand.push_back(m);
   medic.players[0].graveyard.push_back(unit("revive",6));
@@ -313,6 +327,10 @@ static void abilitiesAndValidation() {
   auto forbiddenHero=unit("forbidden-hero",10); forbiddenHero.hero=true;
   medicHero.players[0].graveyard.push_back(forbiddenHero);
   assert(!playCard(medicHero,0,"medic-hero",Row::None,"forbidden-hero"));
+  Game medicNonCombat;auto mn=unit("medic-noncombat",2);mn.medic=true;medicNonCombat.players[0].hand.push_back(mn);
+  auto excluded=unit("medic-noncombat-target",8);excluded.row=Row::None;excluded.agile=false;
+  medicNonCombat.players[0].graveyard.push_back(excluded);
+  assert(!playCard(medicNonCombat,0,"medic-noncombat",Row::None,excluded.id));
 
   Game muster; auto leader=unit("muster1",4); leader.muster=true; leader.group="crone";
   auto copy=unit("muster2",4,Row::Ranged); copy.muster=true; copy.group="crone";
@@ -630,8 +648,13 @@ static void leaderAbilities() {
   heroRestore.players[0].leader=leader("emhyr_relentless"); heroRestore.players[0].leaderAbilityAvailable=true;
   Card graveHero=unit("grave-hero",15);graveHero.hero=true;
   heroRestore.players[1].graveyard.push_back(graveHero);
-  assert(activateLeader(heroRestore,0,Row::None,{"grave-hero"}));
-  assert(heroRestore.players[0].hand.size()==1 && heroRestore.players[0].hand[0].hero);
+  assert(!activateLeader(heroRestore,0,Row::None,{"grave-hero"}));
+  assert(heroRestore.players[0].hand.empty()&&heroRestore.players[1].graveyard.size()==1&&heroRestore.players[0].leaderAbilityAvailable);
+  Game heroRestoreBringer;
+  heroRestoreBringer.players[0].leader=leader("eredin_bringer_of_death");heroRestoreBringer.players[0].leaderAbilityAvailable=true;
+  heroRestoreBringer.players[0].graveyard.push_back(graveHero);
+  assert(!activateLeader(heroRestoreBringer,0,Row::None,{"grave-hero"}));
+  assert(heroRestoreBringer.players[0].hand.empty()&&heroRestoreBringer.players[0].graveyard.size()==1&&heroRestoreBringer.players[0].leaderAbilityAvailable);
 
   Game discard;
   discard.players[0].leader=leader("eredin_destroyer"); discard.players[0].leaderAbilityAvailable=true;
