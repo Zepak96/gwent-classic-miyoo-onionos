@@ -26,6 +26,10 @@ Bez SDL2 można budować same testy i silnik: ustaw `-DGWENT_WITH_SDL=OFF`.
 
 The SDL app writes a versioned, checksummed match save in `SDL_GetPrefPath("GwentClassic", "MiyooMiniPlus")`. The engine save API can also be called with an explicit path. Writes go to a temporary file and replace the previous save only after the new data is complete. `S`/SELECT saves, `O`/START loads, and `R` on deck selection resumes the save. The save format stores the complete engine match state; UI language and menu selection are not part of the match save.
 
+## User deck data API
+
+`gwent/deck.hpp` exposes validated user deck recipes and checksummed `.gwd` persistence. Recipes store a display name, faction, leader reference, and card reference/count pairs from the pinned Witcher 3 Gwent catalog; `materializeUserDeck` resolves them back to the exact catalog entries before starting a match. This is an engine API foundation only: the SDL deck builder, multiple-slot management, and UI integration are not implemented yet.
+
 ## Miyoo Mini Plus / OnionOS
 
 Wymagany jest 32-bitowy ARM hard-float (arm-linux-gnueabihf) oraz wersje bibliotek zgodne z docelowym OnionOS. Referencyjny SDL z `steward-fu/sdl2` deklaruje wsparcie dla Miyoo Mini/Plus i OnionOS v4.3.1-1; trzeba potwierdzić docelową wersję systemu i biblioteki na urządzeniu. Ta konfiguracja nie produkuje jeszcze binarki ARM.

@@ -2,6 +2,7 @@
 #include "gwent/catalog.hpp"
 #include "gwent/ai.hpp"
 #include "gwent/save.hpp"
+#include "gwent/deck.hpp"
 #include <algorithm>
 #include <cassert>
 #include <filesystem>
@@ -174,6 +175,32 @@ static void saveRoundTripAndCorruptionHandling() {
   Game preserved;preserved.round=2;preserved.lastError="must remain intact";
   assert(!loadGame(path,preserved,&error));
   assert(preserved.round==2 && preserved.lastError=="must remain intact");
+  std::filesystem::remove(path,ignored);std::filesystem::remove(path+".tmp",ignored);
+}
+static void userDeckPersistenceAndValidation() {
+  const auto& source=referencePremadeDecks().front();
+  UserDeck deck{"Geralt - talia testowa",source.faction,source.leaderReferenceIndex,source.cardCounts};
+  assert(validateUserDeck(deck).empty());
+  std::vector<Card> cards;Card leaderCard;std::string error;
+  assert(materializeUserDeck(deck,cards,leaderCard,&error));
+  const auto expectedCards=makeReferenceDeck(source.cardCounts);
+  assert(cards.size()==expectedCards.size());
+  for(std::size_t i=0;i<cards.size();++i)assert(cards[i].id==expectedCards[i].id);
+  assert(leaderCard.kind==Kind::Leader&&leaderCard.referenceIndex==source.leaderReferenceIndex);
+  const auto path=(std::filesystem::temp_directory_path()/"gwent-classic-user-deck.gwd").string();
+  std::error_code ignored;std::filesystem::remove(path,ignored);std::filesystem::remove(path+".tmp",ignored);
+  assert(saveUserDeck(path,deck,&error));
+  UserDeck restored{"sentinel",Faction::Nilfgaard,0,{}};
+  assert(loadUserDeck(path,restored,&error));
+  assert(restored.name==deck.name&&restored.faction==deck.faction&&restored.leaderReferenceIndex==deck.leaderReferenceIndex&&restored.cardCounts==deck.cardCounts);
+  {
+    std::fstream file(path,std::ios::binary|std::ios::in|std::ios::out);
+    file.seekg(-1,std::ios::end);char byte=0;file.read(&byte,1);byte=static_cast<char>(byte^0x5a);file.seekp(-1,std::ios::end);file.write(&byte,1);
+  }
+  assert(!loadUserDeck(path,restored,&error));
+  assert(restored.name==deck.name&&restored.cardCounts==deck.cardCounts);
+  auto invalid=deck;invalid.cardCounts.push_back(invalid.cardCounts.front());
+  assert(!validateUserDeck(invalid).empty());
   std::filesystem::remove(path,ignored);std::filesystem::remove(path+".tmp",ignored);
 }
 static void abilitiesAndValidation() {
@@ -434,4 +461,4 @@ static void leaderAbilities() {
   assert(crach.players[0].deck.size()==1 && crach.players[1].deck.size()==1);
   assert(crach.players[0].graveyard.empty() && crach.players[1].graveyard.empty());
 }
-int main() { scoreRules(); turnsAndRounds(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); abilitiesAndValidation(); openingHandAndMulligan(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); avengerCards(); leaderAbilities(); }
+int main() { scoreRules(); turnsAndRounds(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); avengerCards(); leaderAbilities(); }
