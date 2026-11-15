@@ -35,6 +35,19 @@ Docelowa gra to wyłącznie Gwint jako minigra w Wiedźminie 3: Wild Hunt, z zaw
 - [ ] ARM toolchain, binarka, launcher OnionOS i archiwum instalacyjne.
 - [ ] Desktop/ARM build, regresja, pomiar zasobów oraz test sprzętowy.
 
+## Rozszerzenie po ukończeniu wiernego silnika — kampania arcade
+
+Użytkownik chce później rozbudować grę o lekką warstwę fabularną. Ten zakres jest celowo po pełnej implementacji pojedynczego meczu, żeby każdy przeciwnik używał tych samych sprawdzonych zasad.
+
+- [ ] Mapa/drzewko kolejnych przeciwników inspirowanych postaciami z Wiedźmina 3.
+- [ ] Rosnąca trudność przeciwników i talii między pojedynkami.
+- [ ] Finałowy przeciwnik/boss oraz zakończenie małej kampanii.
+- [ ] Menu kampanii i osobny zapis jej postępu.
+- [ ] Kilka wariantów plansz/stolików z legalną, oryginalną oprawą graficzną.
+- [ ] Opracować krótkie wprowadzenie fabularne oraz teksty PL/EN, bez naruszania licencji tekstów i assetów gry.
+
+Nie zmienia to bieżącego celu: najpierw kompletna rozgrywka Gwinta z Wiedźmina 3 next-gen przeciw AI oraz stabilny port OnionOS.
+
 ## Znane blokady środowiska
 
 - Lokalnie nie znaleziono CMake ani kompilatora C++; build desktop wykonał GitHub Actions na Ubuntu.
