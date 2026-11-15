@@ -177,7 +177,18 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
   a.players[1].hand[0].name="private hand A"; b.players[1].hand[0].name="private hand B";
   const auto choiceA=chooseAiAction(a,0,Difficulty::Hard);
   const auto choiceB=chooseAiAction(b,0,Difficulty::Hard);
-  assert(choiceA.pass==choiceB.pass && choiceA.cardId==choiceB.cardId && choiceA.target==choiceB.target);
+  assert(choiceA.pass==choiceB.pass && choiceA.cardId==choiceB.cardId && choiceA.target==choiceB.target &&
+         choiceA.activateLeader==choiceB.activateLeader && choiceA.leaderSelection==choiceB.leaderSelection);
+
+  Game leaderChoice;
+  leaderChoice.players[0].leader.id="foltest_siegemaster";
+  leaderChoice.players[0].leader.kind=Kind::Leader;
+  leaderChoice.players[0].leader.abilities={"foltest_siegemaster"};
+  leaderChoice.players[0].leaderAbilityAvailable=true;
+  leaderChoice.players[0].board[2].push_back(unit("ai-siege",6,Row::Siege));
+  leaderChoice.players[0].hand.push_back(unit("ai-small-play",1));
+  const auto leaderAction=chooseAiAction(leaderChoice,0,Difficulty::Hard);
+  assert(leaderAction.activateLeader && leaderAction.leaderSelection.empty());
 
   const auto& recipes=referencePremadeDecks();
   const auto deck0=makeReferenceDeck(recipes[0]);
@@ -190,7 +201,8 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
     if(game.phase==Phase::RoundResult) { assert(startNextRound(game)); continue; }
     const int actor=game.currentPlayer;
     const auto action=chooseAiAction(game,actor,Difficulty::Hard);
-    const bool ok=action.pass ? pass(game,actor) : playCard(game,actor,action.cardId,action.target,action.selectedCardId);
+    const bool ok=action.pass ? pass(game,actor) : action.activateLeader ? activateLeader(game,actor,action.target,action.leaderSelection) :
+      playCard(game,actor,action.cardId,action.target,action.selectedCardId);
     assert(ok); ++actions;
   }
   assert(game.phase==Phase::MatchResult && actions<500);
