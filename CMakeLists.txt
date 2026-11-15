@@ -13,8 +13,8 @@ set(GWENT_CATALOG_SOURCE ${GWENT_GENERATED_DIR}/reference_catalog.cpp)
 add_custom_command(
   OUTPUT ${GWENT_CATALOG_SOURCE}
   COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_catalog.py
-          ${CMAKE_CURRENT_SOURCE_DIR}/data/cards.json ${GWENT_CATALOG_SOURCE}
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_catalog.py ${CMAKE_CURRENT_SOURCE_DIR}/data/cards.json
+          ${CMAKE_CURRENT_SOURCE_DIR}/data/cards.json ${CMAKE_CURRENT_SOURCE_DIR}/data/premade-decks.json ${GWENT_CATALOG_SOURCE}
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_catalog.py ${CMAKE_CURRENT_SOURCE_DIR}/data/cards.json ${CMAKE_CURRENT_SOURCE_DIR}/data/premade-decks.json
   VERBATIM
 )
 

@@ -145,6 +145,15 @@ static void referenceCatalog() {
   std::vector<Card> deck(22, unit("plain",1));
   assert(validateDeck(deck,*leader,Faction::NorthernRealms).empty());
 
+  const auto& recipes = referencePremadeDecks();
+  assert(recipes.size()==10);
+  for (const auto& recipe : recipes) {
+    const auto premade = makeReferenceDeck(recipe);
+    Card chosenLeader;
+    assert(!premade.empty() && referenceLeader(recipe.leaderReferenceIndex, chosenLeader));
+    assert(validateDeck(premade, chosenLeader, recipe.faction).empty());
+  }
+
   Game mardroeme; Card potion; potion.id="potion"; potion.kind=Kind::Mardroeme;
   mardroeme.players[0].hand.push_back(potion);
   auto berserker=unit("bear-source",4); berserker.name="Berserker"; berserker.berserker=true;

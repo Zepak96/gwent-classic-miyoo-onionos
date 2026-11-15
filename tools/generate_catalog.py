@@ -5,8 +5,10 @@ import sys
 import unicodedata
 
 source = pathlib.Path(sys.argv[1])
-output = pathlib.Path(sys.argv[2])
+premade_source = pathlib.Path(sys.argv[2])
+output = pathlib.Path(sys.argv[3])
 records = json.loads(source.read_text(encoding="utf-8"))
+premade = json.loads(premade_source.read_text(encoding="utf-8"))
 
 factions = {
     "realms": "NorthernRealms", "nilfgaard": "Nilfgaard", "scoiatael": "Scoiatael",
@@ -73,6 +75,13 @@ output.write_text(
     'namespace gwent {\n'
     'const std::vector<Card>& referenceCardCatalog() {\n'
     '  static const std::vector<Card> cards = {\n' + ",\n".join(cards) + '\n  };\n'
-    '  return cards;\n}\n}\n',
+    '  return cards;\n}\n'
+    'const std::vector<ReferenceDeck>& referencePremadeDecks() {\n'
+    '  static const std::vector<ReferenceDeck> decks = {\n' + ",\n".join(
+        '    ReferenceDeck{' + cpp_string(f"reference_{i + 1}") + ', Faction::' + factions[item["faction"]] +
+        ', ' + str(item["leader"]) + ', {' + ', '.join('{' + str(index) + ', ' + str(count) + '}' for index, count in item["cards"]) + '}}'
+        for i, item in enumerate(premade)
+    ) + '\n  };\n'
+    '  return decks;\n}\n}\n',
     encoding="utf-8"
 )

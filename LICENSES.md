@@ -4,7 +4,7 @@
 
 Oryginalny kod tego projektu jest objęty dołączoną licencją MIT. Nie obejmuje ona cudzych zasobów, znaków towarowych ani materiałów gry. Nazwy kart, opisy i katalog danych wymagają oddzielnego przeglądu pochodzenia przed wydaniem.
 
-## Projekty referencyjne (nie dołączone)
+## Repozytoria referencyjne
 
 - `asundr/gwent-classic`, HEAD `08592d847f2573440a34deb9f32bc855b2544cdd` — upstream oznacza kod jako MIT z Commons Clause v1.0 (licensor: Arun Sundaram). Commons Clause wyłącza prawo sprzedaży zdefiniowane w klauzuli i wymaga zachowania informacji licencyjnych. Źródło: https://github.com/asundr/gwent-classic/blob/08592d847f2573440a34deb9f32bc855b2544cdd/LICENSE
 - `ia2904/gwent-classic-v3.5`, HEAD `2efc94ed626c0baeb28fc5e51c0e279ed5ee51dd` — rozwinięty fork; jego kod i zawartość nie są kopiowane do tego repozytorium. Weryfikacja źródeł i plikowych licencji przed ewentualnym użyciem jest wymagana.
@@ -13,7 +13,7 @@ Oryginalny kod tego projektu jest objęty dołączoną licencją MIT. Nie obejmu
 
 ## Zaimportowane dane
 
-`data/cards.json` zawiera 216 mechanicznych rekordów wyciągniętych z `card_dict` w `asundr/gwent-classic` commit `08592d847f2573440a34deb9f32bc855b2544cdd`. Zapisano upstreamowy plik `LICENSE` i informację o pochodzeniu w `third_party/gwent-classic/`. Dane podlegają MIT + Commons Clause v1.0; warunek Commons Clause ogranicza sprzedaż. Przed wydaniem należy zachować ten notice i sprawdzić ograniczenia dystrybucyjne.
+`data/cards.json` zawiera 216 mechanicznych rekordów wyciągniętych z `card_dict`, a `data/premade-decks.json` 10 przepisów talii z `decks.js` w `asundr/gwent-classic` commit `08592d847f2573440a34deb9f32bc855b2544cdd`. Zapisano upstreamowy plik `LICENSE` i informację o pochodzeniu w `third_party/gwent-classic/`. Dane podlegają MIT + Commons Clause v1.0; warunek Commons Clause ogranicza sprzedaż. Przed wydaniem należy zachować ten notice i sprawdzić ograniczenia dystrybucyjne.
 
 Obecność zasobów w którymkolwiek repozytorium nie oznacza praw do ich redystrybucji. Nie dołączono ilustracji, fontów, muzyki, SFX ani kodu z tych repozytoriów. Nie dołączono zasobów CD PROJEKT RED. Nowe zasoby audio/graficzne wymagają własnej dokumentacji autorstwa i licencji przed dystrybucją.
 

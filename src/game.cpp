@@ -401,4 +401,16 @@ std::vector<Card> makeReferenceDeck(const std::vector<std::pair<int, int>>& card
   }
   return deck;
 }
+std::vector<Card> makeReferenceDeck(const ReferenceDeck& recipe) {
+  return makeReferenceDeck(recipe.cardCounts);
+}
+bool referenceLeader(int sourceIndex, Card& leader) {
+  const auto& catalog = referenceCardCatalog();
+  const auto found = std::find_if(catalog.begin(), catalog.end(), [&](const Card& card) {
+    return card.referenceIndex == sourceIndex && card.kind == Kind::Leader && card.deckCopies > 0;
+  });
+  if (found == catalog.end()) return false;
+  leader = *found;
+  return true;
+}
 }
