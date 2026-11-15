@@ -1,0 +1,16 @@
+name: desktop-build
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  engine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DGWENT_WITH_SDL=OFF -DGWENT_BUILD_TESTS=ON
+      - name: Build
+        run: cmake --build build --parallel
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
