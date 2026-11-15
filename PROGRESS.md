@@ -1,6 +1,6 @@
 # Postęp projektu
 
-## Status: początek implementacji — 15.11.2026
+## Status: aktywna implementacja — 15.11.2026
 
 Repozytorium wejściowe było puste. Powstał szkielet C++17/CMake, minimalny model silnika oraz pierwsze testy reguł. To nie jest ukończona gra ani wydanie dla Miyoo.
 
@@ -20,7 +20,9 @@ Docelowa gra to wyłącznie Gwint jako minigra w Wiedźminie 3: Wild Hunt, z zaw
 
 ### Etap 2 — silnik
 
-- [~] Model danych kart i graczy oraz początkowe liczenie punktów, pogoda, róg, scorch, pasowanie i przejście rundy.
+- [~] Model danych kart i graczy; podstawowe punktowanie z pogodą, rogiem, Morale, Więzią i immunitetem Bohaterów.
+- [~] Szpieg, Medyk, Manekin, Zbiórka, Pożoga, pasowanie, remis, przejście rundy i wstępne zdolności frakcji.
+- [ ] Pełna weryfikacja obliczeń (w tym zachowania 3+ kart Więzi) względem Wiedźmina 3 na ustalonym buildzie.
 - [ ] Pełny katalog kart zweryfikowany z ustalonym profilem wersji.
 - [ ] Wszystkie zdolności jednostek, dowódców i frakcji oraz prawidłowa kolejność ich rozstrzygania.
 - [ ] Pełna walidacja talii, mulligan, medyk, manekin i zapis odrzuconych kart.

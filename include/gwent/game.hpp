@@ -23,6 +23,7 @@ struct Card {
   bool agile{false};
   bool morale{false};
   bool bond{false};
+  bool muster{false};
   std::string group;
 };
 struct Player {
@@ -31,12 +32,15 @@ struct Player {
   bool passed{false};
   int score{0};
   int roundWins{0};
+  int roundLosses{0};
   Faction faction{Faction::NorthernRealms};
 };
 struct Game {
   std::array<Player, 2> players;
   Phase phase{Phase::PlayerTurn};
   int currentPlayer{0};
+  int firstPlayer{0};
+  int matchWinner{-1}; // -1 while active; 0/1 for winner; 2 for a drawn match.
   int round{1};
   std::array<bool, 3> weather{false, false, false};
   std::array<bool, 3> horn{false, false, false};
@@ -46,7 +50,8 @@ struct Game {
 
 int calculateScore(const Player&, const std::array<bool,3>& weather,
                    const std::array<bool,3>& horn);
-bool playCard(Game&, int playerIndex, const std::string& cardId, Row target = Row::None);
+bool playCard(Game&, int playerIndex, const std::string& cardId, Row target = Row::None,
+              const std::string& selectedCardId = {});
 bool pass(Game&, int playerIndex);
 bool startNextRound(Game&);
 std::string validateDeck(const std::vector<Card>& deck, Faction faction);
