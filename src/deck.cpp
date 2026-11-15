@@ -115,7 +115,8 @@ bool loadUserDeck(const std::string& path,UserDeck& deck,std::string* error){
   if(faction>static_cast<std::uint8_t>(Faction::Skellige)){setError(error,"deck faction is invalid");return false;}
   decoded.faction=static_cast<Faction>(faction);decoded.leaderReferenceIndex=reader.i32();const auto count=reader.u32();
   if(count>kMaxEntries){setError(error,"deck has too many card entries");return false;}
-  decoded.cardCounts.reserve(count);for(std::uint32_t i=0;i<count;++i)decoded.cardCounts.emplace_back(reader.i32(),reader.i32());
+  decoded.cardCounts.reserve(count);
+  for(std::uint32_t i=0;i<count;++i){const auto referenceIndex=reader.i32();const auto copies=reader.i32();decoded.cardCounts.emplace_back(referenceIndex,copies);}
   if(!reader.done()){setError(error,"deck data is incomplete or invalid");return false;}
   const auto invalid=validateUserDeck(decoded);if(!invalid.empty()){setError(error,invalid);return false;}
   deck=std::move(decoded);setError(error,{});return true;
