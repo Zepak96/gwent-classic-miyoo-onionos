@@ -132,6 +132,12 @@ Funkcja pozostaje nieukończona, dopóki nie ma implementacji i testu. Kompatybi
 - Desktop build, CTest (2/2), `--input-test` oraz SDL smoke test przeszły; kadr komunikatu sprawdzono wizualnie. Nie budowano ARM i nie zapisywano tej zmiany na SD.
 - To nadal częściowy port animacji. Karuzela kart, fade podglądu i ekranu końca gry, dokładna kolejność wszystkich animacji oraz test fizyczny pozostają do zrobienia.
 
+## Animacja ekranu wyniku — 15.11.2026
+
+- Zgodnie z `showEndScreen()` w źródłowym `gwent.js` ekran końca rundy/meczu pojawia się przez fade-in 300 ms. Przeniesiono animację na przyciemnienie planszy, grafikę wyniku i tekst; czas startuje przy wejściu w fazę wyniku i przy wczytaniu zapisu z takim ekranem.
+- Dodano test alpha dla 0/150/300/600 ms oraz osobny kadr smoke w połowie przejścia. Build desktop, CTest (2/2), `--input-test` i pełny SDL smoke przechodzą; kadr sprawdzono wizualnie.
+- Pozostałe animacje źródłowe nadal są otwarte; animacja wyniku nie zamyka audytu 1:1.
+
 ## Animacje z repozytorium źródłowego — 15.11.2026
 
 Przeniesiono do SDL wybrane istniejące animacje źródłowe: lot karty trwa 499 ms, oryginalne grafiki `anim_*.png` są używane dla efektów kart, a nakładka pogody pojawia się i znika w 500 ms. Szczegóły timingów i lista efektów nadal wymagających portu są w `docs/REFERENCE_ANIMATIONS.md`. To jest częściowy postęp, nie ukończony port animacji 1:1. Desktop build, CTest 2/2 i test wejścia SDL przeszły; ta zmiana nie była cross-buildowana dla Miyoo, kopiowana na kartę SD ani sprawdzana na konsoli.

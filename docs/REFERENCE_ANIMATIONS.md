@@ -16,16 +16,16 @@ files under `assets/gwent-classic/img/icons/anim_*.png`.
 | Card preview fade | `style.css` | 300 ms opacity transition | Not ported |
 | Five-card carousel movement | `style.css` and `ui.queueCarousel()` in `gwent.js` | 250 ms base; each adjacent/outer card is staggered by −50/+50/+200 ms; center card has a separate 50 ms glow transition | Not ported |
 | Notifications | `ui.notification()` in `gwent.js` | 150 ms fade-in, 900 ms hold, 150 ms fade-out (1200 ms total) | Source `notif_*.png` art is shown in a queued center banner with matching timing; turn/round/pass/coin events are wired. Notification copy is localized; exact source text typography/layout still needs comparison |
-| Round/game end screen | `gwent.js` | End screen fades in over 300 ms | Not ported |
+| Round/game end screen | `gwent.js` `showEndScreen()` | Result overlay fades from opacity 0 to 1 over 300 ms | Timed 300 ms alpha fade added to result shade, source result art and labels; starts on result phase and resumes from saved result state. Exact source result composition still needs comparison |
 | Other source CSS transitions | `style.css` | Includes 100 ms opacity, color, border, and shadow changes plus 250/500 ms layout transitions | Not ported comprehensively |
 
 ## Verification status
 
 This file is deliberately an inventory, not a completion claim. The native
 implementation reuses original animation PNGs and now covers more of the
-source ability targets, card flight, weather fades, and timed notification
-events. It does not yet reproduce source card movement for every affected card,
-exact asynchronous sequencing, source container geometry, carousel, card
-preview fade, leader/end-screen transitions, or all CSS selection/hover states.
+source ability targets, card flight, weather fades, timed notification events,
+and the result-screen fade. It does not yet reproduce source card movement for
+every affected card, exact asynchronous sequencing, source container geometry,
+carousel, card preview fade, leader transitions, or all CSS selection/hover states.
 Therefore the animation parity checkbox in
 `docs/SOURCE_PARITY.md` remains unchecked.

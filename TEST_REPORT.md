@@ -162,3 +162,8 @@ Ported the reference `Player.canPlay()`, `Player.endTurn()`, and `Game.startRoun
 - Wired initial coin result, round start, turn handoff, pass, and round result events; added PL/EN labels and a persisted notification toggle. Existing settings remain readable.
 - Extended `--input-test` with notification alpha boundaries, queue ordering, disabled behavior, and gameplay transition cases. Desktop build and CTest (2/2), `--input-test`, and the SDL dummy smoke run passed; the notification screenshot was generated and visually inspected.
 - This is one slice of the animation port, not full animation parity. Carousel/preview/end-screen fades, source-exact sequencing and physical Miyoo behavior remain open. No ARM build or SD write was made in this slice.
+
+## Source result-screen fade — 15.11.2026
+
+- Implemented the reference `showEndScreen()` 300 ms fade for the board shade, result art and labels, starting when the game enters a round or match result. A loaded result save starts its fade on load.
+- Added timing-boundary checks at 0/150/300/600 ms and a half-fade SDL smoke frame. Desktop build, CTest (2/2), `--input-test` and the full SDL dummy smoke run passed; the 640×480 half-fade frame was visually inspected. Result-screen source composition and physical Miyoo behavior remain unverified.

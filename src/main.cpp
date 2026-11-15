@@ -182,6 +182,7 @@ struct App {
   bool notificationsEnabled{true};
   std::string activeNotification;
   Uint32 notificationStartedAt{0};
+  Uint32 endScreenStartedAt{0};
   std::vector<std::string> notificationQueue;
   std::vector<std::string> leaderSelections;
   CardFlight cardFlight;
@@ -375,6 +376,10 @@ std::string displayCardName(const App& a,const gwent::Card& card) {
 constexpr Uint32 notificationFadeMs=150;
 constexpr Uint32 notificationHoldMs=900;
 constexpr Uint32 notificationDurationMs=notificationFadeMs*2+notificationHoldMs;
+constexpr Uint32 endScreenFadeMs=300;
+Uint8 endScreenAlpha(Uint32 elapsed) {
+  return static_cast<Uint8>(std::min<Uint32>(elapsed,endScreenFadeMs)*255/endScreenFadeMs);
+}
 Uint8 notificationAlpha(Uint32 elapsed) {
   if(elapsed<notificationFadeMs)return static_cast<Uint8>(elapsed*255/notificationFadeMs);
   if(elapsed<notificationFadeMs+notificationHoldMs)return 255;
@@ -447,6 +452,7 @@ bool loadSavedMatch(App& a) {
   gwent::Game restored;std::string error;
   if(a.savePath.empty()||!gwent::loadGame(a.savePath,restored,&error)) { a.status=tr(a,"no_save");return false; }
   a.game=std::move(restored);a.screen=Screen::Match;a.handIndex=0;a.rowIndex=0;a.targetIndex=0;
+  a.endScreenStartedAt=SDL_GetTicks();
   a.targetMode=false;a.selectedTargets.clear();a.mulligan.clear();a.status=tr(a,"loaded");
   if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+400;
   return true;
@@ -568,7 +574,7 @@ void startMatch(App& a) {
   }
   gwent::beginMatchWithLeaders(a.game,std::move(humanDeck),humanLeader,
       std::move(opponent.cards),opponent.leader,seed,-1);
-  a.mulligan.clear(); a.handIndex=0; a.rowIndex=0; a.screen=Screen::Match;
+  a.mulligan.clear(); a.handIndex=0; a.rowIndex=0; a.screen=Screen::Match;a.endScreenStartedAt=0;
   queueNotification(a,a.game.firstPlayer==0?"me-coin":"op-coin");
   a.audio.play("game_opening");
   a.status=tr(a,"mulligan");
@@ -1237,13 +1243,14 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     }
   }
   if(a.game.phase==gwent::Phase::RoundResult || a.game.phase==gwent::Phase::MatchResult) {
-    box(r,0,0,W,STAGE_H,Color{10,10,10,242});
+    const Uint8 alpha=endScreenAlpha(SDL_GetTicks()-a.endScreenStartedAt);
+    box(r,0,0,W,STAGE_H,Color{10,10,10,static_cast<Uint8>(242u*alpha/255)});
     const bool done=a.game.phase==gwent::Phase::MatchResult;
     const bool won=a.game.matchWinner==0;
-    drawImage(r,a,std::string("img/icons/end_")+(done?(won?"win":"lose"):(won?"win":"lose"))+".png",210,21,220,102);
-    text(r,213,139,done?tr(a,won?"victory":"defeat"):tr(a,"round_complete"),gold,2);
-    text(r,220,174,tr(a,"player_short")+" "+std::to_string(me.score)+"  -  "+std::to_string(op.score)+" "+tr(a,"opponent_short"),paper,1);
-    text(r,265,217,tr(a,"continue"),muted,1);
+    drawImageAlpha(r,a,std::string("img/icons/end_")+(done?(won?"win":"lose"):(won?"win":"lose"))+".png",210,21,220,102,alpha);
+    text(r,213,139,done?tr(a,won?"victory":"defeat"):tr(a,"round_complete"),Color{gold.r,gold.g,gold.b,alpha},2);
+    text(r,220,174,tr(a,"player_short")+" "+std::to_string(me.score)+"  -  "+std::to_string(op.score)+" "+tr(a,"opponent_short"),Color{paper.r,paper.g,paper.b,alpha},1);
+    text(r,265,217,tr(a,"continue"),Color{muted.r,muted.g,muted.b,alpha},1);
   }
   const bool showHand=a.game.phase!=gwent::Phase::RoundResult&&a.game.phase!=gwent::Phase::MatchResult;
   if(!me.hand.empty()&&showHand) {
@@ -1746,6 +1753,7 @@ int main(int argc,char** argv) {
     notificationProbe.notificationStartedAt=SDL_GetTicks()-notificationDurationMs;
     updateNotification(notificationProbe,SDL_GetTicks());
     okay=okay&&notificationProbe.activeNotification=="me-turn"&&notificationProbe.notificationQueue.empty();
+    okay=okay&&endScreenAlpha(0)==0&&endScreenAlpha(150)>=127&&endScreenAlpha(300)==255&&endScreenAlpha(600)==255;
     notificationProbe.notificationsEnabled=false;
     queueNotification(notificationProbe,"op-turn");
     okay=okay&&notificationProbe.activeNotification=="me-turn"&&notificationProbe.notificationQueue.empty();
@@ -1950,6 +1958,15 @@ int main(int argc,char** argv) {
       clearFrame();drawMatchOnScreen(renderer,app);presentFrame();
       if(!saveFrame(argv[11])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
     }
+    if(argc>13) {
+      app.screen=Screen::Match;app.game=gwent::Game{};app.game.phase=gwent::Phase::MatchResult;
+      app.game.matchWinner=0;app.game.players[0].score=42;app.game.players[1].score=37;
+      app.pauseOpen=false;app.cardDetailsOpen=false;app.activeNotification.clear();
+      app.cardFlight.active=false;app.cardEffects.clear();
+      app.endScreenStartedAt=SDL_GetTicks()-150;
+      clearFrame();drawMatchOnScreen(renderer,app);presentFrame();
+      if(!saveFrame(argv[13])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
+    }
     presentFrame();
     for(auto& image:app.textures)if(image.second)SDL_DestroyTexture(image.second);
     app.audio.shutdown();destroyRenderers(); SDL_DestroyWindow(window); SDL_Quit(); return 0;
@@ -2000,6 +2017,8 @@ int main(int argc,char** argv) {
     updateWeatherTransitions(app);
     const auto previousPhase=observedPhase;
     if(app.screen==Screen::Match&&app.game.phase!=observedPhase) {
+      if(app.game.phase==gwent::Phase::RoundResult||app.game.phase==gwent::Phase::MatchResult)
+        app.endScreenStartedAt=now;
       if(app.game.phase==gwent::Phase::Mulligan)app.audio.play("redraw");
       else if(app.game.phase==gwent::Phase::PlayerTurn)app.audio.play("turn_me");
       else if(app.game.phase==gwent::Phase::OpponentTurn)app.audio.play("turn_op");
