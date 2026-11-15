@@ -1,0 +1,20 @@
+{
+  "app.title": "Gwint Klasyczny",
+  "menu.quick_match": "Szybka gra",
+  "menu.deck_builder": "Budowa talii",
+  "menu.tutorial": "Samouczek",
+  "menu.settings": "Ustawienia",
+  "menu.quit": "Wyjście",
+  "language.polish": "Polski",
+  "language.english": "English",
+  "faction.northern_realms": "Królestwa Północy",
+  "faction.nilfgaard": "Nilfgaard",
+  "faction.scoiatael": "Scoia'tael",
+  "faction.monsters": "Potwory",
+  "faction.skellige": "Skellige",
+  "action.pass": "Pasuj",
+  "action.confirm_pass": "Przytrzymaj, aby spasować",
+  "round.label": "Runda",
+  "result.victory": "Zwycięstwo",
+  "result.defeat": "Porażka"
+}

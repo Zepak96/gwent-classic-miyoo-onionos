@@ -1,0 +1,20 @@
+{
+  "app.title": "Gwent Classic",
+  "menu.quick_match": "Quick Match",
+  "menu.deck_builder": "Deck Builder",
+  "menu.tutorial": "Tutorial",
+  "menu.settings": "Settings",
+  "menu.quit": "Quit",
+  "language.polish": "Polski",
+  "language.english": "English",
+  "faction.northern_realms": "Northern Realms",
+  "faction.nilfgaard": "Nilfgaard",
+  "faction.scoiatael": "Scoia'tael",
+  "faction.monsters": "Monsters",
+  "faction.skellige": "Skellige",
+  "action.pass": "Pass",
+  "action.confirm_pass": "Hold to pass",
+  "round.label": "Round",
+  "result.victory": "Victory",
+  "result.defeat": "Defeat"
+}
