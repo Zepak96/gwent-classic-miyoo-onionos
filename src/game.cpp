@@ -327,7 +327,8 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
   if (c.agile && (target == Row::Melee || target == Row::Ranged)) deployRow = target;
   if (c.kind == Kind::Unit && !validRow(deployRow)) return false;
   if (c.kind == Kind::CommanderHorn && !validRow(target)) return false;
-  if (c.kind == Kind::Mardroeme && !validRow(target)) return false;
+  if (c.kind == Kind::CommanderHorn && p.specialOccupied[rowIndex(target)]) return false;
+  if (c.kind == Kind::Mardroeme && (!validRow(target) || p.specialOccupied[rowIndex(target)])) return false;
   const bool typedWeather = hasAbility(c, "frost") || hasAbility(c, "fog") || hasAbility(c, "rain") || hasAbility(c, "storm");
   if (c.kind == Kind::Weather && !typedWeather && !validRow(target)) return false;
 
@@ -366,6 +367,7 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
     case Kind::ClearWeather:
       clearWeather(g); p.graveyard.push_back(c); break;
     case Kind::Mardroeme:
+      p.specialOccupied[rowIndex(target)]=true; p.mardroeme[rowIndex(target)]=true;
       transformBerserkers(p, rowIndex(target)); p.graveyard.push_back(c); break;
     case Kind::Scorch: {
       int strongest = -1;
@@ -389,8 +391,7 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
       p.graveyard.push_back(c); break;
     }
     case Kind::CommanderHorn:
-      if (g.horn[who][rowIndex(target)]) { p.hand.push_back(c); return false; }
-      g.horn[who][rowIndex(target)] = true; p.graveyard.push_back(c); break;
+      p.specialOccupied[rowIndex(target)]=true; g.horn[who][rowIndex(target)] = true; p.graveyard.push_back(c); break;
     case Kind::Decoy: {
       const Card returned=*boardTarget;
       p.hand.push_back(returned);
@@ -403,7 +404,10 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
         g.players[1 - who].board[rowIndex(deployRow)].push_back(c);
         for (int i = 0; i < 2 && !p.deck.empty(); ++i) { p.hand.push_back(p.deck.back()); p.deck.pop_back(); }
       } else p.board[rowIndex(deployRow)].push_back(c);
-      if (c.muster) applyMuster(p, c);
+      if (c.muster) {
+        applyMuster(p, c);
+        for(int row=0;row<3;++row)if(p.mardroeme[row])transformBerserkers(p,row);
+      }
       if (medicIndex >= 0) {
         const Card revived = p.graveyard[medicIndex];
         p.graveyard.erase(p.graveyard.begin()+medicIndex);
@@ -414,7 +418,11 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
       if (hasAbility(c, "scorch_c")) scorchEnemyRow(g, who, 0);
       if (hasAbility(c, "scorch_r")) scorchEnemyRow(g, who, 1);
       if (hasAbility(c, "scorch_s")) scorchEnemyRow(g, who, 2);
-      if (hasAbility(c, "mardroeme")) transformBerserkers(p, rowIndex(deployRow));
+      if (hasAbility(c, "mardroeme")) {
+        p.mardroeme[rowIndex(deployRow)]=true;
+        transformBerserkers(p, rowIndex(deployRow));
+      }
+      if (g.players[who].mardroeme[rowIndex(deployRow)]) transformBerserkers(g.players[who], rowIndex(deployRow));
       break;
     case Kind::Leader:
       p.hand.push_back(c);
@@ -457,7 +465,7 @@ bool activateLeader(Game& g, int who, Row target, const std::vector<std::string>
   };
   if (id=="foltest_king") playWeatherFromDeck("Impenetrable Fog",false);
   else if (id=="foltest_lord") clearWeather(g);
-  else if (id=="foltest_siegemaster") { if(g.horn[who][2]) canActivate=false; else g.horn[who][2]=true; }
+  else if (id=="foltest_siegemaster") { if(player.specialOccupied[2]) canActivate=false; else {player.specialOccupied[2]=true;g.horn[who][2]=true;} }
   else if (id=="foltest_steelforged") scorchEnemyRow(g,who,2);
   else if (id=="foltest_son") scorchEnemyRow(g,who,1);
   else if (id=="emhyr_imperial") playWeatherFromDeck("Torrential Rain",false);
@@ -478,7 +486,7 @@ bool activateLeader(Game& g, int who, Row target, const std::vector<std::string>
     else { player.hand.push_back(*found); grave.erase(found); }
   }
   else if (id=="emhyr_whiteflame" || id=="emhyr_invader" || id=="eredin_treacherous" || id=="francesca_daisy" || id=="king_bran") canActivate=false;
-  else if (id=="eredin_commander") { if(g.horn[who][0]) canActivate=false; else g.horn[who][0]=true; }
+  else if (id=="eredin_commander") { if(player.specialOccupied[0]) canActivate=false; else {player.specialOccupied[0]=true;g.horn[who][0]=true;} }
   else if (id=="eredin_bringer_of_death") {
     auto& grave=player.graveyard;
     auto found=selected.empty()?grave.end():findCard(grave,selected);
@@ -514,7 +522,7 @@ bool activateLeader(Game& g, int who, Row target, const std::vector<std::string>
   }
   else if (id=="eredin_treacherous") canActivate=false;
   else if (id=="francesca_queen") scorchEnemyRow(g,who,0);
-  else if (id=="francesca_beautiful") { if(g.horn[who][1]) canActivate=false; else g.horn[who][1]=true; }
+  else if (id=="francesca_beautiful") { if(player.specialOccupied[1]) canActivate=false; else {player.specialOccupied[1]=true;g.horn[who][1]=true;} }
   else if (id=="francesca_pureblood") playWeatherFromDeck("Biting Frost",false);
   else if (id=="francesca_hope") {
     std::vector<Card> agile;
@@ -562,6 +570,8 @@ bool startNextRound(Game& g) {
   for (int owner = 0; owner < 2; ++owner) {
     auto& player = g.players[owner];
     player.passed = false;
+    player.mardroeme.fill(false);
+    player.specialOccupied.fill(false);
     // Monsters keep one random unit from their side; all other units go to their owner's graveyard.
     int keepRow = -1, keepIndex = -1;
     if (player.faction == Faction::Monsters) {

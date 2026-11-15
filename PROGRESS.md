@@ -18,6 +18,11 @@ nie jest wydaniem do instalacji.
   dystansowego; wejście SDL pozwala przełączać rząd góra/dół przed zatwierdzeniem.
   Test sprawdza również odrzucenie niekompletnego wyboru bez częściowej zmiany
   stanu.
+- Zachowano oddzielnie efekt Mardroeme oraz zajętość slotu specjalnego dla
+  każdego rzędu. Mardroeme z Ermiona nie zajmuje slotu; specjalna karta
+  Mardroeme i zdolności Rogu zajmują go. Berserker zagrany, przywołany Zbiórką
+  lub obecny przy aktywacji jest transformowany. Zapis ma wersję 4 i czyta
+  starsze formaty 2 oraz 3.
 - Weryfikacja lokalna w kontenerze: kompilacja SDL2, CTest 2/2 oraz
   `gwent --input-test` z SDL dummy. Nie jest to test urządzenia Miyoo; nie
   zbudowano ani nie wgrano nowej paczki ARM/SD w tej gałęzi.

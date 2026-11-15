@@ -109,7 +109,7 @@ int weightRowChange(const Game& game,int who,int row,const Card& card) {
   return std::max(0,change);
 }
 int weightHornRow(const Game& game,int who,int row) {
-  if(game.horn[who][row])return 0;
+  if(game.players[who].specialOccupied[row])return 0;
   return std::max(0,scoreRow(game,who,row,game.players[who].board[row],game.weather[row],true)-
                      currentRowScore(game,who,row));
 }
@@ -158,7 +158,7 @@ int weightGlobalScorch(const BoardData& data) {
 }
 int weightMardroemeRow(const Game& game,int who,const Card& card,int row) {
   if(row!=0&&row!=1)return 0;
-  if(card.name=="Mardroeme"&&game.horn[who][row])return 0;
+  if(card.name=="Mardroeme"&&game.players[who].specialOccupied[row])return 0;
   if(row==1&&card.name!="Ermion"&&std::any_of(game.players[who].hand.begin(),game.players[who].hand.end(),
       [](const Card& item){return item.name=="Ermion";}))return 0;
   const std::string target=row==1?"Young Berserker":"Berserker";
@@ -170,12 +170,17 @@ bool hasInHand(const Player& player,const std::string& ability) {
   return std::any_of(player.hand.begin(),player.hand.end(),[&](const Card& c){return has(c,ability);});
 }
 int weightBerserker(const Game& game,int who,int row,const Card& card,int score) {
-  if(!hasInHand(game.players[who],"mardroeme"))return score;
+  if(!hasInHand(game.players[who],"mardroeme") && !game.players[who].mardroeme[row])return score;
   score-=card.power;
   if(row==0)return std::max(1,score+14);
   int count=0;
-  const std::string transformed=card.name=="Young Berserker"?"Transformed Young Vildkaarl":"Transformed Vildkaarl";
-  for(const auto& unit:game.players[who].board[row])if(unit.name==transformed)++count;
+  if(!game.players[who].mardroeme[row]) {
+    for(const auto& unit:game.players[who].board[row])if(unit.name=="Young Berserker")++count;
+  } else {
+    // Preserve ControllerAI.weightBerserker's source expression exactly:
+    // its predicate is a non-empty string literal, so every row card counts.
+    count=static_cast<int>(game.players[who].board[row].size());
+  }
   score=8*((count+1)*(count+1)-count*count)+count*score;
   return std::max(1,score);
 }

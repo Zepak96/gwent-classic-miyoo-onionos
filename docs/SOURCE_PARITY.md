@@ -68,3 +68,21 @@ source behavior. A build or screenshot alone does not count as parity.
 All sections above remain open. The current native prototype has selected
 engine rules, a subset of screens, and asset loading, but it does not meet the
 1:1 acceptance bar. The previous SD package is not a parity release.
+
+## Verified increments on `codex/full-source-parity`
+
+These focused regression checks pass, but they do not close the broader parity
+items above:
+
+- Agile Medic target plus melee/ranged revive row, including Miyoo-style SDL
+  directional input and rejection of an incomplete choice.
+- Mardroeme's persistent row effect, its distinction from special-slot
+  occupancy, Ermion activation, Berserker transformation on later plays and
+  Muster summons, round reset, and save/load state.
+- Decoy fallback considers each own row's maximum units as `ControllerAI` does.
+- An AI action rejected by the port is reported; it is not converted into a
+  voluntary pass.
+
+Verification for the current source tree: SDL2 desktop build, CTest 2/2, and
+`gwent --input-test` with dummy SDL video/audio. No current ARM package or
+physical-device result is claimed.

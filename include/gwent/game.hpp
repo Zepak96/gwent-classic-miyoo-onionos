@@ -43,6 +43,8 @@ struct Player {
   bool leaderPassivesApplied{false};
   bool halfWeather{false};
   bool doubleSpyPower{false};
+  std::array<bool, 3> mardroeme{false, false, false};
+  std::array<bool, 3> specialOccupied{false, false, false};
   int score{0};
   int roundWins{0};
   int roundLosses{0};

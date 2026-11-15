@@ -20,6 +20,19 @@ Data raportu: 2026-11-15.
 
 ## Wynik
 
+### Uzupełnienie modelu Mardroeme i Medyka Agile — 15.11.2026
+
+- Zgodnie z `Row.updateState` w przypiętym `gwent.js`, Mardroeme jest trwałym
+  efektem rzędu w tej rundzie. Silnik rozróżnia ten efekt od zajętego slotu
+  specjalnego, co pozwala poprawnie odwzorować Mardroeme z Ermiona. Test sprawdza
+  transformację istniejącego i później zagranego Berserkera, Zbiórkę, ponowne
+  użycie slotu oraz zapis obu stanów.
+- Zapis stanu używa wersji 4; loader akceptuje formaty 2 i 3.
+- Desktop SDL2 build, CTest 2/2 i `--input-test` pod SDL dummy przechodzą.
+  Nie wykonano ARM cross-builda: Docker Desktop przerwał wcześniejszą próbę i
+  nie powstał z niej pakiet. Nie instalowano zmian na SD ani nie testowano ich
+  na fizycznym Miyoo.
+
 ### Najnowsza weryfikacja — 15.11.2026
 
 - Po ponownym audycie wizualnym podgląd zdolności w meczu zmieniono na czcionkę 2×, ograniczono do czterech wierszy, a dłuższy tekst otrzymuje widoczną wskazówkę `I - PELNY OPIS` / `I - FULL TEXT`. Pełny inspektor pokazuje cały opis Cirilli i cytat. Świeży render 640×480 obejrzano w natywnej skali; testy CTest 2/2 i dekodowanie 35 SFX przeszły. Długie opisy pozostają w inspektorze, a wizualna zgodność 1:1 i test na fizycznym Miyoo nadal są otwarte.

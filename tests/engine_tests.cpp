@@ -178,6 +178,8 @@ static void saveRoundTripAndCorruptionHandling() {
   original.weather={true,false,true}; original.horn[1]={false,true,false};
   original.randomRespawn=true; original.scoiataelChoicePending=false;
   original.skelligeRevivesRemaining=1; original.skelligeRevivePlayer=0; original.skelligeAgileReviveIds={"save-agile"}; original.factionAbilitiesInitialized=true;
+  original.players[1].mardroeme[2]=true;
+  original.players[1].specialOccupied[1]=true;
   original.rngState=0x12345678; original.lastError="persisted diagnostic";
   auto card=unit("save-card",9,Row::None); card.agile=true; card.spy=true; card.group="save-group";
   card.abilities={"spy","agile","morale"}; card.referenceIndex=42; card.deckCopies=3;
@@ -200,6 +202,8 @@ static void saveRoundTripAndCorruptionHandling() {
   assert(restored.players[0].board[1][0].id=="save-board" && restored.players[0].leader.id=="save-leader");
   assert(restored.weather==original.weather && restored.horn==original.horn && restored.weatherCards[0].card.name=="Skellige Storm");
   assert(restored.skelligeRevivesRemaining==1 && restored.skelligeRevivePlayer==0 && restored.skelligeAgileReviveIds==original.skelligeAgileReviveIds && restored.rngState==original.rngState);
+  assert(restored.players[1].mardroeme[2]);
+  assert(restored.players[1].specialOccupied[1]);
   {
     std::fstream file(path,std::ios::binary|std::ios::in|std::ios::out);
     file.seekg(-1,std::ios::end);char byte=0;file.read(&byte,1);byte=static_cast<char>(byte^0x5a);file.seekp(-1,std::ios::end);file.write(&byte,1);
@@ -364,6 +368,36 @@ static void referenceCatalog() {
   assert(playCard(mardroeme,0,"potion",Row::Melee));
   assert(mardroeme.players[0].board[0][0].name=="Transformed Vildkaarl");
   assert(mardroeme.players[0].board[0][0].power==14);
+  assert(mardroeme.players[0].mardroeme[0]);
+  auto laterBerserker=unit("later-berserker",4);laterBerserker.name="Berserker";laterBerserker.berserker=true;
+  mardroeme.players[0].hand.push_back(laterBerserker);
+  mardroeme.currentPlayer=0;mardroeme.phase=Phase::PlayerTurn;
+  assert(playCard(mardroeme,0,"later-berserker"));
+  assert(std::any_of(mardroeme.players[0].board[0].begin(),mardroeme.players[0].board[0].end(),
+                     [](const Card& card){return card.id=="later-berserker"&&card.name=="Transformed Vildkaarl";}));
+  Card secondPotion=potion;secondPotion.id="potion-duplicate";mardroeme.players[0].hand.push_back(secondPotion);
+  mardroeme.currentPlayer=0;mardroeme.phase=Phase::PlayerTurn;
+  assert(!playCard(mardroeme,0,"potion-duplicate",Row::Melee));
+
+  Game mardroemeRound; mardroemeRound.phase=Phase::RoundResult;
+  mardroemeRound.players[0].mardroeme[0]=true;mardroemeRound.players[0].specialOccupied[0]=true;
+  assert(startNextRound(mardroemeRound));
+  assert(!mardroemeRound.players[0].mardroeme[0]&&!mardroemeRound.players[0].specialOccupied[0]);
+
+  Game ermion;auto enabler=unit("ermion",8,Row::Ranged);enabler.abilities={"mardroeme"};
+  auto young=unit("young-berserker",8,Row::Ranged);young.name="Young Berserker";young.berserker=true;
+  ermion.players[0].hand.push_back(enabler);ermion.players[0].board[1].push_back(young);
+  assert(playCard(ermion,0,"ermion"));
+  assert(ermion.players[0].mardroeme[1]);
+  assert(std::any_of(ermion.players[0].board[1].begin(),ermion.players[0].board[1].end(),
+                     [](const Card& card){return card.id=="young-berserker"&&card.name=="Transformed Young Vildkaarl";}));
+  Card rowMardroeme;rowMardroeme.id="row-mardroeme";rowMardroeme.kind=Kind::Mardroeme;
+  ermion.players[0].hand.push_back(rowMardroeme);ermion.currentPlayer=0;ermion.phase=Phase::PlayerTurn;
+  assert(playCard(ermion,0,"row-mardroeme",Row::Ranged));
+  assert(ermion.players[0].mardroeme[1]&&ermion.players[0].specialOccupied[1]);
+  Card rowHorn;rowHorn.id="row-horn";rowHorn.kind=Kind::CommanderHorn;ermion.players[0].hand.push_back(rowHorn);
+  ermion.currentPlayer=0;ermion.phase=Phase::PlayerTurn;
+  assert(!playCard(ermion,0,"row-horn",Row::Ranged));
 }
 static void aiUsesNoHiddenCardsAndCompletesMatches() {
   Game a, b;
