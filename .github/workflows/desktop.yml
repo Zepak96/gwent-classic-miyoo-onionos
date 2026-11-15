@@ -27,4 +27,11 @@ jobs:
       - name: Test
         run: ctest --test-dir build-sdl --output-on-failure
       - name: Frontend smoke test
-        run: SDL_VIDEODRIVER=dummy ./build-sdl/gwent --smoke-test
+        run: SDL_VIDEODRIVER=dummy ./build-sdl/gwent --smoke-test frontend-smoke.bmp
+      - name: Upload frontend smoke frame
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-smoke-frame
+          path: frontend-smoke.bmp
+          if-no-files-found: error
+          retention-days: 7

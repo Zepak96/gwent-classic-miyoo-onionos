@@ -397,7 +397,16 @@ int main(int argc,char** argv) {
     app.screen=Screen::DeckSelect; drawDeckSelect(renderer,app); SDL_RenderPresent(renderer);
     startMatch(app);
     gwent::replaceMulliganCards(app.game,0,{}); gwent::replaceMulliganCards(app.game,1,{});
-    drawMatch(renderer,app); SDL_RenderPresent(renderer);
+    drawMatch(renderer,app);
+    if(argc>2) {
+      SDL_Surface* surface=SDL_CreateRGBSurfaceWithFormat(0,W,H,32,SDL_PIXELFORMAT_ARGB8888);
+      if(!surface || SDL_RenderReadPixels(renderer,nullptr,SDL_PIXELFORMAT_ARGB8888,surface->pixels,surface->pitch)!=0 || SDL_SaveBMP(surface,argv[2])!=0) {
+        if(surface)SDL_FreeSurface(surface);
+        SDL_DestroyRenderer(renderer); SDL_DestroyWindow(window); SDL_Quit(); return 4;
+      }
+      SDL_FreeSurface(surface);
+    }
+    SDL_RenderPresent(renderer);
     SDL_DestroyRenderer(renderer); SDL_DestroyWindow(window); SDL_Quit(); return 0;
   }
   while(running) {
