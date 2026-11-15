@@ -404,11 +404,21 @@ AiAction chooseAiAction(Game& game,int who) {
   actions.reserve(player.hand.size()+2);
   for(const auto& card:player.hand) {
     const auto choice=cardAction(game,who,card,data);
-    actions.push_back({choice,static_cast<double>(std::max(0,weightCard(game,who,card,data)))});
+    int weight=std::max(0,weightCard(game,who,card,data));
+    if(weight>0) {
+      Game preview=game;
+      if(!playCard(preview,who,choice.cardId,choice.target,choice.selectedCardId))weight=0;
+    }
+    actions.push_back({choice,static_cast<double>(weight)});
   }
   if(player.leaderAbilityAvailable && !player.leader.abilities.empty()) {
     const auto choice=chooseLeaderAction(game,who,data);
-    actions.push_back({choice,static_cast<double>(std::max(0,weightLeader(game,who,data,player.leader.abilities.front())))});
+    int weight=std::max(0,weightLeader(game,who,data,player.leader.abilities.front()));
+    if(weight>0) {
+      Game preview=game;
+      if(!activateLeader(preview,who,choice.target,choice.leaderSelection))weight=0;
+    }
+    actions.push_back({choice,static_cast<double>(weight)});
   }
   double passWeight=0.0;
   if(2-player.roundLosses>1) {
