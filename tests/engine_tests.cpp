@@ -1,5 +1,6 @@
 #include "gwent/game.hpp"
 #include "gwent/catalog.hpp"
+#include "gwent/ai.hpp"
 #include <algorithm>
 #include <cassert>
 #include <utility>
@@ -162,4 +163,29 @@ static void referenceCatalog() {
   assert(mardroeme.players[0].board[0][0].name=="Transformed Vildkaarl");
   assert(mardroeme.players[0].board[0][0].power==14);
 }
-int main() { scoreRules(); turnsAndRounds(); abilitiesAndValidation(); openingHandAndMulligan(); referenceCatalog(); }
+static void aiUsesNoHiddenCardsAndCompletesMatches() {
+  Game a, b;
+  a.players[0].hand.push_back(unit("visible",4)); b.players[0].hand.push_back(unit("visible",4));
+  a.players[1].hand.push_back(unit("hidden-A",1)); b.players[1].hand.push_back(unit("hidden-B",15));
+  a.players[1].hand[0].name="private hand A"; b.players[1].hand[0].name="private hand B";
+  const auto choiceA=chooseAiAction(a,0,Difficulty::Hard);
+  const auto choiceB=chooseAiAction(b,0,Difficulty::Hard);
+  assert(choiceA.pass==choiceB.pass && choiceA.cardId==choiceB.cardId && choiceA.target==choiceB.target);
+
+  const auto& recipes=referencePremadeDecks();
+  const auto deck0=makeReferenceDeck(recipes[0]);
+  const auto deck1=makeReferenceDeck(recipes[2]);
+  Game game;
+  beginMatch(game,deck0,recipes[0].faction,deck1,recipes[2].faction,0x987654,0);
+  assert(replaceMulliganCards(game,0,{})); assert(replaceMulliganCards(game,1,{}));
+  int actions=0;
+  while(game.phase!=Phase::MatchResult && actions<500) {
+    if(game.phase==Phase::RoundResult) { assert(startNextRound(game)); continue; }
+    const int actor=game.currentPlayer;
+    const auto action=chooseAiAction(game,actor,Difficulty::Hard);
+    const bool ok=action.pass ? pass(game,actor) : playCard(game,actor,action.cardId,action.target,action.selectedCardId);
+    assert(ok); ++actions;
+  }
+  assert(game.phase==Phase::MatchResult && actions<500);
+}
+int main() { scoreRules(); turnsAndRounds(); abilitiesAndValidation(); openingHandAndMulligan(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); }

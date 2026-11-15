@@ -18,7 +18,7 @@ add_custom_command(
   VERBATIM
 )
 
-add_library(gwent_engine src/game.cpp ${GWENT_CATALOG_SOURCE})
+add_library(gwent_engine src/game.cpp src/ai.cpp ${GWENT_CATALOG_SOURCE})
 target_include_directories(gwent_engine PUBLIC include)
 if(MSVC)
   target_compile_options(gwent_engine PRIVATE /W4 /permissive-)
