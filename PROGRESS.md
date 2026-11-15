@@ -76,3 +76,4 @@ Nie zmienia to bieżącego celu: najpierw kompletna rozgrywka Gwinta z Wiedźmin
 ## Zasada raportowania
 
 Funkcja pozostaje nieukończona, dopóki nie ma implementacji i testu. Kompatybilność urządzenia nie będzie oznaczana jako potwierdzona bez testu fizycznego.
+- [~] Po ponownym zgłoszeniu czytelności powiększono podgląd kart na stole i grafikę w inspektorze (w tym cytat Cirilli), zmieniono kolor oraz centrowanie liczb siły i zwiększono kontrast panelu opisu. Lokalny frontend SDL zbudował się i wygenerował cztery klatki smoke 640×480; fizyczny test Miyoo pozostaje otwarty.

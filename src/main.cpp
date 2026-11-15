@@ -424,12 +424,12 @@ void drawSourceCard(SDL_Renderer* r,const App& a,int x,int y,const gwent::Card& 
       const int scale=power.size()>1?1:2;
       centeredTextInBox(r,x-1,y-2,24,25,power,paper,scale);
     } else {
-      const int advance=std::min(6,12/static_cast<int>(power.size()));
-      const int numberX=x+1+(12-advance*static_cast<int>(power.size()))/2;
-      // Normal medallions are only about 12 px wide at this render scale.
-      // Fit two digit strengths inside that inner circle and center them.
-      narrowText(r,numberX,y+3,power,Color{28,21,13,220},advance);
-      narrowText(r,numberX,y+2,power,ink,advance);
+      // The badge's inner disc is 12x12 px at the 640x480 render size.
+      // Use the regular bitmap glyphs so two-digit strengths remain legible.
+      const int numberWidth=static_cast<int>(power.size())*6-1;
+      const int numberX=x+6-numberWidth/2;
+      text(r,numberX+1,y+4,power,Color{190,145,70,255},1);
+      text(r,numberX,y+3,power,ink,1);
     }
   }
   if(card.row!=gwent::Row::None) {
@@ -480,12 +480,14 @@ void drawCardFlight(SDL_Renderer* r,const App& a) {
 std::vector<std::string> wrapDetailText(const std::string& value,std::size_t limit);
 void drawCardPreview(SDL_Renderer* r,const App& a,const gwent::Card& card) {
   // CSS reference: .card-preview art at (80.3vw, 11.95vw), 16.1vw x 30.4vw.
-  drawImage(r,a,"img/lg/"+gwent::referenceCardImage(card.referenceIndex),514,76,103,195);
+  // Give the enlarged card enough pixels for its printed name and flavor text
+  // to survive the Miyoo's 640x480 output without competing with board labels.
+  drawImage(r,a,"img/lg/"+gwent::referenceCardImage(card.referenceIndex),489,15,127,241);
   const std::string& title=gwent::referenceCardAbilityTitle(card.referenceIndex);
   const std::string& description=gwent::referenceCardDescription(card.referenceIndex);
   if(title.empty()&&description.empty())return;
-  box(r,435,276,186,80,Color{20,20,20,242});
-  box(r,435,276,186,1,Color{255,255,255,87});
+  box(r,435,266,186,90,Color{12,12,12,255});
+  box(r,435,266,186,1,Color{255,255,255,110});
   box(r,435,355,186,1,Color{255,255,255,87});
   std::string icon;
   if(card.kind!=gwent::Kind::Leader&&!card.abilities.empty()&&
@@ -496,25 +498,18 @@ void drawCardPreview(SDL_Renderer* r,const App& a,const gwent::Card& card) {
     if(icon.rfind("scorch",0)==0)icon="scorch";
     if(icon=="hero")icon.clear();
   } else if(card.agile)icon="agile";
-  if(!icon.empty())drawImage(r,a,"img/icons/card_ability_"+icon+".png",441,281,14,14);
-  text(r,465,282,title,Color{210,180,120},1);
+  if(!icon.empty())drawImage(r,a,"img/icons/card_ability_"+icon+".png",441,271,14,14);
+  const auto titleLines=wrapDetailText(title,26);
+  int textY=271;
+  for(const auto& line:titleLines) { text(r,459,textY,line,Color{255,220,153},1);textY+=9; }
   const auto lines=wrapDetailText(description,29);
   for(std::size_t i=0;i<lines.size();++i) {
     const auto& line=lines[i];
-    const auto drawTall=[&](int ox,int oy,Color c) {
-      color(r,c);
-      for(std::size_t n=0;n<line.size();++n) {
-        const auto it=font().find(line[n]);const Glyph g=it==font().end()?font().at('?'):it->second;
-        for(int row=0;row<7;++row)for(int col=0;col<5;++col)if(g[row]&(1u<<(4-col))) {
-          const int top=(row*3)/2,bottom=((row+1)*3)/2;
-          const int renderedWidth=static_cast<int>(line.size())*6-1;
-          const int startX=435+(186-renderedWidth)/2;
-          SDL_Rect p{startX+static_cast<int>(n)*6+col+ox,289+static_cast<int>(i)*11+top+oy,1,bottom-top};SDL_RenderFillRect(r,&p);
-        }
-      }
-    };
-    drawTall(1,1,Color{0,0,0,230});
-    drawTall(0,0,Color{235,223,198});
+    const int lineY=textY+static_cast<int>(i)*11;
+    if(lineY+7>354)break;
+    const int lineX=435+(186-textWidth(line))/2;
+    text(r,lineX+1,lineY+1,line,Color{0,0,0,255},1);
+    text(r,lineX,lineY,line,Color{255,243,219,255},1);
   }
 }
 std::vector<std::string> wrapDetailText(const std::string& value,std::size_t limit) {
@@ -535,29 +530,29 @@ std::vector<std::string> wrapDetailText(const std::string& value,std::size_t lim
 }
 void drawCardDetails(SDL_Renderer* r,const App& a,const gwent::Card& card) {
   box(r,0,0,W,H,Color{0,0,0,255});
-  drawImage(r,a,"img/lg/"+gwent::referenceCardImage(card.referenceIndex),24,24,214,406);
-  frame(r,23,23,216,408,gold);
-  box(r,252,23,366,434,Color{20,20,20,250});
-  frame(r,252,23,366,434,Color{143,108,54});
-  text(r,270,40,tr(a,"card_details"),gold,2);
+  drawImage(r,a,"img/lg/"+gwent::referenceCardImage(card.referenceIndex),8,8,246,465);
+  frame(r,7,7,248,467,gold);
+  box(r,264,23,354,434,Color{20,20,20,250});
+  frame(r,264,23,354,434,Color{143,108,54});
+  text(r,280,40,tr(a,"card_details"),gold,2);
   const auto nameLines=wrapDetailText(card.name,27);
   int y=68;
-  for(const auto& line:nameLines) { text(r,270,y,line,paper,2);y+=18; }
+  for(const auto& line:nameLines) { text(r,280,y,line,paper,2);y+=18; }
   std::string row=card.row==gwent::Row::Ranged?tr(a,"ranged"):card.row==gwent::Row::Siege?tr(a,"siege"):card.row==gwent::Row::Melee?tr(a,"melee"):tr(a,"special");
-  text(r,270,y+4,tr(a,"power")+" "+std::to_string(card.power)+"  "+tr(a,"row")+" "+row,Color{210,180,120},1);
+  text(r,280,y+4,tr(a,"power")+" "+std::to_string(card.power)+"  "+tr(a,"row")+" "+row,Color{235,207,164},1);
   y+=28;
   const auto& title=gwent::referenceCardAbilityTitle(card.referenceIndex);
   const auto& description=gwent::referenceCardDescription(card.referenceIndex);
   if(!title.empty()) {
-    for(const auto& line:wrapDetailText(title,27)) { text(r,270,y,line,gold,2);y+=18; }
+    for(const auto& line:wrapDetailText(title,27)) { text(r,280,y,line,gold,2);y+=18; }
     y+=4;
   }
   const auto descriptionLines=wrapDetailText(description.empty()?tr(a,"no_ability"):description,28);
   for(const auto& line:descriptionLines) {
     if(y>414)break;
-    text(r,270,y,line,Color{220,210,190},2);y+=18;
+    text(r,280,y,line,Color{242,234,218},2);y+=18;
   }
-  text(r,270,433,tr(a,"close_card"),Color{149,149,149},1);
+  text(r,280,433,tr(a,"close_card"),Color{185,185,185},1);
 }
 void drawRow(SDL_Renderer* r,const App& a,int owner,int row,int y) {
   constexpr int left=170,width=336,rowHeight=44;
