@@ -827,6 +827,14 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     drawCardDetails(r,a,me.hand[static_cast<std::size_t>(selected)]);
   }
 }
+void drawMatchOnScreen(SDL_Renderer* r,const App& a) {
+  // The reference match board is 16:9 (640x360); center it on Miyoo's 4:3
+  // 640x480 screen instead of pinning the unused 120 px to the bottom.
+  SDL_Rect stageViewport{0,(H-STAGE_H)/2,W,STAGE_H};
+  SDL_RenderSetViewport(r,&stageViewport);
+  drawMatch(r,a);
+  SDL_RenderSetViewport(r,nullptr);
+}
 void handleMatchKey(App& a,SDL_Keycode key) {
   if(key==SDLK_ESCAPE) { a.screen=Screen::DeckSelect; a.targetMode=false; return; }
   if(key==SDLK_s||key==SDLK_F5) { saveCurrentMatch(a);return; }
@@ -1069,7 +1077,7 @@ int main(int argc,char** argv) {
     gwent::replaceMulliganCards(app.game,0,{}); gwent::replaceMulliganCards(app.game,1,gwent::chooseAiMulligan(app.game,1));
     app.game.phase=gwent::Phase::PlayerTurn;app.game.currentPlayer=0;
     clearFrame();
-    drawMatch(renderer,app);
+    drawMatchOnScreen(renderer,app);
     if(argc>2&&!saveFrame(argv[2])) { app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 4; }
     if(argc>5) {
       app.game.phase=gwent::Phase::PlayerTurn;app.game.currentPlayer=0;
@@ -1082,7 +1090,7 @@ int main(int argc,char** argv) {
       if(!gwent::playCard(app.game,0,card.id,row)) { app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 5; }
       animatePlayedCard(app,card,0,index,before);
       app.cardFlight.startedAt=SDL_GetTicks()>250?SDL_GetTicks()-250:0;
-      clearFrame();drawMatch(renderer,app);SDL_RenderPresent(renderer);
+      clearFrame();drawMatchOnScreen(renderer,app);SDL_RenderPresent(renderer);
       if(!saveFrame(argv[5])) { app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 4; }
     }
     SDL_RenderPresent(renderer);
@@ -1128,7 +1136,7 @@ int main(int argc,char** argv) {
     if(app.screen==Screen::Title)drawTitle(renderer,app);
     else if(app.screen==Screen::DeckSelect)drawDeckSelect(renderer,app);
     else if(app.screen==Screen::DeckBuilder)drawDeckBuilder(renderer,app);
-    else drawMatch(renderer,app);
+    else drawMatchOnScreen(renderer,app);
     SDL_RenderPresent(renderer); SDL_Delay(8);
   }
   for(auto& image:app.textures)if(image.second)SDL_DestroyTexture(image.second);
