@@ -148,3 +148,10 @@ Ported the reference `Player.canPlay()`, `Player.endTurn()`, and `Game.startRoun
 - Catalog validation checks complete name-map and ability-map coverage; engine tests check Geralt's English/Polish name and translated ability description across the catalog.
 - Fresh desktop configure/build passed; CTest passed 2/2; SDL `--input-test` passed; 640×480 Polish detail/deck smoke frames were generated and visually inspected.
 - This does not complete UI localization: several static prompts and labels remain English, official Polish text still requires a source-by-source review, and no ARM/SD/device validation was performed.
+
+## Start on the source DeckMaker screen — 15.11.2026
+
+- Removed the invented title screen and made the deck editor the app's initial screen, matching the source's immediate `new DeckMaker()` initialization.
+- The auxiliary deck selector's Escape path returns to the deck editor. Startup-screen checks run in `--input-test` and `--smoke-test`.
+- Desktop build, CTest 2/2, `--input-test`, and a six-frame SDL dummy smoke run passed; the initial DeckMaker frame is saved at `artifacts/qa/deckmaker-start.png`.
+- Only the initial-screen flow is aligned here; DeckMaker geometry and interaction parity remain open. No ARM, SD, or physical-device validation was done.

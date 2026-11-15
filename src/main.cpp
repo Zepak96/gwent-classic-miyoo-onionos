@@ -147,7 +147,7 @@ void rowScoreText(SDL_Renderer* r,int x,int y,const std::string& value) {
   tallTextInBox(r,x,y,17,44,value,ink,true);
 }
 
-enum class Screen { Title, DeckSelect, DeckBuilder, Match };
+enum class Screen { DeckSelect, DeckBuilder, Match };
 enum class Language { Polish, English };
 struct App {
   struct CardFlight {
@@ -165,7 +165,7 @@ struct App {
     Uint32 startedAt{0};
     Uint32 duration{1650};
   };
-  Screen screen{Screen::Title};
+  Screen screen{Screen::DeckBuilder};
   Language language{Language::Polish};
   std::size_t deckIndex{0};
   int deckSlot{1};
@@ -919,18 +919,6 @@ void updateWeatherTransitions(App& a) {
   }
   a.weatherInitialized=true;
 }
-void drawTitle(SDL_Renderer* r,const App& a) {
-  drawImage(r,a,"img/board.jpg",0,0,W,H);box(r,0,0,W,H,Color{13,19,20,205});box(r,0,0,W,5,gold);box(r,0,H-5,W,5,gold);
-  box(r,54,54,532,372,panel); frame(r,54,54,532,372,gold); frame(r,61,61,518,358,Color{95,83,58});
-  text(r,134,103,tr(a,"title"),gold,3);
-  text(r,132,151,a.language==Language::Polish?"WIEDŹMIN 3 - GWINT KLASYCZNY":"THE WITCHER 3 - CLASSIC GWENT",paper,1);
-  text(r,116,177,a.language==Language::Polish?"PORT DLA JEDNEGO GRACZA NA MIYOO MINI PLUS":"A SINGLE PLAYER PORT FOR MIYOO MINI PLUS",muted,1);
-  box(r,118,231,404,2,gold);
-  text(r,202,266,tr(a,"start"),paper,2);
-  text(r,164,309,a.language==Language::Polish?"KRZYŻAK / STRZAŁKI - RUCH":"D-PAD / ARROWS TO MOVE",muted,1);
-  text(r,174,332,a.language==Language::Polish?"X / ENTER - WYBIERZ":"X / ENTER TO SELECT",muted,1);
-  text(r,250,389,a.language==Language::Polish?"1.0 - PORT W TRAKCIE":"1.0 - PORT IN PROGRESS",gold,1);
-}
 void drawDeckSelect(SDL_Renderer* r,const App& a) {
   box(r,0,0,W,H,ink); box(r,0,0,W,5,gold); box(r,0,H-5,W,5,gold);
   text(r,22,18,tr(a,"choose"),gold,2);
@@ -1455,11 +1443,8 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
   }
   if(key==SDLK_i&&(a.screen==Screen::DeckBuilder||a.screen==Screen::Match)) { a.cardDetailsOpen=true;a.audio.play("open");return; }
   if(key==SDLK_v) { a.audio.setEnabled(!a.audio.enabled());if(a.audio.enabled())a.audio.play("ui_card");return; }
-  if(key==SDLK_ESCAPE && a.screen==Screen::Title) { running=false; return; }
-  if(a.screen==Screen::Title) {
-    if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x||key==SDLK_SPACE)a.screen=Screen::DeckSelect;
-  } else if(a.screen==Screen::DeckSelect) {
-    if(key==SDLK_ESCAPE) { a.screen=Screen::Title; return; }
+  if(a.screen==Screen::DeckSelect) {
+    if(key==SDLK_ESCAPE) { openDeckEditor(a); return; }
     if(key==SDLK_z) { a.language=a.language==Language::Polish?Language::English:Language::Polish;saveSettings(a);return; }
     if(key==SDLK_r) { loadSavedMatch(a);return; }
     if(key==SDLK_b) { openDeckEditor(a);return; }
@@ -1637,9 +1622,11 @@ int main(int argc,char** argv) {
     app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return okay?0:5;
   }
   if(argc>1&&std::string(argv[1])=="--input-test") {
+    const bool startsInDeckMaker=app.screen==Screen::DeckBuilder;
     app.miyooControls=true;
     app.screen=Screen::Match;
-    bool okay=normalizeMiyooKey(app,SDLK_LCTRL)==SDLK_x&&
+    bool okay=startsInDeckMaker&&
+              normalizeMiyooKey(app,SDLK_LCTRL)==SDLK_x&&
               normalizeMiyooKey(app,SDLK_LALT)==SDLK_ESCAPE&&
               normalizeMiyooKey(app,SDLK_LSHIFT)==SDLK_i&&
               normalizeMiyooKey(app,SDLK_SPACE)==SDLK_l&&
@@ -1709,6 +1696,7 @@ int main(int argc,char** argv) {
   }
   app.audio.play("menu_opening");
   if(argc>1 && std::string(argv[1])=="--smoke-test") {
+    if(app.screen!=Screen::DeckBuilder) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 11; }
     const auto clearFrame=[&](){SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);};
     const auto saveFrame=[&](const char* path){
       SDL_Surface* surface=SDL_CreateRGBSurfaceWithFormat(0,W,H,32,SDL_PIXELFORMAT_ARGB8888);
@@ -1771,14 +1759,13 @@ int main(int argc,char** argv) {
       if(!saveFrame(argv[6])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
     }
     if(argc>7) {
-      app.screen=Screen::Title;
+      app.screen=Screen::DeckSelect;
       bool smokeRunning=true;
-      handleKey(app,SDLK_RETURN,smokeRunning);
-      if(app.screen!=Screen::DeckSelect) {
+      handleKey(app,SDLK_ESCAPE,smokeRunning);
+      if(app.screen!=Screen::DeckBuilder) {
         app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 7;
       }
-      app.screen=Screen::Title;
-      clearFrame();drawTitle(renderer,app);presentFrame();
+      clearFrame();drawDeckBuilder(renderer,app);presentFrame();
       if(!saveFrame(argv[7])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
     }
     const auto& catalog=gwent::referenceCardCatalog();
@@ -1881,8 +1868,7 @@ int main(int argc,char** argv) {
     }
     app.audio.playMusic(app.screen==Screen::Match?"match":"menu");
     SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);
-    if(app.screen==Screen::Title)drawTitle(renderer,app);
-    else if(app.screen==Screen::DeckSelect)drawDeckSelect(renderer,app);
+    if(app.screen==Screen::DeckSelect)drawDeckSelect(renderer,app);
     else if(app.screen==Screen::DeckBuilder)drawDeckBuilder(renderer,app);
     else drawMatchOnScreen(renderer,app);
     presentFrame(); SDL_Delay(8);

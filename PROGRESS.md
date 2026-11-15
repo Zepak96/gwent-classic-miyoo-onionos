@@ -144,3 +144,7 @@ Porównanie z `abilities.js` i `Card.animate()` wykazało, że nakładki muszą 
 ## Lokalizacja katalogu kart PL/EN — 15.11.2026
 
 Generator katalogu kompiluje teraz osobne nazwy kart oraz tytuły/opisy zdolności po polsku i angielsku; UI wybiera tekst według ustawienia języka, a wybrane nazwy są nakładane nad oryginalną ilustracją w podglądzie i inspektorze. Dodano polskie glify bitmapowe i kontrolę, że każda nazwa katalogowa oraz każda zdolność źródłowa ma wpis PL. Test sprawdza Geralta w obu językach i obecność tłumaczeń dla wszystkich 258 instancji kart. Desktop build, CTest (2/2), `--input-test` oraz zrzut smoke 640×480 przeszły. Lokalizacja statycznych komunikatów UI nie jest jeszcze pełna, a tłumaczenia nazw wymagają weryfikacji względem oficjalnej polskiej wersji gry; parytet i build ARM pozostają otwarte.
+
+## Start z ekranem DeckMaker jak w źródle — 15.11.2026
+
+Pin `gwent.js` kończy inicjalizację przez `let dm = new DeckMaker()`, bez ekranu tytułowego. SDL uruchamia się teraz od razu w edytorze talii; usunięto nieźródłowy ekran tytułowy, a powrót z pomocniczego selektora talii prowadzi z powrotem do edytora. Test wejścia sprawdza domyślny ekran, a smoke przetestował render DeckMakera oraz powrót selektora. Build, CTest (2/2), `--input-test` i pełny smoke z sześcioma zrzutami zakończyły się poprawnie. Edytor nie odtwarza jeszcze całej geometrii i wszystkich operacji DeckMakera, dlatego pozycja parytetu pozostaje otwarta. Bez cross-builda i zapisu na SD.
