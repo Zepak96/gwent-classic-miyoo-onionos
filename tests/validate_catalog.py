@@ -22,6 +22,8 @@ assert all("description" in item for item in ability_text.values())
 asset_root = root.parent / "assets" / "gwent-classic" / "img"
 for icon in ("ui_exit", "ui_music", "ui_notification", "ui_sfx", "ui_trash", "ui_view"):
     assert (asset_root / "icons" / f"{icon}.png").is_file(), f"Missing rasterized UI icon: {icon}"
+sfx_root = root.parent / "assets" / "gwent-classic" / "sfx"
+assert len(list(sfx_root.glob("*.mp3"))) == 35
 for card in cards:
     image = f"{card['deck']}_{card['filename']}.jpg"
     assert (asset_root / "sm" / image).is_file(), f"Missing small card image: {image}"

@@ -20,7 +20,7 @@ Po podłączeniu edytora do menu workflow [desktop-build #43717386389](https://g
 | Budowanie ARM | Niewykonane | Brak uruchomionego toolchaina |
 | Zasady / regresja | Częściowo zaliczone w CI | Testy jednostkowe istnieją dla wybranych reguł, liderów i AI; kompletne pokrycie gry nadal nie istnieje |
 | Interfejs 640×480 | Wstępny smoke zaliczony | Prototyp buduje się, uruchamia i generuje oglądany kadr; brak testu interakcji i pełnej QA wizualnej |
-| Audio | Niewykonane | Brak implementacji audio i legalnych ścieżek |
+| Audio | Częściowo zaliczone desktopowo | `dr_mp3` dekoduje wszystkie 35 MP3; SDL Audio miksuje dźwięki zdarzeń. Brak muzyki w repo źródłowym i testu dźwięku na Miyoo. |
 | OnionOS | Niewykonane | Brak binarki/paczki i urządzenia |
 | Długi test / RAM | Niewykonane | Nie przeprowadzono |
 
@@ -37,3 +37,5 @@ Nie uruchomiono jeszcze portu na fizycznym Miyoo Mini Plus. Po podłączeniu ada
 Po porównaniu renderera SDL z `style.css` poprawiono położenie liczników/pól rzędów i początek układania kart w środkowym panelu, bazując na oryginalnym podziale 26.5% / 52.5% / 21% i proporcjach rzędów. Dodano też kartę dużego podglądu i panel opisu zdolności w pozycjach źródłowych oraz zaimportowano 44 wpisy nazw/opisów zdolności z przypiętego `abilities.js`. Build desktop SDL2 w Ubuntu 24.04 zakończył się powodzeniem; CTest: 2/2. Smoke test wyrenderował edytor i mecz; obrazy sprawdzono wizualnie. Klatki nadal pokazują odstępstwa od źródła, m.in. nieodtworzone panele pozostałych akcji/karty, oryginalną typografię i zachowanie nakładek. Zmiana geometrii i dodanie podglądu nie są dowodem portu 1:1; zgodność wizualna i sprzętowa pozostaje niezaliczona.
 
 Następnie sześć źródłowych ikon SVG zrasteryzowano do PNG 256×256 przez CairoSVG 2.9.1. Renderer meczu przełączono na PNG dla muzyki, efektów i powiadomień; wizualny smoke test potwierdził widoczne ikony. Build i CTest (2/2) przeszły ponownie. Pozostałe UI i rzeczywiste interakcje nie zostały przez tę kontrolę zaakceptowane jako zgodne 1:1.
+
+Dodano własny dekoder MP3 `dr_mp3` (Unlicense/public domain) oraz odtwarzanie wielokanałowych efektów przez SDL Audio. Desktopowy build zakończył się powodzeniem; CTest 2/2, a `SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy gwent --audio-test` pomyślnie zdekodował wszystkie 35 plików. To weryfikuje dekodowanie i otwarcie urządzenia SDL dummy, nie fizyczny głośnik Miyoo. Renderowane klatki edytora i meczu zapisano w `docs/screenshots/current-deck-smoke.png` oraz `docs/screenshots/current-match-smoke.png`; są to zrzuty desktopowego smoke testu, nie test sprzętowy.

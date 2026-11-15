@@ -26,6 +26,8 @@ jobs:
         run: cmake --build build-sdl --parallel
       - name: Test
         run: ctest --test-dir build-sdl --output-on-failure
+      - name: Decode reference SFX
+        run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./build-sdl/gwent --audio-test
       - name: Frontend smoke test
         run: SDL_VIDEODRIVER=dummy ./build-sdl/gwent --smoke-test frontend-smoke.bmp deck-builder-smoke.bmp
       - name: Upload frontend smoke frames

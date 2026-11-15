@@ -6,7 +6,7 @@ Projekt używa C++17 i CMake. Konfiguracja zakłada opcjonalny frontend SDL2 i n
 
 ## Desktop
 
-Wymagania: CMake 3.16+, kompilator C++17, Python 3, SDL2. Python generuje natywny katalog kart na etapie kompilacji. Z katalogu projektu:
+Wymagania: CMake 3.16+, kompilator C++17, Python 3 i SDL2. Python generuje natywny katalog kart na etapie kompilacji. Frontend dekoduje dołączone efekty MP3 przez `dr_mp3` i odtwarza je przez SDL Audio, bez dodatkowej biblioteki miksującej. Z katalogu projektu:
 
 ```sh
 cmake -S . -B build -DGWENT_WITH_SDL=ON
@@ -20,6 +20,12 @@ When SDL2 is available, the `gwent` executable opens the 640×480 match UI. The 
 SDL_VIDEODRIVER=dummy ./build/gwent --smoke-test
 ```
 
+Wszystkie referencyjne efekty MP3 można zdekodować na urządzeniu SDL dummy:
+
+```sh
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./build/gwent --audio-test
+```
+
 Bez SDL2 można budować same testy i silnik: ustaw `-DGWENT_WITH_SDL=OFF`.
 
 ## Save files
@@ -28,7 +34,7 @@ The SDL app writes a versioned, checksummed match save in `SDL_GetPrefPath("Gwen
 
 ## User deck data API
 
-`gwent/deck.hpp` exposes validated user deck recipes and checksummed `.gwd` persistence. Recipes store a display name, faction, leader reference, and card reference/count pairs from the pinned Witcher 3 Gwent catalog; `materializeUserDeck` resolves them back to the exact catalog entries before starting a match. This is an engine API foundation only: the SDL deck builder, multiple-slot management, and UI integration are not implemented yet.
+`gwent/deck.hpp` exposes validated user deck recipes and checksummed `.gwd` persistence. Recipes store a display name, faction, leader reference, and card reference/count pairs from the pinned Witcher 3 Gwent catalog; `materializeUserDeck` resolves them back to the catalog entries before starting a match. The SDL frontend currently has three deck slots and an in-progress card-bank editor; see `PROGRESS.md` for remaining gaps.
 
 ## Miyoo Mini Plus / OnionOS
 

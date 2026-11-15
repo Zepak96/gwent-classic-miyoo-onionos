@@ -11,6 +11,7 @@ Oryginalny kod tego projektu jest objęty dołączoną licencją MIT. Nie obejmu
 - `steward-fu/sdl2`, audytowany HEAD `0631abc8e8916db6f9bc7e2afd0c22913d092a29` — SDL2, licencja LGPL-2.1. Biblioteki nie są na razie dołączone.
 - `OnionUI/Ports-Collection`, audytowany HEAD `685c7e6e9065232d6350765022baa4723a641f13` — wzorzec integracji systemowej. Launcher i materiały muszą zachować licencje upstream przy użyciu.
 - `nothings/stb`, commit `9600522de53973336fa033a289858a4354cbb04c` — `stb_image.h` v2.32, deklarowana licencja public domain; używany do dekodowania JPEG-ów kart i planszy.
+- `mackron/dr_libs`, commit `f12e197fd462e4c22873fbd70d11b1d2f2c1dc3c` — `dr_mp3.h`, używany do dekodowania efektów MP3. Projekt wybiera dołączoną opcję Unlicense/public domain; szczegóły w `third_party/DR_MP3_NOTICE.md`.
 
 ## Zaimportowane dane
 
