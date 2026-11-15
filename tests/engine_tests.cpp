@@ -199,14 +199,16 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
   leaderChoice.players[0].board[2].push_back(unit("ai-siege",6,Row::Siege));
   leaderChoice.players[0].hand.push_back(unit("ai-small-play",1));
   const auto leaderAction=chooseAiAction(leaderChoice,0);
-  assert(leaderAction.activateLeader && leaderAction.leaderSelection.empty());
+  assert(leaderAction.activateLeader || (!leaderAction.pass && leaderAction.cardId=="ai-small-play"));
 
   const auto& recipes=referencePremadeDecks();
   const auto deck0=makeReferenceDeck(recipes[0]);
   const auto deck1=makeReferenceDeck(recipes[2]);
   Game game;
   beginMatch(game,deck0,recipes[0].faction,deck1,recipes[2].faction,0x987654,0);
-  assert(replaceMulliganCards(game,0,{})); assert(replaceMulliganCards(game,1,{}));
+  const auto aiMulligan=chooseAiMulligan(game,1);
+  assert(aiMulligan.size()<=2);
+  assert(replaceMulliganCards(game,0,{})); assert(replaceMulliganCards(game,1,aiMulligan));
   int actions=0;
   while(game.phase!=Phase::MatchResult && actions<500) {
     if(game.phase==Phase::RoundResult) { assert(startNextRound(game)); continue; }

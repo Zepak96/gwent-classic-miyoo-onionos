@@ -435,4 +435,24 @@ AiAction chooseAiAction(Game& game,int who) {
   }
   return actions.back().action;
 }
+
+std::vector<std::string> chooseAiMulligan(const Game& game,int who) {
+  if(who<0||who>1||game.phase!=Phase::Mulligan||game.players[who].mulliganDone)return {};
+  Player simulated=game.players[who];
+  std::vector<std::string> selected;
+  for(int redraw=0;redraw<2;++redraw) {
+    const auto order=discardOrder(simulated);
+    const auto candidate=std::find_if(order.begin(),order.end(),[](const Card& card){return card.power<15;});
+    if(candidate==order.end())break;
+    const auto handCard=std::find_if(simulated.hand.begin(),simulated.hand.end(),[&](const Card& card){return card.id==candidate->id;});
+    if(handCard==simulated.hand.end()||simulated.deck.empty())break;
+    const Card discarded=*handCard;
+    selected.push_back(discarded.id);
+    simulated.hand.erase(handCard);
+    simulated.deck.insert(simulated.deck.begin(),discarded);
+    simulated.hand.push_back(simulated.deck.back());
+    simulated.deck.pop_back();
+  }
+  return selected;
+}
 }

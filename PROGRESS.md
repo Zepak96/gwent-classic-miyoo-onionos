@@ -35,7 +35,7 @@ Docelowa gra to wyłącznie Gwint jako minigra w Wiedźminie 3: Wild Hunt, z zaw
 - [ ] Pełny katalog kart zweryfikowany z ustalonym profilem wersji.
 - [ ] Wszystkie zdolności jednostek, dowódców i frakcji oraz prawidłowa kolejność ich rozstrzygania.
 - [ ] Pełna walidacja talii, mulligan, medyk, manekin i zapis odrzuconych kart.
-- [~] AI „Classic”: zastąpiono sztuczne poziomy Easy/Normal/Hard pojedynczym wyborem ważonym inspirowanym `ControllerAI` z przypiętego repozytorium. Obejmuje ważenie kart, pasowania i liderów oraz wybór części celów/odrzuceń; zgodność wag i wszystkich interakcji z referencją nadal wymaga porównania.
+- [~] AI „Classic”: zastąpiono sztuczne poziomy Easy/Normal/Hard pojedynczym wyborem ważonym opartym na `ControllerAI` z przypiętego repozytorium. Obejmuje ważenie kart, pasowania i liderów, wybór części celów/odrzuceń oraz początkowe wymiany kart; porównanie wszystkich wag i interakcji z referencją nadal trwa.
 - [ ] Porównawcza weryfikacja wszystkich sekwencji względem źródła referencyjnego.
 
 ### Etapy 3–8 — port, UI, lokalizacja, audio, integracja, QA i release

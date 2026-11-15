@@ -339,7 +339,8 @@ void handleMatchKey(App& a,SDL_Keycode key) {
       if(it!=a.mulligan.end())a.mulligan.erase(it); else if(a.mulligan.size()<2)a.mulligan.push_back(id);
     } else if(key==SDLK_BACKSPACE||key==SDLK_z) { if(!a.mulligan.empty())a.mulligan.pop_back(); }
     else if(key==SDLK_RETURN||key==SDLK_KP_ENTER) {
-      if(gwent::replaceMulliganCards(a.game,0,a.mulligan) && gwent::replaceMulliganCards(a.game,1,{})) {
+      const auto opponentMulligan=gwent::chooseAiMulligan(a.game,1);
+      if(gwent::replaceMulliganCards(a.game,0,a.mulligan) && gwent::replaceMulliganCards(a.game,1,opponentMulligan)) {
         a.mulligan.clear(); a.status=tr(a,"your_turn");
         if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+450;
       } else a.status="MULLIGAN ERROR";
@@ -404,7 +405,7 @@ int main(int argc,char** argv) {
     drawTitle(renderer,app); SDL_RenderPresent(renderer);
     app.screen=Screen::DeckSelect; drawDeckSelect(renderer,app); SDL_RenderPresent(renderer);
     startMatch(app);
-    gwent::replaceMulliganCards(app.game,0,{}); gwent::replaceMulliganCards(app.game,1,{});
+    gwent::replaceMulliganCards(app.game,0,{}); gwent::replaceMulliganCards(app.game,1,gwent::chooseAiMulligan(app.game,1));
     drawMatch(renderer,app);
     if(argc>2) {
       SDL_Surface* surface=SDL_CreateRGBSurfaceWithFormat(0,W,H,32,SDL_PIXELFORMAT_ARGB8888);
