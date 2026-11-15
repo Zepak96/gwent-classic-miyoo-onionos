@@ -17,7 +17,7 @@ ctest --test-dir build --output-on-failure
 When SDL2 is available, the `gwent` executable opens the 640×480 match UI. The desktop CI also runs a renderer smoke check without a display server:
 
 ```sh
-SDL_VIDEODRIVER=dummy ./build/gwent --smoke-test
+SDL_VIDEODRIVER=dummy ./build/gwent --smoke-test match.bmp deck-builder.bmp card-details.bmp
 ```
 
 Wszystkie referencyjne efekty MP3 można zdekodować na urządzeniu SDL dummy:
@@ -30,7 +30,7 @@ Bez SDL2 można budować same testy i silnik: ustaw `-DGWENT_WITH_SDL=OFF`.
 
 ## Save files
 
-The SDL app writes a versioned, checksummed match save in `SDL_GetPrefPath("GwentClassic", "MiyooMiniPlus")`. The engine save API can also be called with an explicit path. Writes go to a temporary file and replace the previous save only after the new data is complete. `S`/SELECT saves, `O`/START loads, and `R` on deck selection resumes the save. The save format stores the complete engine match state; UI language and menu selection are not part of the match save.
+The SDL app writes a versioned, checksummed match save in `SDL_GetPrefPath("GwentClassic", "MiyooMiniPlus")`. The engine save API can also be called with an explicit path. Writes go to a temporary file and replace the previous save only after the new data is complete. `S`/short SELECT saves, `O`/START loads, and `R` on deck selection resumes the save. Hold SELECT for 500 ms or press `I` to inspect the selected card at a larger scale; `B`/ESC closes the inspector. The save format stores the complete engine match state; UI language and menu selection are not part of the match save.
 
 ## User deck data API
 
