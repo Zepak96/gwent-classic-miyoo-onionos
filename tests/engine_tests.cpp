@@ -55,6 +55,23 @@ static void scoreRules() {
   orderedEffects.board[0]={bondedA,bondedB,rally};
   assert(calculateScore(orderedEffects,{false,false,false},{false,false,false})==19); // Bond multiplies before Morale is added.
 }
+static void duplicateWeatherIsDiscarded() {
+  Card frost; frost.id="frost-first"; frost.name="Biting Frost"; frost.kind=Kind::Weather; frost.abilities={"frost"};
+  Card duplicate=frost; duplicate.id="frost-duplicate";
+  Card clear; clear.id="clear-weather"; clear.name="Clear Weather"; clear.kind=Kind::ClearWeather;
+  Game game;
+  game.players[0].hand.push_back(frost);
+  game.players[1].hand.push_back(duplicate);
+  assert(playCard(game,0,"frost-first"));
+  assert(game.weather[0] && game.weatherCards.size()==1);
+  assert(playCard(game,1,"frost-duplicate"));
+  assert(game.weather[0] && game.weatherCards.size()==1);
+  assert(game.players[1].graveyard.size()==1 && game.players[1].graveyard[0].id=="frost-duplicate");
+  game.players[0].hand.push_back(clear);
+  assert(playCard(game,0,"clear-weather"));
+  assert(!game.weather[0] && game.weatherCards.empty());
+  assert(std::any_of(game.players[0].graveyard.begin(),game.players[0].graveyard.end(),[](const Card& card){return card.id=="frost-first";}));
+}
 static void turnsAndRounds() {
   Game g; g.players[0].hand.push_back(unit("a", 8)); g.players[1].hand.push_back(unit("b", 3));
   assert(playCard(g,0,"a")); assert(g.currentPlayer==1);
@@ -461,4 +478,4 @@ static void leaderAbilities() {
   assert(crach.players[0].deck.size()==1 && crach.players[1].deck.size()==1);
   assert(crach.players[0].graveyard.empty() && crach.players[1].graveyard.empty());
 }
-int main() { scoreRules(); turnsAndRounds(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); avengerCards(); leaderAbilities(); }
+int main() { scoreRules(); duplicateWeatherIsDiscarded(); turnsAndRounds(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); avengerCards(); leaderAbilities(); }

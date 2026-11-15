@@ -61,6 +61,14 @@ int agileTargetRow(Game& g,int owner,const Card& card) {
   return static_cast<int>(nextRandom(g)%2);
 }
 void applyWeather(Game& g, int owner, const Card& card, Row fallback = Row::None) {
+  // The reference weather container permits one active copy of each weather
+  // card. Further copies are discarded without changing the active effect.
+  if(std::any_of(g.weatherCards.begin(),g.weatherCards.end(),[&](const ActiveWeather& active){
+       return active.card.name==card.name;
+     })) {
+    g.players[owner].graveyard.push_back(card);
+    return;
+  }
   bool typed=false;
   if (hasAbility(card, "frost")) { g.weather[0] = true; typed=true; }
   if (hasAbility(card, "fog")) { g.weather[1] = true; typed=true; }
