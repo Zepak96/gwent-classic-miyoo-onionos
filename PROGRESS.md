@@ -12,8 +12,8 @@ Docelowa gra to wyłącznie Gwint jako minigra w Wiedźminie 3: Wild Hunt, z zaw
 
 - [x] Przejrzano źródła `asundr/gwent-classic`, commit `08592d847f2573440a34deb9f32bc855b2544cdd`.
 - [x] Zebrano informacje o `ia2904/gwent-classic-v3.5`, commit `2efc94ed626c0baeb28fc5e51c0e279ed5ee51dd`.
-- [x] Ustalono, że upstreamowy kod ma licencję MIT z Commons Clause; zaimportowano katalog danych kart/talii z zachowaniem licencji i manifestu. Grafiki i audio z referencji nie zostały zaimportowane.
-- [x] Ustalono, że obrazy, muzyka, fonty i część SFX z referencji nie mają wykazanych praw redystrybucji.
+- [x] Ustalono, że upstreamowy kod ma licencję MIT z Commons Clause; zaimportowano katalog danych kart/talii z zachowaniem licencji i manifestu.
+- [x] Po zgłoszeniu przez właścicielkę projektu zgody przedstawiciela CD PROJEKT RED zaimportowano przypięte grafiki, ikony i SFX z repo źródłowego wraz z pochodzeniem i atrybucją.
 - [x] Sprawdzono dokumentację OnionOS Ports Collection oraz SDL2 dla Miyoo; pakowanie wymaga launcherów i bibliotek zgodnych z docelowym wydaniem OnionOS.
 - [x] Zidentyfikowano wariant next-gen Wiedźmina 3 (m.in. Roach i Muster na Geralt/Ciri); został przyjęty jako docelowy po doprecyzowaniu użytkownika.
 - [x] Utworzono publiczne repozytorium GitHub i dodano workflow CI przez integrację GitHub.
@@ -40,12 +40,13 @@ Docelowa gra to wyłącznie Gwint jako minigra w Wiedźminie 3: Wild Hunt, z zaw
 
 ### Etapy 3–8 — port, UI, lokalizacja, audio, integracja, QA i release
 
-- [~] Prototyp SDL2 640×480 ma menu, wybór talii, mecz, mulligan, planszę, rękę, cele Manekina/Medyków, lidera i pasowanie; CI buduje frontend i wykonuje startowy smoke test. Kompletność UI, lokalizacja i mapowanie fizycznych przycisków wymagają dalszej pracy/testów.
+- [~] Wierny interfejs referencyjny jest w trakcie portowania: ekran startowy edycji talii, proporcje trzech paneli meczu, rozmieszczenie rzędów oraz podgląd dużej karty z nazwą/opisem zdolności odwzorowują część układu `index.html`/`style.css`. Edytor i mecz nadal mają różnice wizualne i brakujące elementy: oryginalny HUD/stany menu, karuzela, pop-upy, powiadomienia, wynik, typografia i część ikon. Mapa elementów i skalowania jest w `docs/REFERENCE_UI_PORT.md`; obecny stan nie jest zgodny 1:1.
+- [~] Prototyp silnika/UI posiada mecz, mulligan, cele Manekina/Medyków, lidera i pasowanie, ale kod nie jest kompletnym portem zachowania referencyjnego; zachowane różnice należy weryfikować jako braki względem `gwent.js` i plików składowych.
 - [~] Zapis i odtwarzanie stanu meczu: dodano wersjonowany, sumowany kontrolnie format binarny, atomowy zapis oraz bezpieczne odrzucanie uszkodzonych plików; UI ma ręczny zapis/wczytanie i wznowienie z menu. Autosave i test na Miyoo pozostają do zrobienia; przepis talii ma już zapis silnikowy, ale nie jest jeszcze podłączony do UI.
 - [~] Dodano format talii użytkownika `.gwd` i podłączono go do SDL: trzy sloty, edycja puli frakcji/neutrali, lidera i kopii, walidacja, zapis atomowy z sumą kontrolną oraz użycie talii przy starcie meczu. Silnik testuje round-trip i odrzucanie uszkodzeń. CI #43717386389 zbudował frontend, zaliczył CTest i wyrenderował ekrany edytora i meczu; brakuje zmiany nazwy talii, automatycznej QA sekwencji przycisków i testu na urządzeniu.
 - [~] Edytor talii jest wstępnie podłączony w PL/EN; pełne PL/EN całego UI, tutorial i ustawienia nadal do zrobienia.
-- [ ] Legalne i udokumentowane grafiki, muzyka oraz efekty dźwiękowe.
-- [ ] ARM toolchain, binarka, launcher OnionOS i archiwum instalacyjne.
+- [~] Przypięte grafiki kart, plansza, ikony SVG i SFX z repo są w `assets/gwent-classic/`; obrazy kart są użyte w prototypowych ekranach. Muzyki nie ma w repo wzorcowym. Odtwarzanie audio w porcie nie jest zaimplementowane.
+- [~] Przygotowano pliki launchera/pakowania OnionOS; ARM binarka i instalacja na karcie czekają na wierne UI oraz build docelowy.
 - [ ] Desktop/ARM build, regresja, pomiar zasobów oraz test sprzętowy.
 
 ## Rozszerzenie po ukończeniu wiernego silnika — kampania arcade
@@ -63,9 +64,9 @@ Nie zmienia to bieżącego celu: najpierw kompletna rozgrywka Gwinta z Wiedźmin
 
 ## Znane blokady środowiska
 
-- Lokalnie nie znaleziono CMake ani kompilatora C++; build desktop wykonał GitHub Actions na Ubuntu.
-- Docker Desktop nie ma uruchomionego daemonu; brak lokalnego obrazu/toolchaina ARM.
-- Brak potwierdzonego fizycznego Miyoo Mini Plus.
+- Lokalnie nie znaleziono CMake ani kompilatora C++; build desktop został wykonany w Dockerze Ubuntu.
+- Karta OnionOS jest widoczna w Windows jako `E:` (`MIYOO MINI`, FAT32); nie ma jeszcze binarki ARM do instalacji ani uruchomienia.
+- Samo Miyoo nie było testowane bezpośrednio po USB; test konsoli pozostaje niewykonany.
 - Workflow GitHub Actions publikuje wynik kompilacji/testów przy każdym pushu.
 
 ## Zasada raportowania

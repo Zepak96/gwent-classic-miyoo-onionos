@@ -1,0 +1,10 @@
+#!/bin/sh
+# Standalone Ports Script Template for OnionOS Ports Collection.
+GameName="Gwent Classic"
+GameDir="GwentClassic"
+GameExecutable="launch.sh"
+GameDataFile="gwent"
+KillAudioserver=0
+PerformanceMode=0
+Arguments=""
+/mnt/SDCARD/Emu/PORTS/launch_standalone.sh "$GameName" "$GameDir" "$GameExecutable" "$Arguments" "$GameDataFile" "$KillAudioserver" "$PerformanceMode"

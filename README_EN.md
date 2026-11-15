@@ -1,10 +1,10 @@
 # Gwent Classic for Miyoo Mini Plus / OnionOS
 
-A native 1:1 port of the Gwent minigame from **The Witcher 3: Wild Hunt** to Miyoo Mini Plus is the project goal, covering the base game, Hearts of Stone, Blood and Wine, and the Gwent additions/changes from the Witcher 3 next-gen update. The pinned Gwent Classic repository is the gameplay reference; this is not the standalone `GWENT: The Witcher Card Game` or its online rules. The 640x480 SDL prototype has AI matches, reference decks, mulligan, and a deck editor with three saved slots, but it is not a complete implementation or OnionOS release.
+A native 1:1 port of the Gwent minigame from **The Witcher 3: Wild Hunt** to Miyoo Mini Plus is the project goal, covering the base game, Hearts of Stone, Blood and Wine, and the Gwent additions/changes from the Witcher 3 next-gen update. The pinned Gwent Classic repository is the source of truth; this is not the standalone `GWENT: The Witcher Card Game` or its online rules. The current SDL interface is a prototype and does not reproduce the reference layout, so it is not a faithful port or an OnionOS release.
 
 ## Status
 
-See [PROGRESS.md](PROGRESS.md) for the audit, implementation status, and remaining work. There is no ARM binary or installation ZIP yet, and Miyoo compatibility has not been confirmed. Rules and card coverage are still being implemented; do not treat the current code as a faithful full game.
+See [PROGRESS.md](PROGRESS.md) and [docs/REFERENCE_UI_PORT.md](docs/REFERENCE_UI_PORT.md) for the reference audit and remaining work. There is no ARM binary or installation ZIP yet, and the current code is not a faithful full game.
 
 ## Build
 
@@ -12,7 +12,7 @@ Requirements and commands are in [BUILD.md](BUILD.md). The project requires CMak
 
 ## Licenses and assets
 
-This project does not include code or assets from the reference repositories. See [LICENSES.md](LICENSES.md). No CD PROJEKT RED material is included.
+All card images, interface graphics, and SFX present in the pinned reference repository are included under `assets/gwent-classic/`; the card art is used by the current prototype. Music tracks are absent from the reference repository. See [LICENSES.md](LICENSES.md) and the asset provenance file.
 
 ## Controls
 

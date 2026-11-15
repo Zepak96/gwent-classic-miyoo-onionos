@@ -11,6 +11,9 @@ struct ReferenceDeck {
 // Generated from the pinned reference cards.json during the host build.
 const std::vector<Card>& referenceCardCatalog();
 const std::vector<ReferenceDeck>& referencePremadeDecks();
+const std::string& referenceCardImage(int sourceIndex);
+const std::string& referenceCardAbilityTitle(int sourceIndex);
+const std::string& referenceCardDescription(int sourceIndex);
 std::vector<Card> makeReferenceDeck(const ReferenceDeck& recipe);
 bool referenceLeader(int sourceIndex, Card& leader);
 }

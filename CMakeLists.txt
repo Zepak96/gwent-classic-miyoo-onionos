@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 option(GWENT_BUILD_TESTS "Build engine tests" ON)
 option(GWENT_WITH_SDL "Build the SDL front end when SDL2 is installed" ON)
+set(GWENT_SDL2_INCLUDE_DIR "" CACHE PATH "SDL2 include directory for cross builds")
+set(GWENT_SDL2_LIBRARY "" CACHE FILEPATH "SDL2 shared library for cross builds")
 
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
 set(GWENT_GENERATED_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated)
@@ -13,8 +15,9 @@ set(GWENT_CATALOG_SOURCE ${GWENT_GENERATED_DIR}/reference_catalog.cpp)
 add_custom_command(
   OUTPUT ${GWENT_CATALOG_SOURCE}
   COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_catalog.py
-          ${CMAKE_CURRENT_SOURCE_DIR}/data/cards.json ${CMAKE_CURRENT_SOURCE_DIR}/data/premade-decks.json ${GWENT_CATALOG_SOURCE}
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_catalog.py ${CMAKE_CURRENT_SOURCE_DIR}/data/cards.json ${CMAKE_CURRENT_SOURCE_DIR}/data/premade-decks.json
+          ${CMAKE_CURRENT_SOURCE_DIR}/data/cards.json ${CMAKE_CURRENT_SOURCE_DIR}/data/premade-decks.json
+          ${CMAKE_CURRENT_SOURCE_DIR}/data/ability-text.json ${GWENT_CATALOG_SOURCE}
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_catalog.py ${CMAKE_CURRENT_SOURCE_DIR}/data/cards.json ${CMAKE_CURRENT_SOURCE_DIR}/data/premade-decks.json ${CMAKE_CURRENT_SOURCE_DIR}/data/ability-text.json
   VERBATIM
 )
 
@@ -28,7 +31,18 @@ endif()
 
 if(GWENT_WITH_SDL)
   find_package(SDL2 QUIET)
-  if(SDL2_FOUND)
+  if(GWENT_SDL2_INCLUDE_DIR AND GWENT_SDL2_LIBRARY)
+    add_executable(gwent src/main.cpp)
+    target_include_directories(gwent SYSTEM PRIVATE ${GWENT_SDL2_INCLUDE_DIR})
+    target_link_libraries(gwent PRIVATE gwent_engine ${GWENT_SDL2_LIBRARY})
+    set_target_properties(gwent PROPERTIES INSTALL_RPATH "$ORIGIN")
+    target_compile_definitions(gwent PRIVATE GWENT_HAS_SDL=1)
+    if(MSVC)
+      target_compile_options(gwent PRIVATE /W4 /permissive-)
+    else()
+      target_compile_options(gwent PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+  elseif(SDL2_FOUND)
     add_executable(gwent src/main.cpp)
     target_link_libraries(gwent PRIVATE gwent_engine SDL2::SDL2)
     target_compile_definitions(gwent PRIVATE GWENT_HAS_SDL=1)
@@ -38,6 +52,9 @@ if(GWENT_WITH_SDL)
       target_compile_options(gwent PRIVATE -Wall -Wextra -Wpedantic)
     endif()
   else()
+    if(GWENT_SDL2_INCLUDE_DIR OR GWENT_SDL2_LIBRARY)
+      message(FATAL_ERROR "Set both GWENT_SDL2_INCLUDE_DIR and GWENT_SDL2_LIBRARY for an SDL cross build")
+    endif()
     message(STATUS "SDL2 not found: SDL front end is not built")
   endif()
 endif()

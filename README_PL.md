@@ -1,10 +1,10 @@
 # Gwent Classic dla Miyoo Mini Plus / OnionOS
 
-Natywny port 1:1 Gwinta jako minigry z **Wiedźmina 3: Dziki Gon** na Miyoo Mini Plus — bazujący na wskazanym repozytorium Gwent Classic oraz obejmujący docelowo podstawkę, Hearts of Stone, Blood and Wine i zmiany/karty z aktualizacji next-gen Wiedźmina 3. Repo referencyjne określa zachowanie gry; nie zastępujemy go zasadami samodzielnej gry `GWENT: The Witcher Card Game`. Prototyp SDL 640×480 ma mecz AI, talie referencyjne, mulligan oraz edytor talii z zapisem trzech slotów; projekt nadal nie jest kompletną implementacją ani gotowym portem OnionOS.
+Natywny port 1:1 Gwinta jako minigry z **Wiedźmina 3: Dziki Gon** na Miyoo Mini Plus — bazujący na wskazanym repozytorium Gwent Classic oraz obejmujący docelowo podstawkę, Hearts of Stone, Blood and Wine i zmiany/karty z aktualizacji next-gen Wiedźmina 3. Repo referencyjne określa zachowanie gry; nie zastępujemy go zasadami samodzielnej gry `GWENT: The Witcher Card Game`. Prototyp SDL 640×480 ma mecz AI, talie referencyjne, mulligan i edytor talii z zapisem trzech slotów. Port OnionOS i kompletna zgodność z grą pozostają w trakcie prac.
 
 ## Stan
 
-Aktualny postęp, zakres audytu i braki opisuje [PROGRESS.md](PROGRESS.md). Nie ma jeszcze binarki ARM, paczki ZIP ani potwierdzenia działania na Miyoo. Zasady i karty są w trakcie implementacji; nie traktuj obecnego kodu jako wiernej kompletnej wersji gry.
+Aktualny postęp, zakres audytu i braki opisuje [PROGRESS.md](PROGRESS.md). Obecny kod nie jest kompletną implementacją gry ani gotowym portem OnionOS.
 
 ## Budowanie
 
@@ -12,7 +12,7 @@ Wymagania i polecenia opisuje [BUILD.md](BUILD.md). Projekt wymaga CMake oraz ko
 
 ## Licencje i zasoby
 
-Ten projekt nie dołącza kodu ani zasobów z repozytoriów referencyjnych. Zobacz [LICENSES.md](LICENSES.md). Nie są dołączone materiały CD Projekt RED.
+Repozytorium zawiera wszystkie grafiki, ikony i 35 SFX z przypiętej wersji repozytorium wzorcowego. Oryginalne ilustracje są już wyświetlane na ekranach gry i w edytorze talii. Zobacz [LICENSES.md](LICENSES.md) i `assets/gwent-classic/ASSET_ORIGIN.md`.
 
 ## Sterowanie
 

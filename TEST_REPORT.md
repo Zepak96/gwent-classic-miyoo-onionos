@@ -24,6 +24,14 @@ Po podłączeniu edytora do menu workflow [desktop-build #43717386389](https://g
 | OnionOS | Niewykonane | Brak binarki/paczki i urządzenia |
 | Długi test / RAM | Niewykonane | Nie przeprowadzono |
 
+## Test renderowania assetów i UI
+
+W tej sesji dołączono 531 plików obrazów, 35 SFX MP3 i 6 SVG z przypiętego repo. Test katalogu sprawdza istnienie małej i dużej ilustracji dla każdego z 216 rekordów. Build SDL2 w Dockerze Ubuntu zakończył się powodzeniem, CTest zaliczył 2/2, a smoke test utworzył kadr meczu i edytora z wczytanymi ilustracjami. Oględziny potwierdziły ładowanie plików, ale wykazały, że kompozycja menu/HUD/stołu jest autorskim prototypem i nie odpowiada layoutowi `style.css`; kadry nie są dowodem zgodności 1:1 i wymagają zastąpienia wiernym portem.
+
 ## Test sprzętowy
 
-Nie wykonano testu na fizycznym Miyoo Mini Plus. Zgodność pozostaje niezweryfikowana. Połączenie USB nie udostępniło konsoli w Windows; następną drogą testu będzie karta microSD w czytniku albo dostęp przez sieć OnionOS (np. SSH/SFTP lub Samba), jeśli usługi zostaną włączone.
+Nie uruchomiono jeszcze portu na fizycznym Miyoo Mini Plus. Po podłączeniu adaptera karta microSD została wykryta jako `E:` z etykietą `MIYOO MINI`, FAT32, z katalogami `Roms`, `Emu`, `Saves` i `Themes`. Do chwili uzyskania wiernego ekranu i binarki ARM karta nie została zmodyfikowana. Samo wykrycie karty nie potwierdza działania gry na urządzeniu.
+
+## Ponowna kontrola zgodności układu źródłowego
+
+Po porównaniu renderera SDL z `style.css` poprawiono położenie liczników/pól rzędów i początek układania kart w środkowym panelu, bazując na oryginalnym podziale 26.5% / 52.5% / 21% i proporcjach rzędów. Dodano też kartę dużego podglądu i panel opisu zdolności w pozycjach źródłowych oraz zaimportowano 44 wpisy nazw/opisów zdolności z przypiętego `abilities.js`. Build desktop SDL2 w Ubuntu 24.04 zakończył się powodzeniem; CTest: 2/2. Smoke test wyrenderował edytor i mecz; obrazy sprawdzono wizualnie. Klatki nadal pokazują odstępstwa od źródła, m.in. nieodtworzone panele pozostałych akcji/karty, część ikon SVG oraz oryginalną typografię i zachowanie nakładek. Zmiana geometrii i dodanie podglądu nie są dowodem portu 1:1; zgodność wizualna i sprzętowa pozostaje niezaliczona.

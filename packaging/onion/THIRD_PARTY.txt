@@ -1,0 +1,30 @@
+Gwent Classic OnionOS package: third-party runtime components
+
+SDL2 Miyoo port
+- Project: steward-fu/sdl2
+- Pinned source commit: 0631abc8e8916db6f9bc7e2afd0c22913d092a29
+- Runtime files: libSDL2-2.0.so.0, libEGL.so
+- Port license: LGPL-2.1; SDL core source license: zlib; upstream source and build scripts:
+  https://github.com/steward-fu/sdl2/tree/0631abc8e8916db6f9bc7e2afd0c22913d092a29
+- The SDL library is dynamically linked and may be replaced by a compatible
+  modified build. Upstream licenses are included as LICENSE.SDL2-port.txt and
+  LICENSE.SDL2-core.txt.
+
+SwiftShader
+- Project: google/swiftshader, bundled by steward-fu/sdl2
+- Runtime file: libGLESv2.so
+- License: Apache-2.0; upstream license is included as LICENSE.SwiftShader.txt.
+
+json-c
+- Version: 0.15, from the pinned steward-fu/sdl2 source tree
+- Runtime file: libjson-c.so.5
+- License: MIT; upstream source archive and license are available in the pinned
+  steward-fu/sdl2 tree under sdl2/dependency/json-c-0.15.tar.gz.
+
+The package includes the pinned reference artwork, SVG icons, and SFX under
+assets/gwent-classic/. Asset origins, CDPR authorization as reported by the
+project owner, and the upstream RandomPianist SFX credit are documented in
+assets/gwent-classic/ASSET_ORIGIN.md. Music tracks are absent from the pinned
+reference repository. The card catalog and deck data are covered by the
+notices in the source repository's LICENSES.md and
+third_party/gwent-classic/NOTICE.md.

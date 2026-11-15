@@ -6,9 +6,11 @@ import unicodedata
 
 source = pathlib.Path(sys.argv[1])
 premade_source = pathlib.Path(sys.argv[2])
-output = pathlib.Path(sys.argv[3])
+ability_source = pathlib.Path(sys.argv[3])
+output = pathlib.Path(sys.argv[4])
 records = json.loads(source.read_text(encoding="utf-8"))
 premade = json.loads(premade_source.read_text(encoding="utf-8"))
+ability_text = json.loads(ability_source.read_text(encoding="utf-8"))
 
 factions = {
     "realms": "NorthernRealms", "nilfgaard": "Nilfgaard", "scoiatael": "Scoiatael",
@@ -33,6 +35,34 @@ def enum_kind(record, ability, row):
             if tag in ability:
                 return kind
     return "Unit"
+
+def card_description(record):
+    ability = record["ability"].split()
+    hero = bool(ability and ability[0] == "hero")
+    if hero:
+        ability = ability[1:]
+    parts = []
+    if record["row"] == "agile":
+        parts.append(ability_text.get("agile", {}).get("description", ""))
+    parts.extend(ability_text.get(tag, {}).get("description", "") for tag in reversed(ability))
+    if hero:
+        parts.append(ability_text.get("hero", {}).get("description", ""))
+    return "".join(parts).strip()
+
+def card_ability_title(record):
+    ability = record["ability"].split()
+    hero = bool(ability and ability[0] == "hero")
+    if hero:
+        ability = ability[1:]
+    if record["row"] == "leader":
+        return "Leader Ability"
+    if ability:
+        return ability_text.get(ability[-1], {}).get("name", ability[-1])
+    if record["row"] == "agile":
+        return ability_text.get("agile", {}).get("name", "agile")
+    if hero:
+        return ability_text.get("hero", {}).get("name", "hero")
+    return ""
 
 cards = []
 for index, item in enumerate(records):
@@ -82,6 +112,28 @@ output.write_text(
         ', ' + str(item["leader"]) + ', {' + ', '.join('{' + str(index) + ', ' + str(count) + '}' for index, count in item["cards"]) + '}}'
         for i, item in enumerate(premade)
     ) + '\n  };\n'
-    '  return decks;\n}\n}\n',
+    '  return decks;\n}\n'
+    'const std::string& referenceCardImage(int sourceIndex) {\n'
+    '  static const std::vector<std::string> images = {\n' + ",\n".join(
+        '    ' + cpp_string(item["deck"] + "_" + item["filename"] + ".jpg")
+        for item in records
+    ) + '\n  };\n'
+    '  static const std::string empty;\n'
+    '  return sourceIndex >= 0 && sourceIndex < static_cast<int>(images.size()) ? images[static_cast<std::size_t>(sourceIndex)] : empty;\n'
+    '}\n'
+    'const std::string& referenceCardAbilityTitle(int sourceIndex) {\n'
+    '  static const std::vector<std::string> titles = {\n' + ",\n".join(
+        '    ' + cpp_string(card_ability_title(item)) for item in records
+    ) + '\n  };\n'
+    '  static const std::string empty;\n'
+    '  return sourceIndex >= 0 && sourceIndex < static_cast<int>(titles.size()) ? titles[static_cast<std::size_t>(sourceIndex)] : empty;\n'
+    '}\n'
+    'const std::string& referenceCardDescription(int sourceIndex) {\n'
+    '  static const std::vector<std::string> descriptions = {\n' + ",\n".join(
+        '    ' + cpp_string(card_description(item)) for item in records
+    ) + '\n  };\n'
+    '  static const std::string empty;\n'
+    '  return sourceIndex >= 0 && sourceIndex < static_cast<int>(descriptions.size()) ? descriptions[static_cast<std::size_t>(sourceIndex)] : empty;\n'
+    '}\n}\n',
     encoding="utf-8"
 )
