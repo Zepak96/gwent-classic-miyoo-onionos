@@ -167,3 +167,8 @@ Ported the reference `Player.canPlay()`, `Player.endTurn()`, and `Game.startRoun
 
 - Implemented the reference `showEndScreen()` 300 ms fade for the board shade, result art and labels, starting when the game enters a round or match result. A loaded result save starts its fade on load.
 - Added timing-boundary checks at 0/150/300/600 ms and a half-fade SDL smoke frame. Desktop build, CTest (2/2), `--input-test` and the full SDL dummy smoke run passed; the 640×480 half-fade frame was visually inspected. Result-screen source composition and physical Miyoo behavior remain unverified.
+
+## Ability overlay scale easing — 15.11.2026
+
+- Compared `Card.animate()` and the source CSS background-size transition. Replaced instantaneous overlay size jumps with the source 250 ms CSS `ease` curve across the 40→100%, 100→80% and 80→40% stages.
+- Added boundary checks to `--input-test` and an SDL smoke frame with the Morale overlay midway through its first scale transition. Desktop build, CTest (2/2), `--input-test`, and full SDL dummy smoke passed. ARM GCC 8.2 build produced a 32-bit ARM hard-float ELF; the OnionOS ZIP passed `unzip -t`, SHA-256 `e9b8fbebbc730a58fa94e87e41caebdb6bc7bdedb235db9af6d9dfd78cca1046`. No SD copy or physical Miyoo test was performed.

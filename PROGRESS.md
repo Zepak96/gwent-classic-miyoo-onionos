@@ -138,6 +138,11 @@ Funkcja pozostaje nieukończona, dopóki nie ma implementacji i testu. Kompatybi
 - Dodano test alpha dla 0/150/300/600 ms oraz osobny kadr smoke w połowie przejścia. Build desktop, CTest (2/2), `--input-test` i pełny SDL smoke przechodzą; kadr sprawdzono wizualnie.
 - Pozostałe animacje źródłowe nadal są otwarte; animacja wyniku nie zamyka audytu 1:1.
 
+## Krzywa skalowania nakładek zdolności — 15.11.2026
+
+- Porównanie `Card.animate()` z `.card > div:nth-child(4)` wykazało, że SDL zmieniał rozmiar grafiki skokowo. Dodano źródłową krzywą CSS `ease` i przejścia tła 250 ms: 40→100%, 100→80% i 80→40%, przy zachowaniu fade-in/out oraz hold.
+- `--input-test` sprawdza granice faz i wartości skali; smoke generuje klatkę Morale w trakcie pierwszego przejścia. Desktop build, CTest (2/2), `--input-test`, pełny smoke, ARM GCC 8.2 hard-float i ZIP OnionOS przeszły. ZIP SHA-256: `e9b8fbebbc730a58fa94e87e41caebdb6bc7bdedb235db9af6d9dfd78cca1046`. Nie skopiowano go na SD ani nie testowano na urządzeniu.
+
 ## Animacje z repozytorium źródłowego — 15.11.2026
 
 Przeniesiono do SDL wybrane istniejące animacje źródłowe: lot karty trwa 499 ms, oryginalne grafiki `anim_*.png` są używane dla efektów kart, a nakładka pogody pojawia się i znika w 500 ms. Szczegóły timingów i lista efektów nadal wymagających portu są w `docs/REFERENCE_ANIMATIONS.md`. To jest częściowy postęp, nie ukończony port animacji 1:1. Desktop build, CTest 2/2 i test wejścia SDL przeszły; ta zmiana nie była cross-buildowana dla Miyoo, kopiowana na kartę SD ani sprawdzana na konsoli.

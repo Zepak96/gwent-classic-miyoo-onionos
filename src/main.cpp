@@ -217,6 +217,31 @@ struct App {
 };
 void animatePlayedCard(App& a,const gwent::Card& card,int player,int handIndex,int handSizeBefore);
 void queueTriggeredEffects(App& a,const gwent::Game& before,const gwent::Card& played,int player);
+double sourceEase(double progress) {
+  progress=std::clamp(progress,0.0,1.0);
+  double low=0.0,high=1.0,t=progress;
+  for(int i=0;i<12;++i) {
+    t=(low+high)*0.5;
+    const double inverse=1.0-t;
+    const double x=3.0*inverse*inverse*t*0.25+3.0*inverse*t*t*0.25+t*t*t;
+    if(x<progress)low=t;else high=t;
+  }
+  const double inverse=1.0-t;
+  return 3.0*inverse*inverse*t*0.1+3.0*inverse*t*t+t*t*t;
+}
+int sourceAbilityScalePercent(Uint32 elapsed) {
+  const auto interpolate=[&](int from,int to,Uint32 time) {
+    const double progress=sourceEase(static_cast<double>(time)/250.0);
+    return static_cast<int>(std::lround(from+(to-from)*progress));
+  };
+  if(elapsed<50)return 40;
+  if(elapsed<300)return interpolate(40,100,elapsed-50);
+  if(elapsed<350)return 100;
+  if(elapsed<600)return interpolate(100,80,elapsed-350);
+  if(elapsed<1350)return 80;
+  if(elapsed<1600)return interpolate(80,40,elapsed-1350);
+  return 40;
+}
 SDL_Texture* textureFor(SDL_Renderer* renderer,const App& app,const std::string& relative) {
   if(relative.empty()||app.assetDirectory.empty())return nullptr;
   const auto found=app.textures.find(relative);
@@ -869,10 +894,9 @@ void drawCardEffect(SDL_Renderer* r,const App& a) {
     if(elapsed<50)alpha=0;
     else if(elapsed<350)alpha=static_cast<Uint8>(std::clamp((elapsed-50)*255/300,0u,255u));
     else if(elapsed>=effect.duration-300)alpha=static_cast<Uint8>(std::clamp((effect.duration-elapsed)*255/300,0u,255u));
-    float size=1.0f;
-    if(effect.icon!="scorch")size=elapsed<350?1.0f:elapsed<1350?0.8f:0.4f;
-    const int width=std::max(1,static_cast<int>(std::lround(28*size)));
-    const int height=std::max(1,static_cast<int>(std::lround(43*size)));
+    const int scale=effect.icon=="scorch"?100:sourceAbilityScalePercent(elapsed);
+    const int width=std::max(1,static_cast<int>(std::lround(28*scale/100.0)));
+    const int height=std::max(1,static_cast<int>(std::lround(43*scale/100.0)));
     drawImageAlpha(r,a,"img/icons/anim_"+effect.icon+".png",effect.x+(28-width)/2,effect.y+(43-height)/2,width,height,alpha);
   }
 }
@@ -1754,6 +1778,10 @@ int main(int argc,char** argv) {
     updateNotification(notificationProbe,SDL_GetTicks());
     okay=okay&&notificationProbe.activeNotification=="me-turn"&&notificationProbe.notificationQueue.empty();
     okay=okay&&endScreenAlpha(0)==0&&endScreenAlpha(150)>=127&&endScreenAlpha(300)==255&&endScreenAlpha(600)==255;
+    okay=okay&&sourceAbilityScalePercent(0)==40&&sourceAbilityScalePercent(50)==40&&
+         sourceAbilityScalePercent(300)==100&&sourceAbilityScalePercent(350)==100&&
+         sourceAbilityScalePercent(600)==80&&sourceAbilityScalePercent(1350)==80&&
+         sourceAbilityScalePercent(1600)==40&&sourceAbilityScalePercent(1650)==40;
     notificationProbe.notificationsEnabled=false;
     queueNotification(notificationProbe,"op-turn");
     okay=okay&&notificationProbe.activeNotification=="me-turn"&&notificationProbe.notificationQueue.empty();
@@ -1966,6 +1994,17 @@ int main(int argc,char** argv) {
       app.endScreenStartedAt=SDL_GetTicks()-150;
       clearFrame();drawMatchOnScreen(renderer,app);presentFrame();
       if(!saveFrame(argv[13])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
+    }
+    if(argc>14) {
+      app.screen=Screen::Match;app.game=gwent::Game{};app.game.phase=gwent::Phase::PlayerTurn;
+      const auto& effectCard=*std::find_if(gwent::referenceCardCatalog().begin(),gwent::referenceCardCatalog().end(),
+        [](const gwent::Card& card){return card.kind==gwent::Kind::Unit&&!card.hero;});
+      app.game.players[0].board[0].push_back(effectCard);
+      app.game.players[0].board[0].back().id+="-effect-smoke";
+      app.cardFlight.active=false;app.cardEffects={{true,"morale",235,143,SDL_GetTicks()-175,1650}};
+      app.activeNotification.clear();app.pauseOpen=false;app.cardDetailsOpen=false;
+      clearFrame();drawMatchOnScreen(renderer,app);presentFrame();
+      if(!saveFrame(argv[14])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
     }
     presentFrame();
     for(auto& image:app.textures)if(image.second)SDL_DestroyTexture(image.second);
