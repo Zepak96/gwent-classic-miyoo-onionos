@@ -85,6 +85,9 @@ items above:
 - Opponent setup now chooses a random source premade recipe and a random leader
   of that recipe's faction; a deterministic 500-seed regression covers legal
   leaders/decks, repeatability, and reachability of all ten premade recipes.
+- After an action, a player with no cards and no available leader ability now
+  auto-passes; round start also pre-passes players with no legal action, matching
+  the source `Player.endTurn()` and `Game.startRound()` checks.
 - An AI action rejected by the port is reported; it is not converted into a
   voluntary pass.
 

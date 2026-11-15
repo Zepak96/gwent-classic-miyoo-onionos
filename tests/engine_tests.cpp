@@ -72,20 +72,19 @@ static void duplicateWeatherIsDiscarded() {
   Card duplicate=frost; duplicate.id="frost-duplicate";
   Card clear; clear.id="clear-weather"; clear.name="Clear Weather"; clear.kind=Kind::ClearWeather;
   Game game;
-  game.players[0].hand.push_back(frost);
-  game.players[1].hand.push_back(duplicate);
+  game.players[0].hand={frost,clear,unit("clear-action-remains",1)};
+  game.players[1].hand={duplicate,unit("duplicate-action-remains",1)};
   assert(playCard(game,0,"frost-first"));
   assert(game.weather[0] && game.weatherCards.size()==1);
   assert(playCard(game,1,"frost-duplicate"));
   assert(game.weather[0] && game.weatherCards.size()==1);
   assert(game.players[1].graveyard.size()==1 && game.players[1].graveyard[0].id=="frost-duplicate");
-  game.players[0].hand.push_back(clear);
   assert(playCard(game,0,"clear-weather"));
   assert(!game.weather[0] && game.weatherCards.empty());
   assert(std::any_of(game.players[0].graveyard.begin(),game.players[0].graveyard.end(),[](const Card& card){return card.id=="frost-first";}));
 }
 static void turnsAndRounds() {
-  Game g; g.players[0].hand.push_back(unit("a", 8)); g.players[1].hand.push_back(unit("b", 3));
+  Game g; g.players[0].hand={unit("a", 8),unit("a-spare",1)}; g.players[1].hand={unit("b",3),unit("b-spare",1)};
   assert(playCard(g,0,"a")); assert(g.currentPlayer==1);
   assert(pass(g,1)); assert(g.currentPlayer==0 && !g.players[0].passed);
   assert(pass(g,0)); assert(g.phase==Phase::RoundResult);
@@ -93,16 +92,57 @@ static void turnsAndRounds() {
   assert(startNextRound(g)); assert(g.currentPlayer==0); // the previous round's winner starts
   assert(!startNextRound(g));
 
-  Game tie; tie.players[0].hand.push_back(unit("ta", 2)); tie.players[1].hand.push_back(unit("tb", 2));
+  Game tie; tie.players[0].hand={unit("ta",2),unit("ta-spare",1)}; tie.players[1].hand={unit("tb",2),unit("tb-spare",1)};
   assert(playCard(tie,0,"ta")); assert(playCard(tie,1,"tb"));
   assert(pass(tie,0)); assert(pass(tie,1));
   assert(tie.phase==Phase::RoundResult && tie.players[0].roundLosses==1 && tie.players[1].roundLosses==1);
 
   Game nilfgaard; nilfgaard.players[0].faction=Faction::Nilfgaard;
-  nilfgaard.players[0].hand.push_back(unit("na",2)); nilfgaard.players[1].hand.push_back(unit("nb",2));
+  nilfgaard.players[0].hand={unit("na",2),unit("na-spare",1)}; nilfgaard.players[1].hand={unit("nb",2),unit("nb-spare",1)};
   assert(playCard(nilfgaard,0,"na")); assert(playCard(nilfgaard,1,"nb"));
   assert(pass(nilfgaard,0)); assert(pass(nilfgaard,1));
   assert(nilfgaard.players[0].roundWins==1 && nilfgaard.players[1].roundLosses==1);
+}
+static void sourceAutomaticPassing() {
+  Game exhausted;
+  exhausted.players[0].hand.push_back(unit("last-human-action",4));
+  exhausted.players[1].hand.push_back(unit("last-opponent-action",3));
+  assert(playCard(exhausted,0,"last-human-action"));
+  assert(exhausted.players[0].passed&&exhausted.currentPlayer==1&&exhausted.phase==Phase::OpponentTurn);
+  assert(playCard(exhausted,1,"last-opponent-action"));
+  assert(exhausted.players[1].passed&&exhausted.phase==Phase::RoundResult);
+
+  Game emptyOpening;
+  emptyOpening.phase=Phase::Mulligan;
+  assert(replaceMulliganCards(emptyOpening,0,{}));
+  assert(replaceMulliganCards(emptyOpening,1,{}));
+  assert(emptyOpening.players[0].passed&&emptyOpening.players[1].passed);
+  assert(emptyOpening.phase==Phase::RoundResult);
+
+  Game oneSidedOpening;oneSidedOpening.phase=Phase::Mulligan;oneSidedOpening.firstPlayer=0;
+  oneSidedOpening.players[1].hand.push_back(unit("only-opponent-action",2));
+  assert(replaceMulliganCards(oneSidedOpening,0,{}));
+  assert(replaceMulliganCards(oneSidedOpening,1,{}));
+  assert(oneSidedOpening.players[0].passed&&!oneSidedOpening.players[1].passed);
+  assert(oneSidedOpening.currentPlayer==1&&oneSidedOpening.phase==Phase::OpponentTurn);
+
+  Game oncePerMatch;
+  oncePerMatch.players[0].leader=referenceCard("Foltest - The Siegemaster");
+  oncePerMatch.players[0].leaderAbilityAvailable=true;
+  oncePerMatch.players[0].hand={unit("leader-round-one",1),unit("leader-round-one-spare",1)};
+  oncePerMatch.players[1].hand={unit("leader-round-one-opponent",1),unit("leader-round-one-opponent-spare",1)};
+  assert(activateLeader(oncePerMatch,0));
+  assert(!oncePerMatch.players[0].leaderAbilityAvailable);
+  assert(pass(oncePerMatch,1)&&pass(oncePerMatch,0));
+  assert(oncePerMatch.phase==Phase::RoundResult&&startNextRound(oncePerMatch));
+  assert(!oncePerMatch.players[0].leaderAbilityAvailable);
+
+  Game lastLeaderAction;
+  lastLeaderAction.players[0].leader=referenceCard("Foltest - The Siegemaster");
+  lastLeaderAction.players[0].leaderAbilityAvailable=true;
+  lastLeaderAction.players[1].hand.push_back(unit("after-leader-action",1));
+  assert(activateLeader(lastLeaderAction,0));
+  assert(lastLeaderAction.players[0].passed&&lastLeaderAction.currentPlayer==1);
 }
 static void factionStartAndSkelligeRoundThree() {
   std::vector<Card> deck;
@@ -146,12 +186,12 @@ static void factionStartAndSkelligeRoundThree() {
   Game skellige;
   skellige.phase=Phase::RoundResult; skellige.round=2; skellige.firstPlayer=0;
   skellige.players[0].faction=Faction::Skellige;
+  skellige.players[0].hand.push_back(unit("blocked-during-setup",1));
   auto agile=unit("skellige-agile",7,Row::None); agile.agile=true;
   auto agile2=unit("skellige-agile-2",4,Row::None); agile2.agile=true;
   skellige.players[0].graveyard={agile,agile2};
   assert(startNextRound(skellige));
   assert(skellige.round==3 && skellige.phase==Phase::RoundSetup && skellige.skelligeRevivesRemaining==2);
-  skellige.players[0].hand.push_back(unit("blocked-during-setup",1));
   assert(!playCard(skellige,0,"blocked-during-setup") && !pass(skellige,0));
   assert(!chooseSkelligeRevive(skellige,0,"skellige-agile",Row::None));
   const auto chosenAgile=skellige.skelligeAgileReviveIds.front();
@@ -165,6 +205,8 @@ static void factionStartAndSkelligeRoundThree() {
 
   Game aiSkellige;
   aiSkellige.phase=Phase::RoundResult; aiSkellige.round=2; aiSkellige.players[1].faction=Faction::Skellige;
+  aiSkellige.players[0].hand.push_back(unit("human-spare",1));
+  aiSkellige.players[1].hand.push_back(unit("ai-spare",1));
   aiSkellige.players[1].graveyard={unit("ai-skellige-1",3),unit("ai-skellige-2",4,Row::Ranged),unit("ai-skellige-3",5,Row::Siege)};
   assert(startNextRound(aiSkellige));
   assert(aiSkellige.phase==Phase::PlayerTurn && aiSkellige.players[1].graveyard.size()==1);
@@ -376,7 +418,7 @@ static void referenceCatalog() {
   assert(std::all_of(observed.begin(),observed.end(),[](bool value){return value;}));
 
   Game mardroeme; Card potion; potion.id="potion"; potion.kind=Kind::Mardroeme;
-  mardroeme.players[0].hand.push_back(potion);
+  mardroeme.players[0].hand={potion,unit("mardroeme-spare",1)};
   auto berserker=unit("bear-source",4); berserker.name="Berserker"; berserker.berserker=true;
   mardroeme.players[0].board[0].push_back(berserker);
   assert(playCard(mardroeme,0,"potion",Row::Melee));
@@ -400,7 +442,7 @@ static void referenceCatalog() {
 
   Game ermion;auto enabler=unit("ermion",8,Row::Ranged);enabler.abilities={"mardroeme"};
   auto young=unit("young-berserker",8,Row::Ranged);young.name="Young Berserker";young.berserker=true;
-  ermion.players[0].hand.push_back(enabler);ermion.players[0].board[1].push_back(young);
+  ermion.players[0].hand={enabler,unit("ermion-spare",1)};ermion.players[0].board[1].push_back(young);
   assert(playCard(ermion,0,"ermion"));
   assert(ermion.players[0].mardroeme[1]);
   assert(std::any_of(ermion.players[0].board[1].begin(),ermion.players[0].board[1].end(),
@@ -611,4 +653,4 @@ static void leaderAbilities() {
   assert(crach.players[0].deck.size()==1 && crach.players[1].deck.size()==1);
   assert(crach.players[0].graveyard.empty() && crach.players[1].graveyard.empty());
 }
-int main() { scoreRules(); duplicateWeatherIsDiscarded(); turnsAndRounds(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); avengerCards(); leaderAbilities(); }
+int main() { scoreRules(); duplicateWeatherIsDiscarded(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); avengerCards(); leaderAbilities(); }

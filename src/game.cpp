@@ -135,6 +135,20 @@ void endTurn(Game& g) {
   g.phase = g.currentPlayer == 0 ? Phase::PlayerTurn : Phase::OpponentTurn;
   recompute(g);
 }
+bool canAct(const Player& player) {
+  return !player.hand.empty() || player.leaderAbilityAvailable;
+}
+void startRoundTurn(Game& g) {
+  for(auto& player:g.players)if(!canAct(player))player.passed=true;
+  if(g.players[0].passed&&g.players[1].passed){finishRound(g);return;}
+  if(g.players[g.currentPlayer].passed)g.currentPlayer=1-g.currentPlayer;
+  g.phase=g.currentPlayer==0?Phase::PlayerTurn:Phase::OpponentTurn;
+}
+void finishActionTurn(Game& g) {
+  auto& player=g.players[g.currentPlayer];
+  if(!player.passed&&!canAct(player))player.passed=true;
+  endTurn(g);
+}
 void applyMuster(Player& player, const Card& played) {
   if ((!played.muster && !hasAbility(played, "muster")) || played.group.empty()) return;
   const auto matchesMusterGroup = [&](const Card& candidate) {
@@ -249,7 +263,7 @@ bool replaceMulliganCards(Game& g, int who, const std::vector<std::string>& ids)
   player.mulliganDone = true;
   if (g.players[0].mulliganDone && g.players[1].mulliganDone) {
     g.currentPlayer = g.firstPlayer;
-    g.phase = g.currentPlayer == 0 ? Phase::PlayerTurn : Phase::OpponentTurn;
+    startRoundTurn(g);
   }
   return true;
 }
@@ -428,7 +442,7 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
       p.hand.push_back(c);
       return false;
   }
-  endTurn(g);
+  finishActionTurn(g);
   return true;
 }
 
@@ -550,7 +564,7 @@ bool activateLeader(Game& g, int who, Row target, const std::vector<std::string>
 
   if (!canActivate) return false;
   player.leaderAbilityAvailable=false;
-  endTurn(g);
+  finishActionTurn(g);
   return true;
 }
 
@@ -626,8 +640,8 @@ bool startNextRound(Game& g) {
     g.skelligeRevivePlayer=0;
   }
   g.currentPlayer = g.firstPlayer;
-  g.phase = g.skelligeRevivesRemaining>0 ? Phase::RoundSetup :
-            g.currentPlayer == 0 ? Phase::PlayerTurn : Phase::OpponentTurn;
+  if(g.skelligeRevivesRemaining>0)g.phase=Phase::RoundSetup;
+  else startRoundTurn(g);
   recompute(g);
   return true;
 }
@@ -652,7 +666,7 @@ bool chooseSkelligeRevive(Game& g,int who,const std::string& cardId,Row target) 
   if(g.skelligeRevivesRemaining==0) {
     g.skelligeRevivePlayer=-1;
     g.skelligeAgileReviveIds.clear();
-    g.phase=g.currentPlayer==0?Phase::PlayerTurn:Phase::OpponentTurn;
+    startRoundTurn(g);
   }
   recompute(g);
   return true;

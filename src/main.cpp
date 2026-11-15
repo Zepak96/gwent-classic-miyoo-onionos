@@ -1568,6 +1568,9 @@ int main(int argc,char** argv) {
     handleMatchKey(app,normalizeMiyooKey(app,SDLK_SPACE));
     okay=okay&&app.game.phase==gwent::Phase::PlayerTurn&&app.game.players[0].mulliganDone&&app.mulligan.empty();
     app.game=gwent::Game{};app.game.phase=gwent::Phase::Mulligan;app.mulligan.clear();
+    gwent::Card humanSpare;humanSpare.id="mulligan-spare-human";humanSpare.kind=gwent::Kind::Unit;
+    gwent::Card opponentSpare;opponentSpare.id="mulligan-spare-opponent";opponentSpare.kind=gwent::Kind::Unit;
+    app.game.players[0].hand.push_back(humanSpare);app.game.players[1].hand.push_back(opponentSpare);
     handleMatchKey(app,normalizeMiyooKey(app,SDLK_RETURN));
     okay=okay&&app.game.phase==gwent::Phase::PlayerTurn&&app.game.players[0].mulliganDone&&app.mulligan.empty();
     handleMatchKey(app,SDLK_BACKQUOTE);

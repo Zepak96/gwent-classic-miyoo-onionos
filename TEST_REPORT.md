@@ -129,3 +129,7 @@ kart, liderów, interfejsu ani animacji. Lista elementów otwartych jest w
 ## Random source opponent setup — 15.11.2026
 
 `DeckMaker.constructOpponentDeck()` in the pinned reference chooses a random premade deck and then a random legal leader from that deck's faction. Replaced the port's predictable "next recipe" opponent with that behavior. `makeReferenceOpponentDeck(seed)` uses a local deterministic PRNG so it can be tested and replayed; the SDL front end supplies a per-match seed. CTest verifies 500 seeds, all ten premade recipes, faction-legal leaders, valid card lists, and repeatability. Desktop build and CTest passed (2/2); ARM/device verification remains open.
+
+## Source automatic passing — 15.11.2026
+
+Ported the reference `Player.canPlay()`, `Player.endTurn()`, and `Game.startRound()` rule: a player with no cards and no available leader action passes automatically after their action; players unable to act are also passed as a round starts. Round start deliberately does not refresh a leader already used earlier in the match. Reworked engine fixtures to retain spare actions where a test needs to continue, and added explicit last-card and empty-opening cases. Desktop build and CTest passed (2/2).

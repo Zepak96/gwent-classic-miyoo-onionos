@@ -132,3 +132,7 @@ Przeniesiono do SDL wybrane istniejące animacje źródłowe: lot karty trwa 499
 ## Losowanie przeciwnika zgodne ze źródłem — 15.11.2026
 
 Źródłowy `DeckMaker.constructOpponentDeck()` wybiera losową talię z puli startowej, a potem losowego lidera należącego do frakcji tej talii. Port nie wybiera już deterministycznie „następnej” talii. Dodano `makeReferenceOpponentDeck(seed)` z lokalnym, odtwarzalnym PRNG oraz test 500 ziaren obejmujący wszystkie dziesięć talii, legalność liderów i poprawność składów. Build desktop i CTest 2/2 przeszły; kompilacja ARM i test Miyoo pozostają otwarte.
+
+## Automatyczne pasowanie zgodne ze źródłem — 15.11.2026
+
+Przeniesiono reguły `Player.canPlay()`, `Player.endTurn()` i `Game.startRound()`: gracz bez kart i dostępnej zdolności lidera pasuje po swojej akcji, a przed rozpoczęciem rundy automatycznie pasują strony, które nie mogą wykonać ruchu. Zdolność lidera użyta wcześniej w meczu nie odnawia się na początku kolejnej rundy. Dodano testy ostatniej karty i pustego rozpoczęcia; desktop build i CTest 2/2 przeszły.
