@@ -8,10 +8,10 @@ Data raportu: 2026-11-15.
 
 - Lokalny frontend SDL2 i silnik skompilowały się w Ubuntu 24.04/Dockerze. CTest: 2/2; dodatkowo dekoder audio sprawdził wszystkie 35 MP3, a smoke test zapisał sześć obrazów 640×480 w `docs/screenshots/`. Planszę meczu wycentrowano w ekranie 4:3, zachowując jej źródłowe 16:9; inspektor karty Cirilli pokazuje cały opis i cytat.
 - Regresja Zbiórki sprawdza Geralta i Roacha. Test AI uruchamia pełne mecze AI kontra AI na poziomach Łatwy, Normalny i Trudny; osobny przypadek sprawdza, że trudny wybiera silniejszy ruch w prostym stanie.
-- ARM workflow i desktop workflow zakończyły się sukcesem dla commita `22cf14b`; sześć klatek smoke obejmuje menu tytułowe i wybór talii. Paczkę ARM z tego commita skopiowano na kartę i porównano 599 plików SHA-256 bez różnic.
+- ARM workflow i desktop workflow zakończyły się sukcesem dla commita `1571642`; test obejmuje trzy poziomy AI, ochronę Roacha przy wymianie oraz sześć klatek smoke dla menu. Paczkę ARM z tego commita skopiowano na kartę i porównano 599 plików SHA-256 bez różnic. SHA-256 ZIP: `df3405e58c6700d6295959db0af68e85c1ab21820aa05af6822fff9d69ff11bf`.
 - Nie wykonano fizycznego startu gry, testu przycisków, długiego testu pamięci/wydajności ani odsłuchu na Miyoo. Skrót nadal jest `.notfound` i wymaga uruchomienia `~Import ports.miyoocmd` na urządzeniu.
 
-Testy automatyczne C++ obejmują punktowanie, pogodę (w tym Skellige Storm), róg, Bohaterów, Morale, Więź (3 kopie), kolejność Więzi i Morale, pasowanie, remis, Nilfgaard, zdolność pierwszego gracza Scoia'tael, wybór dwóch wskrzeszeń Skellige w rundzie trzeciej, Szpiega, Medyka (wymóg celu i zakaz wskrzeszania Bohatera), Manekina, Zbiórkę, Mardroeme/Berserker, Scorch, Avengera Cow/Kambiego po Manekinie, Pożodze i końcu rundy, rozdanie i wymianę kart, walidację talii, katalog, 10 talii referencyjnych, round-trip oraz odrzucenie uszkodzonego przepisu talii użytkownika, wybrane zdolności liderów, zgodność decyzji AI przy zmianie ukrytej ręki przeciwnika, początkową wymianę AI oraz pełny mecz AI kontra AI. Dawny test wymuszający wybór lidera usunięto, bo referencyjny `ControllerAI` losuje akcję proporcjonalnie do wag i nie zawsze wybiera najwyżej ważoną możliwość.
+Testy automatyczne C++ obejmują punktowanie, pogodę (w tym Skellige Storm), róg, Bohaterów, Morale, Więź (3 kopie), kolejność Więzi i Morale, pasowanie, remis, Nilfgaard, zdolność pierwszego gracza Scoia'tael, wybór dwóch wskrzeszeń Skellige w rundzie trzeciej, Szpiega, Medyka (wymóg celu i zakaz wskrzeszania Bohatera), Manekina, Zbiórkę Geralta/Roacha oraz AI, Mardroeme/Berserker, Scorch, Avengera Cow/Kambiego po Manekinie, Pożodze i końcu rundy, rozdanie i wymianę kart, walidację talii, katalog, 10 talii referencyjnych, round-trip oraz odrzucenie uszkodzonego przepisu talii użytkownika, wybrane zdolności liderów, zgodność decyzji AI przy zmianie ukrytej ręki przeciwnika, ochronę Roacha w mulliganie, wszystkie trzy poziomy trudności oraz pełny mecz AI kontra AI na każdym poziomie. Dawny test wymuszający wybór lidera usunięto, bo referencyjny `ControllerAI` losuje akcję proporcjonalnie do wag i nie zawsze wybiera najwyżej ważoną możliwość.
 
 Po dodaniu przepływów Scoia'tael i Skellige workflow [desktop-build #43714840961](https://github.com/Zepak96/gwent-classic-miyoo-onionos/actions/runs/43714840961) zbudował silnik oraz frontend SDL2, zaliczył 2/2 CTest w obu konfiguracjach i uruchomił test startowy SDL z atrapą wideo. Testy automatyczne obejmują wybór pierwszego gracza i wybór wskrzeszeń w rundzie trzeciej. Smoke test frontendowy nie symuluje tych wejść ani pełnego meczu; nie wykonano też testu na urządzeniu Miyoo.
 
@@ -24,11 +24,11 @@ Po podłączeniu edytora do menu workflow [desktop-build #43717386389](https://g
 | Obszar | Status | Uwagi |
 |---|---|---|
 | Budowanie desktop | Zaliczone w CI | Ubuntu, CMake, SDL2; budowany frontend oraz silnik/testy |
-| Budowanie ARM | Zaliczone w CI | Miyoo GCC 8.2.1/armhf, SDL2 z przypiętego portu; aktualna paczka z commita `22cf14b` skopiowana i porównana z kartą. |
+| Budowanie ARM | Zaliczone w CI | Miyoo GCC 8.2.1/armhf, SDL2 z przypiętego portu; aktualna paczka z commita `1571642` skopiowana i porównana z kartą. |
 | Zasady / regresja | Częściowo zaliczone lokalnie i w CI | Wybrane reguły, liderzy, Roach/Muster i pełne mecze AI×AI dla trzech poziomów; kompletne porównanie wszystkich sekwencji z referencją nadal nie istnieje. |
 | Interfejs 640×480 | Smoke wizualny zaliczony | Obejrzano cztery klatki 640×480; plansza jest wycentrowana, opis Ciri czytelny. Brakuje automatyzacji interakcji, porównania wszystkich ekranów 1:1 i testu fizycznego. |
 | Audio | Częściowo zaliczone desktopowo | `dr_mp3` dekoduje wszystkie 35 MP3; SDL Audio miksuje dźwięki zdarzeń. Brak muzyki w repo źródłowym i testu dźwięku na Miyoo. |
-| OnionOS | Paczka na SD; start fizyczny niezweryfikowany | Wszystkie 599 plików paczki z `22cf14b` zgodne SHA-256; import skrótu i uruchomienie gry pozostają do testu na Miyoo. |
+| OnionOS | Paczka na SD; start fizyczny niezweryfikowany | Wszystkie 599 plików paczki z `1571642` zgodne SHA-256; import skrótu i uruchomienie gry pozostają do testu na Miyoo. |
 | Długi test / RAM | Niewykonane | Nie przeprowadzono |
 
 ## Test renderowania assetów i UI
@@ -37,7 +37,7 @@ W tej sesji dołączono 531 plików obrazów, 35 SFX MP3 i 6 SVG z przypiętego 
 
 ## Test sprzętowy
 
-Nie uruchomiono jeszcze portu na fizycznym Miyoo Mini Plus. Po podłączeniu adaptera karta microSD została wykryta jako `E:` z etykietą `MIYOO MINI`, FAT32, z katalogami `Roms`, `Emu`, `Saves` i `Themes`. Do chwili uzyskania wiernego ekranu i binarki ARM karta nie została zmodyfikowana. Samo wykrycie karty nie potwierdza działania gry na urządzeniu.
+Port nie został jeszcze uruchomiony na fizycznym Miyoo Mini Plus. Karta microSD jest wykryta jako `E:` (`MIYOO MINI`, FAT32); paczka z commita `1571642` znajduje się w `Roms/PORTS/Games/GwentClassic`, a skrót `.notfound` wymaga uruchomienia `~Import ports.miyoocmd` na urządzeniu. Zweryfikowano wszystkie pliki paczki przez SHA-256, ale nie potwierdza to startu, wejścia, audio ani wydajności na konsoli.
 
 ## Ponowna kontrola zgodności układu źródłowego
 
