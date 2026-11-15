@@ -1,6 +1,7 @@
 #include <SDL.h>
 #include "gwent/ai.hpp"
 #include "gwent/catalog.hpp"
+#include "gwent/deck.hpp"
 #include "gwent/game.hpp"
 #include "gwent/save.hpp"
 #include <algorithm>
@@ -74,12 +75,17 @@ void text(SDL_Renderer* r,int x,int y,const std::string& value,Color c,int scale
 int textWidth(const std::string& s,int scale=1) { return static_cast<int>(ascii(s).size())*6*scale; }
 std::string shortName(std::string s,int n) { if(static_cast<int>(ascii(s).size())>n) s=ascii(s).substr(0,n); return ascii(s); }
 
-enum class Screen { Title, DeckSelect, Match };
+enum class Screen { Title, DeckSelect, DeckBuilder, Match };
 enum class Language { Polish, English };
 struct App {
   Screen screen{Screen::Title};
   Language language{Language::Polish};
   std::size_t deckIndex{0};
+  int deckSlot{1};
+  bool userDeckSelected{false};
+  bool editingLeader{false};
+  int editorCardIndex{0};
+  gwent::UserDeck editDeck;
   gwent::Game game;
   int handIndex{0};
   int rowIndex{0};
@@ -88,6 +94,7 @@ struct App {
   std::vector<std::string> selectedTargets;
   std::vector<std::string> mulligan;
   std::string savePath;
+  std::string dataDirectory;
   std::string status{"PRESS ENTER"};
   Uint32 aiAt{0};
 };
@@ -122,6 +129,18 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="target")return pl?"WYBIERZ CEL ENTEREM, ESC ANULUJE":"CHOOSE TARGET WITH ENTER, ESC CANCELS";
   if(key=="resume")return pl?"R - WCZYTAJ ZAPIS   ESC - WSTECZ":"R - RESUME SAVE   ESC - BACK";
   if(key=="save_controls")return pl?"SELECT/S - ZAPISZ   START/O - WCZYTAJ":"SELECT/S - SAVE   START/O - LOAD";
+  if(key=="deck_builder")return pl?"BUDOWNICZY Talii":"DECK BUILDER";
+  if(key=="deck_mode")return pl?"KARTY":"CARDS";
+  if(key=="leader_mode")return pl?"LIDER":"LEADER";
+  if(key=="deck_count")return pl?"KARTY W TALII":"CARDS IN DECK";
+  if(key=="deck_valid")return pl?"TALIA POPRAWNA":"DECK IS VALID";
+  if(key=="deck_invalid")return pl?"TALIA NIEPOPRAWNA":"DECK IS INVALID";
+  if(key=="deck_saved")return pl?"ZAPISANO TALIE":"DECK SAVED";
+  if(key=="deck_slot")return pl?"SLOT TALII":"DECK SLOT";
+  if(key=="deck_controls")return pl?"GORA/DOL: KARTA  A: DODAJ  B: USUN":"UP/DOWN: CARD  A: ADD  B: REMOVE";
+  if(key=="deck_controls2")return pl?"L: LIDER  F: FRAKCJA  SELECT: ZAPISZ":"L: LEADER  F: FACTION  SELECT: SAVE";
+  if(key=="deck_need_cards")return pl?"MIN. 22 JEDNOSTKI / MAX. 10 SPECJALNYCH":"MIN 22 UNITS / MAX 10 SPECIALS";
+  if(key=="deck_custom")return pl?"WLASNA TALIA":"CUSTOM DECK";
   if(key=="saved")return pl?"ZAPISANO":"GAME SAVED";
   if(key=="loaded")return pl?"WCZYTANO ZAPIS":"SAVE LOADED";
   if(key=="no_save")return pl?"BRAK POPRAWNEGO ZAPISU":"NO VALID SAVE FOUND";
@@ -150,6 +169,44 @@ std::string factionName(gwent::Faction faction,bool pl) {
     default:return pl?"NEUTRALNA":"NEUTRAL";
   }
 }
+std::string userDeckPath(const App& a,int slot) {
+  return a.dataDirectory+"deck-"+std::to_string(slot)+".gwd";
+}
+std::vector<const gwent::Card*> editorCards(const App& a) {
+  std::vector<const gwent::Card*> cards;std::vector<int> seen;
+  for(const auto& card:gwent::referenceCardCatalog()) {
+    if(card.kind==gwent::Kind::Leader||card.deckCopies<=0||
+       (card.faction!=gwent::Faction::Neutral&&card.faction!=a.editDeck.faction)||
+       std::find(seen.begin(),seen.end(),card.referenceIndex)!=seen.end())continue;
+    seen.push_back(card.referenceIndex);cards.push_back(&card);
+  }
+  return cards;
+}
+int deckCopies(const gwent::UserDeck& deck,int referenceIndex) {
+  const auto it=std::find_if(deck.cardCounts.begin(),deck.cardCounts.end(),[&](const auto& entry){return entry.first==referenceIndex;});
+  return it==deck.cardCounts.end()?0:it->second;
+}
+void openDeckEditor(App& a) {
+  a.editingLeader=false;a.editorCardIndex=0;
+  std::string error;
+  if(!gwent::loadUserDeck(userDeckPath(a,a.deckSlot),a.editDeck,&error)) {
+    const auto& recipe=recipes()[a.deckIndex%recipes().size()];
+    a.editDeck={"Deck "+std::to_string(a.deckSlot),recipe.faction,recipe.leaderReferenceIndex,recipe.cardCounts};
+  }
+  a.screen=Screen::DeckBuilder;
+}
+void changeDeckFaction(App& a) {
+  const int next=(static_cast<int>(a.editDeck.faction)+1)%5;
+  a.editDeck.faction=static_cast<gwent::Faction>(next);
+  const auto& catalog=gwent::referenceCardCatalog();
+  a.editDeck.cardCounts.erase(std::remove_if(a.editDeck.cardCounts.begin(),a.editDeck.cardCounts.end(),[&](const auto& entry){
+    const auto it=std::find_if(catalog.begin(),catalog.end(),[&](const auto& card){return card.referenceIndex==entry.first&&card.kind!=gwent::Kind::Leader;});
+    return it==catalog.end()||(it->faction!=gwent::Faction::Neutral&&it->faction!=a.editDeck.faction);
+  }),a.editDeck.cardCounts.end());
+  const auto leader=std::find_if(catalog.begin(),catalog.end(),[&](const auto& card){return card.kind==gwent::Kind::Leader&&card.faction==a.editDeck.faction;});
+  if(leader!=catalog.end())a.editDeck.leaderReferenceIndex=leader->referenceIndex;
+  a.editorCardIndex=0;
+}
 gwent::Card recipeLeader(std::size_t index) {
   gwent::Card leader;
   if(!recipes().empty()) gwent::referenceLeader(recipes()[index%recipes().size()].leaderReferenceIndex,leader);
@@ -158,9 +215,12 @@ gwent::Card recipeLeader(std::size_t index) {
 void startMatch(App& a) {
   if(recipes().size()<2) { a.status="REFERENCE DECKS MISSING"; return; }
   const std::size_t aiIndex=(a.deckIndex+1)%recipes().size();
-  gwent::Card humanLeader=recipeLeader(a.deckIndex), aiLeader=recipeLeader(aiIndex);
-  gwent::beginMatchWithLeaders(a.game,gwent::makeReferenceDeck(recipes()[a.deckIndex]),humanLeader,
-      gwent::makeReferenceDeck(recipes()[aiIndex]),aiLeader,SDL_GetTicks(),-1);
+  gwent::Card humanLeader=recipeLeader(a.deckIndex);std::vector<gwent::Card> humanDeck;
+  if(a.userDeckSelected) {
+    if(!gwent::materializeUserDeck(a.editDeck,humanDeck,humanLeader)) { a.status=tr(a,"deck_invalid");return; }
+  } else humanDeck=gwent::makeReferenceDeck(recipes()[a.deckIndex]);
+  gwent::Card aiLeader=recipeLeader(aiIndex);
+  gwent::beginMatchWithLeaders(a.game,std::move(humanDeck),humanLeader,gwent::makeReferenceDeck(recipes()[aiIndex]),aiLeader,SDL_GetTicks(),-1);
   a.mulligan.clear(); a.handIndex=0; a.rowIndex=0; a.screen=Screen::Match;
   a.status=tr(a,"mulligan");
 }
@@ -267,18 +327,73 @@ void drawDeckSelect(SDL_Renderer* r,const App& a) {
   const auto opponent=recipes()[(a.deckIndex+1)%recipes().size()];
   const auto opponentLeader=recipeLeader((a.deckIndex+1)%recipes().size());
   text(r,57,83,"<",gold,2); text(r,565,83,">",gold,2);
-  text(r,104,87,factionName(selected.faction,a.language==Language::Polish),paper,2);
-  text(r,104,115,"LEADER: "+leader.name,muted,1);
-  text(r,104,139,"CARDS: "+std::to_string(gwent::makeReferenceDeck(selected).size()),muted,1);
+  const bool custom=a.userDeckSelected;
+  text(r,104,87,custom?tr(a,"deck_custom"):factionName(selected.faction,a.language==Language::Polish),paper,2);
+  text(r,104,115,"LEADER: "+(custom?([&](){gwent::Card c;gwent::referenceLeader(a.editDeck.leaderReferenceIndex,c);return c.name;})():leader.name),muted,1);
+  text(r,104,139,"CARDS: "+std::to_string(custom?gwent::makeReferenceDeck(a.editDeck.cardCounts).size():gwent::makeReferenceDeck(selected).size()),muted,1);
   box(r,73,174,493,1,Color{65,72,67});
   text(r,74,193,tr(a,"opponent"),muted,1);
   text(r,74,215,factionName(opponent.faction,a.language==Language::Polish)+" / "+opponentLeader.name,paper,1);
   text(r,74,251,tr(a,"ai"),muted,1);
   text(r,226,251,"CLASSIC",gold,1);
   text(r,74,276,tr(a,"language"),muted,1); text(r,226,276,a.language==Language::Polish?"POLSKI":"ENGLISH",gold,1);
-  text(r,25,332,tr(a,"instructions"),paper,1);
+  text(r,25,332,custom?tr(a,"deck_slot")+" "+std::to_string(a.deckSlot)+"  B: EDIT  P: PREMADE":tr(a,"instructions"),paper,1);
   text(r,119,370,tr(a,"confirm"),gold,1);
   text(r,170,414,tr(a,"resume"),muted,1);
+  text(r,25,434,"B - "+tr(a,"deck_builder")+"   [ / ] - SLOT  P - PREMADE",muted,1);
+  if(!a.status.empty())text(r,470,434,shortName(a.status,25),gold,1);
+}
+std::vector<const gwent::Card*> editorLeaders(const App& a) {
+  std::vector<const gwent::Card*> leaders;
+  for(const auto& card:gwent::referenceCardCatalog())if(card.kind==gwent::Kind::Leader&&card.faction==a.editDeck.faction)leaders.push_back(&card);
+  return leaders;
+}
+void drawDeckBuilder(SDL_Renderer* r,const App& a) {
+  box(r,0,0,W,H,ink);box(r,0,0,W,5,gold);box(r,0,H-5,W,5,gold);
+  text(r,20,17,tr(a,"deck_builder"),gold,2);
+  text(r,20,45,tr(a,"deck_slot")+" "+std::to_string(a.deckSlot),muted,1);
+  text(r,183,45,"FACTION: "+factionName(a.editDeck.faction,a.language==Language::Polish),paper,1);
+  text(r,20,68,a.editingLeader?tr(a,"leader_mode"):tr(a,"deck_mode"),gold,1);
+  box(r,18,88,604,294,panel);frame(r,18,88,604,294,gold);
+  const std::string validation=gwent::validateUserDeck(a.editDeck);
+  const auto resolved=gwent::makeReferenceDeck(a.editDeck.cardCounts);
+  int units=0;for(const auto& card:resolved)if(card.kind==gwent::Kind::Unit)++units;
+  if(a.editingLeader) {
+    auto leaders=editorLeaders(a);
+    if(!leaders.empty()) {
+      const auto selected=std::find_if(leaders.begin(),leaders.end(),[&](const gwent::Card* card){return card->referenceIndex==a.editDeck.leaderReferenceIndex;});
+      const int current=selected==leaders.end()?0:static_cast<int>(selected-leaders.begin());
+      text(r,42,109,"<  LEFT / RIGHT  >",muted,1);
+      const int start=std::clamp(current-3,0,std::max(0,static_cast<int>(leaders.size())-7));
+      for(int i=start;i<std::min(static_cast<int>(leaders.size()),start+7);++i) {
+        const auto* card=leaders[static_cast<std::size_t>(i)];const int y=138+(i-start)*31;
+        box(r,38,y,560,25,i==current?panelLight:panel);frame(r,38,y,560,25,i==current?gold:Color{62,70,65});
+        text(r,48,y+8,card->name,paper,1);
+        if(i==current)text(r,566,y+8,"*",gold,1);
+      }
+      text(r,42,366,leaders[static_cast<std::size_t>(current)]->name,gold,1);
+    }
+  } else {
+    const auto cards=editorCards(a);
+    if(!cards.empty()) {
+      const int current=std::clamp(a.editorCardIndex,0,static_cast<int>(cards.size())-1);
+      const int start=std::clamp(current-4,0,std::max(0,static_cast<int>(cards.size())-8));
+      for(int i=start;i<std::min(static_cast<int>(cards.size()),start+8);++i) {
+        const auto* card=cards[static_cast<std::size_t>(i)];const int y=101+(i-start)*32;
+        box(r,29,y,582,27,i==current?panelLight:panel);frame(r,29,y,582,27,i==current?gold:Color{62,70,65});
+        text(r,38,y+9,shortName(card->name,39),paper,1);
+        const std::string type=card->kind==gwent::Kind::Unit?std::to_string(card->power):"SPC";
+        text(r,500,y+9,type,muted,1);
+        text(r,562,y+9,std::to_string(deckCopies(a.editDeck,card->referenceIndex))+"/"+std::to_string(card->deckCopies),gold,1);
+      }
+      const auto* card=cards[static_cast<std::size_t>(current)];
+      text(r,35,365,card->name+"  "+std::to_string(deckCopies(a.editDeck,card->referenceIndex))+" / "+std::to_string(card->deckCopies),gold,1);
+    }
+  }
+  text(r,20,394,tr(a,"deck_count")+": "+std::to_string(resolved.size())+"   UNITS: "+std::to_string(units)+" / 22",paper,1);
+  text(r,20,414,validation.empty()?tr(a,"deck_valid"):tr(a,"deck_invalid"),validation.empty()?green:Color{196,105,82},1);
+  text(r,20,434,tr(a,"deck_controls"),muted,1);
+  text(r,20,449,tr(a,"deck_controls2"),muted,1);
 }
 void drawMatch(SDL_Renderer* r,const App& a) {
   box(r,0,0,W,H,ink);
@@ -465,11 +580,69 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
     if(key==SDLK_ESCAPE) { a.screen=Screen::Title; return; }
     if(key==SDLK_z) { a.language=a.language==Language::Polish?Language::English:Language::Polish; return; }
     if(key==SDLK_r) { loadSavedMatch(a);return; }
+    if(key==SDLK_b) { openDeckEditor(a);return; }
+    if(key==SDLK_p) { a.userDeckSelected=false;return; }
+    if(key==SDLK_PAGEUP||key==SDLK_LEFTBRACKET||key==SDLK_PAGEDOWN||key==SDLK_RIGHTBRACKET) {
+      const bool previous=key==SDLK_PAGEUP||key==SDLK_LEFTBRACKET;
+      a.deckSlot=previous?(a.deckSlot<=1?3:a.deckSlot-1):(a.deckSlot>=3?1:a.deckSlot+1);
+      a.userDeckSelected=gwent::loadUserDeck(userDeckPath(a,a.deckSlot),a.editDeck);return;
+    }
     if(key==SDLK_LEFT||key==SDLK_a)a.deckIndex=(a.deckIndex+recipes().size()-1)%recipes().size();
     else if(key==SDLK_RIGHT||key==SDLK_d)a.deckIndex=(a.deckIndex+1)%recipes().size();
     else if(key==SDLK_l)a.language=a.language==Language::Polish?Language::English:Language::Polish;
     else if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x)startMatch(a);
+  } else if(a.screen==Screen::DeckBuilder) {
+    if(key==SDLK_ESCAPE||key==SDLK_z) { a.screen=Screen::DeckSelect;return; }
+    if(key==SDLK_PAGEUP||key==SDLK_LEFTBRACKET) { a.deckSlot=a.deckSlot<=1?3:a.deckSlot-1;openDeckEditor(a);return; }
+    if(key==SDLK_PAGEDOWN||key==SDLK_RIGHTBRACKET) { a.deckSlot=a.deckSlot>=3?1:a.deckSlot+1;openDeckEditor(a);return; }
+    if(key==SDLK_f) { changeDeckFaction(a);return; }
+    if(key==SDLK_l||key==SDLK_TAB) { a.editingLeader=!a.editingLeader;return; }
+    if(key==SDLK_s||key==SDLK_F5) {
+      std::string error;
+      if(gwent::saveUserDeck(userDeckPath(a,a.deckSlot),a.editDeck,&error)) { a.userDeckSelected=true;a.screen=Screen::DeckSelect;a.status=tr(a,"deck_saved"); }
+      else a.status=tr(a,"deck_invalid")+": "+error;
+      return;
+    }
+    if(a.editingLeader) {
+      const auto leaders=editorLeaders(a);if(leaders.empty())return;
+      auto found=std::find_if(leaders.begin(),leaders.end(),[&](const gwent::Card* card){return card->referenceIndex==a.editDeck.leaderReferenceIndex;});
+      int index=found==leaders.end()?0:static_cast<int>(found-leaders.begin());
+      if(key==SDLK_LEFT||key==SDLK_a)index=(index+static_cast<int>(leaders.size())-1)%static_cast<int>(leaders.size());
+      else if(key==SDLK_RIGHT||key==SDLK_d||key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x)index=(index+1)%static_cast<int>(leaders.size());
+      a.editDeck.leaderReferenceIndex=leaders[static_cast<std::size_t>(index)]->referenceIndex;return;
+    }
+    const auto cards=editorCards(a);if(cards.empty())return;
+    a.editorCardIndex=std::clamp(a.editorCardIndex,0,static_cast<int>(cards.size())-1);
+    if(key==SDLK_UP||key==SDLK_w)a.editorCardIndex=(a.editorCardIndex+static_cast<int>(cards.size())-1)%static_cast<int>(cards.size());
+    else if(key==SDLK_DOWN||key==SDLK_j)a.editorCardIndex=(a.editorCardIndex+1)%static_cast<int>(cards.size());
+    else if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x) {
+      const auto* card=cards[static_cast<std::size_t>(a.editorCardIndex)];const int count=deckCopies(a.editDeck,card->referenceIndex);
+      if(count<card->deckCopies) {
+        const auto it=std::find_if(a.editDeck.cardCounts.begin(),a.editDeck.cardCounts.end(),[&](const auto& entry){return entry.first==card->referenceIndex;});
+        if(it==a.editDeck.cardCounts.end())a.editDeck.cardCounts.emplace_back(card->referenceIndex,1);else ++it->second;
+      }
+    } else if(key==SDLK_BACKSPACE||key==SDLK_MINUS) {
+      const auto* card=cards[static_cast<std::size_t>(a.editorCardIndex)];
+      const auto it=std::find_if(a.editDeck.cardCounts.begin(),a.editDeck.cardCounts.end(),[&](const auto& entry){return entry.first==card->referenceIndex;});
+      if(it!=a.editDeck.cardCounts.end()) { if(it->second<=1)a.editDeck.cardCounts.erase(it);else --it->second; }
+    }
   } else handleMatchKey(a,key);
+}
+SDL_Keycode controllerKey(const SDL_ControllerButtonEvent& button,Screen screen) {
+  switch(button.button) {
+    case SDL_CONTROLLER_BUTTON_DPAD_UP:return SDLK_UP;
+    case SDL_CONTROLLER_BUTTON_DPAD_DOWN:return SDLK_DOWN;
+    case SDL_CONTROLLER_BUTTON_DPAD_LEFT:return SDLK_LEFT;
+    case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:return SDLK_RIGHT;
+    case SDL_CONTROLLER_BUTTON_A:return SDLK_x;
+    case SDL_CONTROLLER_BUTTON_B:return screen==Screen::DeckSelect?SDLK_b:SDLK_BACKSPACE;
+    case SDL_CONTROLLER_BUTTON_X:return screen==Screen::DeckSelect?SDLK_b:SDLK_l;
+    case SDL_CONTROLLER_BUTTON_Y:return screen==Screen::DeckBuilder?SDLK_f:SDLK_z;
+    case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:return (screen==Screen::DeckBuilder||screen==Screen::DeckSelect)?SDLK_PAGEUP:SDLK_UNKNOWN;
+    case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER:return (screen==Screen::DeckBuilder||screen==Screen::DeckSelect)?SDLK_PAGEDOWN:SDLK_UNKNOWN;
+    case SDL_CONTROLLER_BUTTON_START:return screen==Screen::DeckBuilder?SDLK_ESCAPE:SDLK_RETURN;
+    default:return SDLK_UNKNOWN;
+  }
 }
 }
 
@@ -484,21 +657,30 @@ int main(int argc,char** argv) {
   if(!renderer){SDL_DestroyWindow(window);SDL_Quit();return 3;}
   SDL_RenderSetLogicalSize(renderer,W,H);
   App app; bool running=true;
-  if(char* directory=SDL_GetPrefPath("GwentClassic","MiyooMiniPlus")) { app.savePath=std::string(directory)+"match-v1.gws";SDL_free(directory); }
+  if(char* directory=SDL_GetPrefPath("GwentClassic","MiyooMiniPlus")) {
+    app.dataDirectory=directory;app.savePath=app.dataDirectory+"match-v1.gws";
+    if(gwent::loadUserDeck(userDeckPath(app,app.deckSlot),app.editDeck))app.userDeckSelected=true;
+    SDL_free(directory);
+  }
   if(argc>1 && std::string(argv[1])=="--smoke-test") {
+    const auto saveFrame=[&](const char* path){
+      SDL_Surface* surface=SDL_CreateRGBSurfaceWithFormat(0,W,H,32,SDL_PIXELFORMAT_ARGB8888);
+      if(!surface)return false;
+      const bool okay=SDL_RenderReadPixels(renderer,nullptr,SDL_PIXELFORMAT_ARGB8888,surface->pixels,surface->pitch)==0&&SDL_SaveBMP(surface,path)==0;
+      SDL_FreeSurface(surface);return okay;
+    };
     drawTitle(renderer,app); SDL_RenderPresent(renderer);
     app.screen=Screen::DeckSelect; drawDeckSelect(renderer,app); SDL_RenderPresent(renderer);
+    if(argc>3) {
+      const auto& recipe=recipes().front();app.editDeck={"Smoke test",recipe.faction,recipe.leaderReferenceIndex,recipe.cardCounts};
+      app.screen=Screen::DeckBuilder;drawDeckBuilder(renderer,app);SDL_RenderPresent(renderer);
+      if(!saveFrame(argv[3])) { SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 4; }
+      app.screen=Screen::DeckSelect;
+    }
     startMatch(app);
     gwent::replaceMulliganCards(app.game,0,{}); gwent::replaceMulliganCards(app.game,1,gwent::chooseAiMulligan(app.game,1));
     drawMatch(renderer,app);
-    if(argc>2) {
-      SDL_Surface* surface=SDL_CreateRGBSurfaceWithFormat(0,W,H,32,SDL_PIXELFORMAT_ARGB8888);
-      if(!surface || SDL_RenderReadPixels(renderer,nullptr,SDL_PIXELFORMAT_ARGB8888,surface->pixels,surface->pitch)!=0 || SDL_SaveBMP(surface,argv[2])!=0) {
-        if(surface)SDL_FreeSurface(surface);
-        SDL_DestroyRenderer(renderer); SDL_DestroyWindow(window); SDL_Quit(); return 4;
-      }
-      SDL_FreeSurface(surface);
-    }
+    if(argc>2&&!saveFrame(argv[2])) { SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 4; }
     SDL_RenderPresent(renderer);
     SDL_DestroyRenderer(renderer); SDL_DestroyWindow(window); SDL_Quit(); return 0;
   }
@@ -508,16 +690,18 @@ int main(int argc,char** argv) {
       if(event.type==SDL_QUIT)running=false;
       else if(event.type==SDL_KEYDOWN&&!event.key.repeat)handleKey(app,event.key.keysym.sym,running);
       else if(event.type==SDL_CONTROLLERBUTTONDOWN) {
-        if(event.cbutton.button==SDL_CONTROLLER_BUTTON_BACK&&app.screen==Screen::Match)saveCurrentMatch(app);
-        else if(event.cbutton.button==SDL_CONTROLLER_BUTTON_START) {
-          if(app.screen==Screen::Match)loadSavedMatch(app);
-          else handleKey(app,SDLK_RETURN,running);
-        }
+        if(event.cbutton.button==SDL_CONTROLLER_BUTTON_BACK) {
+          if(app.screen==Screen::Match)saveCurrentMatch(app);
+          else if(app.screen==Screen::DeckBuilder)handleKey(app,SDLK_s,running);
+          else handleKey(app,SDLK_ESCAPE,running);
+        } else if(event.cbutton.button==SDL_CONTROLLER_BUTTON_START&&app.screen==Screen::Match)loadSavedMatch(app);
+        else { const auto mapped=controllerKey(event.cbutton,app.screen);if(mapped!=SDLK_UNKNOWN)handleKey(app,mapped,running); }
       }
     }
     if(app.screen==Screen::Match && app.game.phase==gwent::Phase::OpponentTurn && SDL_GetTicks()>=app.aiAt)performAi(app);
     if(app.screen==Screen::Title)drawTitle(renderer,app);
     else if(app.screen==Screen::DeckSelect)drawDeckSelect(renderer,app);
+    else if(app.screen==Screen::DeckBuilder)drawDeckBuilder(renderer,app);
     else drawMatch(renderer,app);
     SDL_RenderPresent(renderer); SDL_Delay(8);
   }

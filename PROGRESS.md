@@ -42,8 +42,8 @@ Docelowa gra to wyłącznie Gwint jako minigra w Wiedźminie 3: Wild Hunt, z zaw
 
 - [~] Prototyp SDL2 640×480 ma menu, wybór talii, mecz, mulligan, planszę, rękę, cele Manekina/Medyków, lidera i pasowanie; CI buduje frontend i wykonuje startowy smoke test. Kompletność UI, lokalizacja i mapowanie fizycznych przycisków wymagają dalszej pracy/testów.
 - [~] Zapis i odtwarzanie stanu meczu: dodano wersjonowany, sumowany kontrolnie format binarny, atomowy zapis oraz bezpieczne odrzucanie uszkodzonych plików; UI ma ręczny zapis/wczytanie i wznowienie z menu. Autosave i test na Miyoo pozostają do zrobienia; przepis talii ma już zapis silnikowy, ale nie jest jeszcze podłączony do UI.
-- [~] Dodano silnikowy format talii użytkownika `.gwd`: przechowuje wyłącznie odwołania do przypiętego katalogu kart, lidera, frakcję i nazwę; waliduje przepis według zasad talii i materializuje identyczne rekordy kart. Dodano sumę kontrolną, zapis atomowy i test round-trip/uszkodzenia. Nadal brakuje kreatora w SDL, wielu slotów i połączenia talii użytkownika z menu meczu.
-- [ ] Pełne PL/EN, tutorial, deck builder i ustawienia.
+- [~] Dodano format talii użytkownika `.gwd` i podłączono go do SDL: trzy sloty, edycja puli frakcji/neutrali, lidera i kopii, walidacja, zapis atomowy z sumą kontrolną oraz użycie talii przy starcie meczu. Silnik testuje round-trip i odrzucanie uszkodzeń. Smoke test ekranu edytora czeka na wynik CI; brakuje zmiany nazwy talii i dalszej QA wejść/UI.
+- [~] Edytor talii jest wstępnie podłączony w PL/EN; pełne PL/EN całego UI, tutorial i ustawienia nadal do zrobienia.
 - [ ] Legalne i udokumentowane grafiki, muzyka oraz efekty dźwiękowe.
 - [ ] ARM toolchain, binarka, launcher OnionOS i archiwum instalacyjne.
 - [ ] Desktop/ARM build, regresja, pomiar zasobów oraz test sprzętowy.
