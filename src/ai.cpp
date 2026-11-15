@@ -27,7 +27,10 @@ void addCandidate(std::vector<Candidate>& out, const Game& state, int who, const
   const auto& beforeOpponent = state.players[1-who];
   const auto& afterPlayer = after.players[who];
   const auto& afterOpponent = after.players[1-who];
-  const int delta = (afterPlayer.score - afterOpponent.score) - (beforePlayer.score - beforeOpponent.score);
+  const int beforeDiff=calculateScore(beforePlayer,state.weather,state.horn[who])-
+                       calculateScore(beforeOpponent,state.weather,state.horn[1-who]);
+  const int afterDiff=afterPlayer.score-afterOpponent.score;
+  const int delta=afterDiff-beforeDiff;
   const int spentCards = std::max(0, static_cast<int>(beforePlayer.hand.size()) - static_cast<int>(afterPlayer.hand.size()));
   double value = delta - spentCards * (state.round == 1 ? 0.45 : 0.22);
   const auto card = std::find_if(beforePlayer.hand.begin(), beforePlayer.hand.end(), [&](const Card& c) { return c.id == action.cardId; });
