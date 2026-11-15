@@ -12,7 +12,7 @@ Docelowa gra to wyłącznie Gwint jako minigra w Wiedźminie 3: Wild Hunt, z zaw
 
 - [x] Przejrzano źródła `asundr/gwent-classic`, commit `08592d847f2573440a34deb9f32bc855b2544cdd`.
 - [x] Zebrano informacje o `ia2904/gwent-classic-v3.5`, commit `2efc94ed626c0baeb28fc5e51c0e279ed5ee51dd`.
-- [x] Ustalono, że oba projekty mają kod MIT z Commons Clause. Kod i zasoby nie są dołączane do tego projektu.
+- [x] Ustalono, że upstreamowy kod ma licencję MIT z Commons Clause; zaimportowano katalog danych kart/talii z zachowaniem licencji i manifestu. Grafiki i audio z referencji nie zostały zaimportowane.
 - [x] Ustalono, że obrazy, muzyka, fonty i część SFX z referencji nie mają wykazanych praw redystrybucji.
 - [x] Sprawdzono dokumentację OnionOS Ports Collection oraz SDL2 dla Miyoo; pakowanie wymaga launcherów i bibliotek zgodnych z docelowym wydaniem OnionOS.
 - [x] Zidentyfikowano wariant next-gen Wiedźmina 3 (m.in. Roach i Muster na Geralt/Ciri); został przyjęty jako docelowy po doprecyzowaniu użytkownika.
@@ -27,11 +27,11 @@ Docelowa gra to wyłącznie Gwint jako minigra w Wiedźminie 3: Wild Hunt, z zaw
 - [~] Zaimportowany katalog 216 rekordów; generator kompiluje go jako 258 instancji/rekordów do natywnego builda.
 - [~] Zaimportowano 10 referencyjnych talii przeciwników wraz z liderami i listami kart; budowanie talii z tych przepisów jest spięte z katalogiem.
 - [~] Dodatkowe zdolności z danych: row-specific Scorch, Mardroeme/Berserker, Dandelion oraz 22 liderów w katalogu.
-- [~] Rozpoczęto natywną obsługę zdolności liderów: pasywów, aktywacji, pogody z talii, rogów, row Scorch, odrzucania/dobierania i przenoszenia kart. Implementacja nie jest jeszcze zweryfikowana względem pełnej referencji.
+- [~] Natywna obsługa liderów obejmuje pasywy oraz aktywacje pogody z talii, rogów, row Scorch, doboru/odrzucania i przenoszenia kart. Testy CI sprawdzają wybrane zdolności, ale komplet wszystkich 22 liderów i zgodność wszystkich interakcji z referencją pozostają do zrobienia.
 - [x] CI kompiluje wygenerowany katalog i zalicza walidację wszystkich 10 talii z leaderami.
 - [ ] Wczytywanie kart z katalogu w menu, pełny zestaw zdolności i wszystkich liderów.
 - [~] Rozdanie 10 kart z deterministycznie tasowanej talii oraz jednorazowa wymiana do 2 kart dla każdego gracza.
-- [ ] Pełna weryfikacja obliczeń (w tym zachowania 3+ kart Więzi) względem Wiedźmina 3 na ustalonym buildzie.
+- [~] Kolejność efektów Więzi i Morale oraz podwajanie Szpiegów jest porównana z kodem referencyjnym i objęta testami; weryfikacja pozostałych interakcji nadal trwa.
 - [ ] Pełny katalog kart zweryfikowany z ustalonym profilem wersji.
 - [ ] Wszystkie zdolności jednostek, dowódców i frakcji oraz prawidłowa kolejność ich rozstrzygania.
 - [ ] Pełna walidacja talii, mulligan, medyk, manekin i zapis odrzuconych kart.
@@ -64,7 +64,7 @@ Nie zmienia to bieżącego celu: najpierw kompletna rozgrywka Gwinta z Wiedźmin
 - Lokalnie nie znaleziono CMake ani kompilatora C++; build desktop wykonał GitHub Actions na Ubuntu.
 - Docker Desktop nie ma uruchomionego daemonu; brak lokalnego obrazu/toolchaina ARM.
 - Brak potwierdzonego fizycznego Miyoo Mini Plus.
-- GitHub CLI nie ma workflow scope; zmiany workflow publikujemy przez integrację GitHub.
+- Workflow GitHub Actions publikuje wynik kompilacji/testów przy każdym pushu.
 
 ## Zasada raportowania
 
