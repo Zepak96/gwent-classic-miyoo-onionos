@@ -16,6 +16,7 @@ Docelowa gra to wyłącznie Gwint jako minigra w Wiedźminie 3: Wild Hunt, z zaw
 - [x] Ustalono, że obrazy, muzyka, fonty i część SFX z referencji nie mają wykazanych praw redystrybucji.
 - [x] Sprawdzono dokumentację OnionOS Ports Collection oraz SDL2 dla Miyoo; pakowanie wymaga launcherów i bibliotek zgodnych z docelowym wydaniem OnionOS.
 - [x] Zidentyfikowano wariant next-gen Wiedźmina 3 (m.in. Roach i Muster na Geralt/Ciri); został przyjęty jako docelowy po doprecyzowaniu użytkownika.
+- [x] Utworzono publiczne repozytorium GitHub i dodano workflow CI przez integrację GitHub.
 
 ### Etap 2 — silnik
 
@@ -36,7 +37,8 @@ Docelowa gra to wyłącznie Gwint jako minigra w Wiedźminie 3: Wild Hunt, z zaw
 
 ## Znane blokady środowiska
 
-- Na tym komputerze nie znaleziono CMake ani kompilatora C++; jest Docker, ale nie potwierdzono obrazu/toolchaina ARM.
+- Lokalnie nie znaleziono CMake ani kompilatora C++; build desktop wykonał GitHub Actions na Ubuntu.
+- Docker Desktop nie ma uruchomionego daemonu; brak lokalnego obrazu/toolchaina ARM.
 - Brak potwierdzonego fizycznego Miyoo Mini Plus.
 - Brak aktywnej autoryzacji GitHub CLI może uniemożliwić stworzenie zdalnego repozytorium.
 
