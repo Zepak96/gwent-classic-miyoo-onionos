@@ -155,3 +155,10 @@ Ported the reference `Player.canPlay()`, `Player.endTurn()`, and `Game.startRoun
 - The auxiliary deck selector's Escape path returns to the deck editor. Startup-screen checks run in `--input-test` and `--smoke-test`.
 - Desktop build, CTest 2/2, `--input-test`, and a six-frame SDL dummy smoke run passed; the initial DeckMaker frame is saved at `artifacts/qa/deckmaker-start.png`.
 - Only the initial-screen flow is aligned here; DeckMaker geometry and interaction parity remain open. No ARM, SD, or physical-device validation was done.
+
+## Timed source notifications — 15.11.2026
+
+- Ported the reference notification lifecycle to the SDL frontend: source notification PNGs, a center-screen banner, a queued event sequence, and 150 ms fade-in + 900 ms hold + 150 ms fade-out (1200 ms total).
+- Wired initial coin result, round start, turn handoff, pass, and round result events; added PL/EN labels and a persisted notification toggle. Existing settings remain readable.
+- Extended `--input-test` with notification alpha boundaries, queue ordering, disabled behavior, and gameplay transition cases. Desktop build and CTest (2/2), `--input-test`, and the SDL dummy smoke run passed; the notification screenshot was generated and visually inspected.
+- This is one slice of the animation port, not full animation parity. Carousel/preview/end-screen fades, source-exact sequencing and physical Miyoo behavior remain open. No ARM build or SD write was made in this slice.

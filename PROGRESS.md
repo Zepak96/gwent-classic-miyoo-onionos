@@ -125,6 +125,13 @@ Funkcja pozostaje nieukończona, dopóki nie ma implementacji i testu. Kompatybi
 - Desktop build, CTest (2/2), smoke translacji wejścia, dekodowanie 35 SFX, cross-build zmodyfikowanego SDL i aplikacji ARM hard-float zakończone powodzeniem. Paczka SHA-256 `08c7643b372f57e46e389712ed0677888aa3734c5408605777c24cbf57a5bce4` została skopiowana na kartę `E:`; 599/599 plików zgodnych, skrót OnionOS zachowany, hash gry `f37d866471e5f8d66ba2724dd290bea24fca48fe479eae1d7e5b990365afb5fb`, hash SDL `8eebe8969a25997265b35175c132fc72e66b16615a096af1cf71ec8d91db2053`.
 - To naprawia jeden rozpoznany błąd zasad. Pełne porównanie wszystkich efektów, sekwencji i rozszerzeń next-gen oraz test fizyczny nadal są otwarte.
 
+## Animacje komunikatów z repo źródłowego — 15.11.2026
+
+- Przeniesiono cykl powiadomień z `ui.notification()` wraz z oryginalnymi ikonami `notif_*.png`: kolejka zdarzeń, baner na środku planszy oraz 150 ms wygaszania, 900 ms ekspozycji i 150 ms zanikania (łącznie 1200 ms).
+- Podłączono komunikat rzutu monetą, początek rundy, zmianę tury, spasowanie i wynik rundy; dodano tekst PL/EN oraz zapamiętywany przełącznik powiadomień.
+- Desktop build, CTest (2/2), `--input-test` oraz SDL smoke test przeszły; kadr komunikatu sprawdzono wizualnie. Nie budowano ARM i nie zapisywano tej zmiany na SD.
+- To nadal częściowy port animacji. Karuzela kart, fade podglądu i ekranu końca gry, dokładna kolejność wszystkich animacji oraz test fizyczny pozostają do zrobienia.
+
 ## Animacje z repozytorium źródłowego — 15.11.2026
 
 Przeniesiono do SDL wybrane istniejące animacje źródłowe: lot karty trwa 499 ms, oryginalne grafiki `anim_*.png` są używane dla efektów kart, a nakładka pogody pojawia się i znika w 500 ms. Szczegóły timingów i lista efektów nadal wymagających portu są w `docs/REFERENCE_ANIMATIONS.md`. To jest częściowy postęp, nie ukończony port animacji 1:1. Desktop build, CTest 2/2 i test wejścia SDL przeszły; ta zmiana nie była cross-buildowana dla Miyoo, kopiowana na kartę SD ani sprawdzana na konsoli.

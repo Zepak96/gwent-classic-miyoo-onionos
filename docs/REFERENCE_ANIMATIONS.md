@@ -15,7 +15,7 @@ files under `assets/gwent-classic/img/icons/anim_*.png`.
 | Weather row overlay | `Row.addOverlay()` / `removeOverlay()` in `gwent.js` | Fade in/out over 500 ms | Native alpha transition added and previous overlay type retained for fade-out; multiple simultaneous row overlay composition still needs comparison |
 | Card preview fade | `style.css` | 300 ms opacity transition | Not ported |
 | Five-card carousel movement | `style.css` and `ui.queueCarousel()` in `gwent.js` | 250 ms base; each adjacent/outer card is staggered by −50/+50/+200 ms; center card has a separate 50 ms glow transition | Not ported |
-| Notifications | `ui.notification()` in `gwent.js` | 150 ms fade-in, timed hold (requested 1200 ms for turn/round notices), 150 ms fade-out | Not ported as timed source notifications |
+| Notifications | `ui.notification()` in `gwent.js` | 150 ms fade-in, 900 ms hold, 150 ms fade-out (1200 ms total) | Source `notif_*.png` art is shown in a queued center banner with matching timing; turn/round/pass/coin events are wired. Notification copy is localized; exact source text typography/layout still needs comparison |
 | Round/game end screen | `gwent.js` | End screen fades in over 300 ms | Not ported |
 | Other source CSS transitions | `style.css` | Includes 100 ms opacity, color, border, and shadow changes plus 250/500 ms layout transitions | Not ported comprehensively |
 
@@ -23,8 +23,9 @@ files under `assets/gwent-classic/img/icons/anim_*.png`.
 
 This file is deliberately an inventory, not a completion claim. The native
 implementation reuses original animation PNGs and now covers more of the
-source ability targets. It does not yet reproduce source card movement for
-every affected card, exact asynchronous sequencing, source container geometry,
-carousel, timed notifications, leader/end-screen transitions, or all CSS
-selection/hover states. Therefore the animation parity checkbox in
+source ability targets, card flight, weather fades, and timed notification
+events. It does not yet reproduce source card movement for every affected card,
+exact asynchronous sequencing, source container geometry, carousel, card
+preview fade, leader/end-screen transitions, or all CSS selection/hover states.
+Therefore the animation parity checkbox in
 `docs/SOURCE_PARITY.md` remains unchecked.

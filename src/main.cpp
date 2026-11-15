@@ -179,6 +179,10 @@ struct App {
   bool pauseOpen{false};
   int pauseIndex{0};
   bool sfxEnabled{true};
+  bool notificationsEnabled{true};
+  std::string activeNotification;
+  Uint32 notificationStartedAt{0};
+  std::vector<std::string> notificationQueue;
   std::vector<std::string> leaderSelections;
   CardFlight cardFlight;
   std::vector<CardEffect> cardEffects;
@@ -276,6 +280,16 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="opponent")return pl?"PRZECIWNIK":"OPPONENT";
   if(key=="opponent_short")return pl?"RYWAL":"OPPONENT";
   if(key=="player_short")return pl?"TY":"YOU";
+  if(key=="notif_coin_me")return pl?"ZACZYNASZ TY":"YOU WILL GO FIRST";
+  if(key=="notif_coin_op")return pl?"RYWAL ZACZYNA":"YOUR OPPONENT WILL GO FIRST";
+  if(key=="notif_round_start")return pl?"POCZĄTEK RUNDY":"ROUND START";
+  if(key=="notif_me_pass")return pl?"SPASOWAŁEŚ RUNDĘ":"ROUND PASSED";
+  if(key=="notif_op_pass")return pl?"RYWAL SPASOWAŁ":"YOUR OPPONENT HAS PASSED";
+  if(key=="notif_win_round")return pl?"WYGRYWASZ RUNDĘ!":"YOU WON THE ROUND!";
+  if(key=="notif_lose_round")return pl?"RYWAL WYGRYWA RUNDĘ":"YOUR OPPONENT WON THE ROUND";
+  if(key=="notif_draw_round")return pl?"REMIS W TEJ RUNDZIE":"THE ROUND ENDED IN A DRAW";
+  if(key=="notif_me_turn")return pl?"TWÓJ RUCH!":"YOUR TURN!";
+  if(key=="notif_op_turn")return pl?"RUCH RYWALA":"OPPONENT'S TURN";
   if(key=="ai")return pl?"PRZECIWNIK AI":"AI OPPONENT";
   if(key=="language")return pl?"JĘZYK":"LANGUAGE";
   if(key=="instructions")return pl?"LEWO/PRAWO - TALIA":"LEFT/RIGHT - DECK";
@@ -333,6 +347,7 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="pause_load")return pl?"WCZYTAJ MECZ":"LOAD MATCH";
   if(key=="pause_language")return pl?"JEZYK":"LANGUAGE";
   if(key=="pause_sfx")return pl?"EFEKTY DZWIEKOWE":"SOUND EFFECTS";
+  if(key=="pause_notifications")return pl?"POWIADOMIENIA":"NOTIFICATIONS";
   if(key=="pause_exit")return pl?"WRÓĆ DO MENU TALII":"RETURN TO DECK MENU";
   if(key=="pause_controls")return pl?"GÓRA/DÓŁ: WYBÓR  A: ZMIEŃ  B: WRÓĆ":"UP/DOWN: SELECT  A: CHANGE  B: BACK";
   if(key=="pass_confirm")return pl?"SPASOWAĆ TĘ RUNDĘ?":"PASS THIS ROUND?";
@@ -356,6 +371,77 @@ std::string displayCardName(const App& a,const gwent::Card& card) {
     if(!localized.empty())return localized;
   }
   return card.name;
+}
+constexpr Uint32 notificationFadeMs=150;
+constexpr Uint32 notificationHoldMs=900;
+constexpr Uint32 notificationDurationMs=notificationFadeMs*2+notificationHoldMs;
+Uint8 notificationAlpha(Uint32 elapsed) {
+  if(elapsed<notificationFadeMs)return static_cast<Uint8>(elapsed*255/notificationFadeMs);
+  if(elapsed<notificationFadeMs+notificationHoldMs)return 255;
+  if(elapsed<notificationDurationMs)return static_cast<Uint8>((notificationDurationMs-elapsed)*255/notificationFadeMs);
+  return 0;
+}
+void startNextNotification(App& a) {
+  if(!a.notificationsEnabled||a.notificationQueue.empty()) { a.activeNotification.clear();return; }
+  a.activeNotification=std::move(a.notificationQueue.front());
+  a.notificationQueue.erase(a.notificationQueue.begin());
+  a.notificationStartedAt=SDL_GetTicks();
+}
+void queueNotification(App& a,const std::string& key) {
+  if(!a.notificationsEnabled)return;
+  if(a.activeNotification.empty()) { a.activeNotification=key;a.notificationStartedAt=SDL_GetTicks(); }
+  else a.notificationQueue.push_back(key);
+}
+void updateNotification(App& a,Uint32 now) {
+  if(!a.notificationsEnabled) { a.activeNotification.clear();a.notificationQueue.clear();return; }
+  if(!a.activeNotification.empty()&&SDL_TICKS_PASSED(now,a.notificationStartedAt+notificationDurationMs))
+    startNextNotification(a);
+}
+void drawNotification(SDL_Renderer* r,const App& a) {
+  if(a.activeNotification.empty())return;
+  const Uint32 elapsed=SDL_GetTicks()-a.notificationStartedAt;
+  const Uint8 alpha=notificationAlpha(elapsed);
+  if(!alpha)return;
+  std::string image,label;
+  if(a.activeNotification=="me-coin") { image="notif_me_coin";label="notif_coin_me"; }
+  else if(a.activeNotification=="op-coin") { image="notif_op_coin";label="notif_coin_op"; }
+  else if(a.activeNotification=="round-start") { image="notif_round_start";label="notif_round_start"; }
+  else if(a.activeNotification=="me-pass") { image="notif_round_passed";label="notif_me_pass"; }
+  else if(a.activeNotification=="op-pass") { image="notif_round_passed";label="notif_op_pass"; }
+  else if(a.activeNotification=="win-round") { image="notif_win_round";label="notif_win_round"; }
+  else if(a.activeNotification=="lose-round") { image="notif_lose_round";label="notif_lose_round"; }
+  else if(a.activeNotification=="draw-round") { image="notif_draw_round";label="notif_draw_round"; }
+  else if(a.activeNotification=="me-turn") { image="notif_me_turn";label="notif_me_turn"; }
+  else if(a.activeNotification=="op-turn") { image="notif_op_turn";label="notif_op_turn"; }
+  else return;
+  const auto trAlpha=[alpha](Uint8 value){return static_cast<Uint8>(static_cast<unsigned>(value)*alpha/255);};
+  box(r,0,154,640,51,Color{10,10,10,trAlpha(242)});
+  drawImageAlpha(r,a,"img/icons/"+image+".png",144,121,141,104,alpha);
+  text(r,287,171,tr(a,label),Color{218,170,78,alpha},1);
+}
+void queueGameplayNotifications(App& a,gwent::Phase previousPhase,int previousRound,int previousPlayer,
+                               const std::array<bool,2>& previousPassed,
+                               const std::array<int,2>& previousRoundWins) {
+  if(a.screen!=Screen::Match)return;
+  const bool wasTurn=previousPhase==gwent::Phase::PlayerTurn||previousPhase==gwent::Phase::OpponentTurn;
+  if(wasTurn)for(int player=0;player<2;++player)
+    if(!previousPassed[player]&&a.game.players[player].passed)
+      queueNotification(a,player==0?"me-pass":"op-pass");
+  const bool enteredResult=(a.game.phase==gwent::Phase::RoundResult||a.game.phase==gwent::Phase::MatchResult)&&
+                           previousPhase!=a.game.phase;
+  if(enteredResult) {
+    if(a.game.players[0].roundWins>previousRoundWins[0])queueNotification(a,"win-round");
+    else if(a.game.players[1].roundWins>previousRoundWins[1])queueNotification(a,"lose-round");
+    else queueNotification(a,"draw-round");
+    return;
+  }
+  const bool roundStarted=a.game.round!=previousRound||
+    (previousPhase==gwent::Phase::Mulligan&&
+     (a.game.phase==gwent::Phase::PlayerTurn||a.game.phase==gwent::Phase::OpponentTurn));
+  if(roundStarted)queueNotification(a,"round-start");
+  const bool enteredTurn=a.game.phase==gwent::Phase::PlayerTurn||a.game.phase==gwent::Phase::OpponentTurn;
+  if(enteredTurn&&(roundStarted||a.game.currentPlayer!=previousPlayer))
+    queueNotification(a,a.game.currentPlayer==0?"me-turn":"op-turn");
 }
 bool loadSavedMatch(App& a) {
   gwent::Game restored;std::string error;
@@ -386,18 +472,26 @@ std::string userDeckPath(const App& a,int slot) {
 void saveSettings(const App& a) {
   if(a.dataDirectory.empty())return;
   std::ofstream settings(a.dataDirectory+"settings-v1.cfg",std::ios::trunc);
-  if(settings)settings<<static_cast<int>(a.language)<<' '<<static_cast<int>(a.sfxEnabled)<<'\n';
+  if(settings)settings<<"GWENT_SETTINGS_V2 "<<static_cast<int>(a.language)<<' '
+                     <<static_cast<int>(a.sfxEnabled)<<' '<<static_cast<int>(a.notificationsEnabled)<<'\n';
 }
 void loadSettings(App& a) {
   if(a.dataDirectory.empty())return;
   std::ifstream settings(a.dataDirectory+"settings-v1.cfg");
-  int language=0,sfx=1;
-  if(!(settings>>language))return;
+  std::string first;
+  if(!(settings>>first))return;
+  int language=0,sfx=1,notifications=1;
+  if(first=="GWENT_SETTINGS_V2") {
+    if(!(settings>>language>>sfx>>notifications))return;
+  } else {
+    try { language=std::stoi(first); } catch(...) { return; }
+    int second=1,legacyThird=0;
+    if(!(settings>>second))return;
+    sfx=settings>>legacyThird?legacyThird:second;
+  }
   if(language>=0&&language<=1)a.language=static_cast<Language>(language);
-  if(!(settings>>sfx))return;
-  int legacySfx=0;
-  if(sfx>=0&&sfx<=2&&settings>>legacySfx)sfx=legacySfx;
   a.sfxEnabled=sfx!=0;
+  a.notificationsEnabled=notifications!=0;
 }
 void playCardSound(App& a,const gwent::Card& card) {
   std::string key;
@@ -475,6 +569,7 @@ void startMatch(App& a) {
   gwent::beginMatchWithLeaders(a.game,std::move(humanDeck),humanLeader,
       std::move(opponent.cards),opponent.leader,seed,-1);
   a.mulligan.clear(); a.handIndex=0; a.rowIndex=0; a.screen=Screen::Match;
+  queueNotification(a,a.game.firstPlayer==0?"me-coin":"op-coin");
   a.audio.play("game_opening");
   a.status=tr(a,"mulligan");
 }
@@ -1036,7 +1131,9 @@ void drawDeckBuilder(SDL_Renderer* r,const App& a) {
   drawImage(r,a,"img/icons/deck_back_"+std::string(opponent.faction==gwent::Faction::Monsters?"monsters":opponent.faction==gwent::Faction::Nilfgaard?"nilfgaard":opponent.faction==gwent::Faction::Scoiatael?"scoiatael":opponent.faction==gwent::Faction::Skellige?"skellige":"realms")+".jpg",354,330,23,28);
   const int toggleY=290;
   drawImage(r,a,"img/icons/ui_music.png",299,toggleY,16,16);drawImage(r,a,"img/icons/ui_sfx.png",321,toggleY,16,16);
+  drawImage(r,a,"img/icons/ui_notification.png",343,toggleY,16,16);
   if(!a.audio.enabled()) { color(r,gold);SDL_RenderDrawLine(r,321,290,337,306); }
+  if(!a.notificationsEnabled) { color(r,gold);SDL_RenderDrawLine(r,343,290,359,306); }
   if(!shownCards.empty()) {
     const auto& selected=*shownCards[static_cast<std::size_t>(cursor)];
     drawCardPreview(r,a,selected);
@@ -1097,6 +1194,7 @@ void drawMatch(SDL_Renderer* r,const App& a) {
   if(op.passed)text(r,110,80,tr(a,"passed"),paper,1);
   drawImage(r,a,"img/icons/ui_music.png",90,313,16,16);drawImage(r,a,"img/icons/ui_sfx.png",110,313,16,16);drawImage(r,a,"img/icons/ui_notification.png",128,313,16,16);
   if(!a.audio.enabled()) { color(r,gold);SDL_RenderDrawLine(r,110,313,126,329); }
+  if(!a.notificationsEnabled) { color(r,gold);SDL_RenderDrawLine(r,128,313,144,329); }
   const int count=static_cast<int>(me.hand.size());
   if(count) {
     const int start=std::clamp(a.handIndex-5,0,std::max(0,count-11));
@@ -1237,10 +1335,11 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     frame(r,120,22,400,316,gold);
     box(r,122,24,396,312,panel);
     centeredTextInBox(r,142,35,356,20,tr(a,"pause"),gold,2);
-    const std::array<std::string,6> options={
+    const std::array<std::string,7> options={
       tr(a,"pause_resume"),tr(a,"pause_save"),tr(a,"pause_load"),
       tr(a,"pause_language")+": "+(a.language==Language::Polish?"POLSKI":"ENGLISH"),
-      tr(a,"pause_sfx")+": "+tr(a,a.sfxEnabled?"on":"off"),tr(a,"pause_exit")
+      tr(a,"pause_sfx")+": "+tr(a,a.sfxEnabled?"on":"off"),
+      tr(a,"pause_notifications")+": "+tr(a,a.notificationsEnabled?"on":"off"),tr(a,"pause_exit")
     };
     for(std::size_t i=0;i<options.size();++i) {
       const int y=76+static_cast<int>(i)*31;
@@ -1259,11 +1358,12 @@ void drawMatchOnScreen(SDL_Renderer* r,const App& a) {
   SDL_Rect stageViewport{0,(H-STAGE_H)/2,W,STAGE_H};
   SDL_RenderSetViewport(r,&stageViewport);
   drawMatch(r,a);
+  drawNotification(r,a);
   SDL_RenderSetViewport(r,nullptr);
 }
 void handleMatchKey(App& a,SDL_Keycode key) {
   if(a.pauseOpen) {
-    constexpr int optionCount=6;
+    constexpr int optionCount=7;
     if(key==SDLK_ESCAPE||key==SDLK_z||key==SDLK_BACKSPACE) { a.pauseOpen=false;return; }
     if(key==SDLK_UP||key==SDLK_LEFT) { a.pauseIndex=(a.pauseIndex+optionCount-1)%optionCount;return; }
     if(key==SDLK_DOWN||key==SDLK_RIGHT) { a.pauseIndex=(a.pauseIndex+1)%optionCount;return; }
@@ -1274,7 +1374,8 @@ void handleMatchKey(App& a,SDL_Keycode key) {
         case 2:a.pauseOpen=false;loadSavedMatch(a);break;
         case 3:a.language=a.language==Language::Polish?Language::English:Language::Polish;saveSettings(a);break;
         case 4:a.sfxEnabled=!a.sfxEnabled;a.audio.setEnabled(a.sfxEnabled);saveSettings(a);break;
-        case 5:saveCurrentMatch(a);a.pauseOpen=false;a.screen=Screen::DeckSelect;break;
+        case 5:a.notificationsEnabled=!a.notificationsEnabled;saveSettings(a);break;
+        case 6:saveCurrentMatch(a);a.pauseOpen=false;a.screen=Screen::DeckSelect;break;
       }
     }
     return;
@@ -1436,6 +1537,7 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
     if(a.screen==Screen::Match)saveCurrentMatch(a);
     running=false;return;
   }
+  if(a.screen==Screen::Match&&!a.activeNotification.empty())return;
   if(a.screen==Screen::Match&&(a.leaderSelectionMode||a.leaderRevealOpen||a.passConfirmationOpen||a.pauseOpen)) { handleMatchKey(a,key);return; }
   if(a.cardDetailsOpen) {
     if(key==SDLK_i||key==SDLK_ESCAPE||key==SDLK_BACKSPACE||key==SDLK_z)a.cardDetailsOpen=false;
@@ -1443,6 +1545,7 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
   }
   if(key==SDLK_i&&(a.screen==Screen::DeckBuilder||a.screen==Screen::Match)) { a.cardDetailsOpen=true;a.audio.play("open");return; }
   if(key==SDLK_v) { a.audio.setEnabled(!a.audio.enabled());if(a.audio.enabled())a.audio.play("ui_card");return; }
+  if(key==SDLK_n) { a.notificationsEnabled=!a.notificationsEnabled;saveSettings(a);return; }
   if(a.screen==Screen::DeckSelect) {
     if(key==SDLK_ESCAPE) { openDeckEditor(a); return; }
     if(key==SDLK_z) { a.language=a.language==Language::Polish?Language::English:Language::Polish;saveSettings(a);return; }
@@ -1634,6 +1737,31 @@ int main(int argc,char** argv) {
               normalizeMiyooKey(app,SDLK_BACKSPACE)==SDLK_DOWN&&
               normalizeMiyooKey(app,SDLK_RETURN)==SDLK_p&&
               normalizeMiyooKey(app,SDLK_ESCAPE)==SDLK_BACKQUOTE;
+    App notificationProbe;
+    queueNotification(notificationProbe,"round-start");
+    queueNotification(notificationProbe,"me-turn");
+    okay=okay&&notificationProbe.activeNotification=="round-start"&&
+         notificationProbe.notificationQueue.size()==1&&notificationAlpha(0)==0&&
+         notificationAlpha(150)==255&&notificationAlpha(1050)==255&&notificationAlpha(1200)==0;
+    notificationProbe.notificationStartedAt=SDL_GetTicks()-notificationDurationMs;
+    updateNotification(notificationProbe,SDL_GetTicks());
+    okay=okay&&notificationProbe.activeNotification=="me-turn"&&notificationProbe.notificationQueue.empty();
+    notificationProbe.notificationsEnabled=false;
+    queueNotification(notificationProbe,"op-turn");
+    okay=okay&&notificationProbe.activeNotification=="me-turn"&&notificationProbe.notificationQueue.empty();
+    App openingNotice;openingNotice.screen=Screen::Match;openingNotice.game.phase=gwent::Phase::OpponentTurn;openingNotice.game.currentPlayer=1;
+    queueGameplayNotifications(openingNotice,gwent::Phase::Mulligan,1,0,{{false,false}},{{0,0}});
+    okay=okay&&openingNotice.activeNotification=="round-start"&&openingNotice.notificationQueue.size()==1&&
+         openingNotice.notificationQueue.front()=="op-turn";
+    App passNotice;passNotice.screen=Screen::Match;passNotice.game.phase=gwent::Phase::PlayerTurn;
+    passNotice.game.currentPlayer=0;passNotice.game.players[1].passed=true;
+    queueGameplayNotifications(passNotice,gwent::Phase::OpponentTurn,1,1,{{false,false}},{{0,0}});
+    okay=okay&&passNotice.activeNotification=="op-pass"&&passNotice.notificationQueue.size()==1&&
+         passNotice.notificationQueue.front()=="me-turn";
+    App resultNotice;resultNotice.screen=Screen::Match;resultNotice.game.phase=gwent::Phase::RoundResult;
+    resultNotice.game.players[0].roundWins=1;
+    queueGameplayNotifications(resultNotice,gwent::Phase::PlayerTurn,1,0,{{true,true}},{{0,0}});
+    okay=okay&&resultNotice.activeNotification=="win-round";
     app.game.phase=gwent::Phase::PlayerTurn;
     handleMatchKey(app,SDLK_BACKQUOTE);
     okay=okay&&app.passConfirmationOpen&&!app.game.players[0].passed;
@@ -1747,11 +1875,14 @@ int main(int argc,char** argv) {
     if(argc>6) {
       app.screen=Screen::DeckSelect;
       app.language=Language::Polish;
+      app.notificationsEnabled=true;
       bool smokeRunning=true;
+      handleKey(app,SDLK_n,smokeRunning);
       handleKey(app,SDLK_z,smokeRunning);
       App settingsProbe;settingsProbe.dataDirectory=app.dataDirectory;loadSettings(settingsProbe);
       if(app.language!=Language::English ||
-         (!app.dataDirectory.empty() && settingsProbe.language!=app.language)) {
+         (!app.dataDirectory.empty() &&
+          (settingsProbe.language!=app.language||settingsProbe.notificationsEnabled))) {
         app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 6;
       }
       app.status.clear();
@@ -1812,11 +1943,22 @@ int main(int argc,char** argv) {
       if(!saveFrame(argv[10])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
       presentFrame();
     }
+    if(argc>11) {
+      app.screen=Screen::Match;app.game=gwent::Game{};app.game.phase=gwent::Phase::PlayerTurn;
+      app.pauseOpen=false;app.language=Language::Polish;app.activeNotification="round-start";
+      app.notificationStartedAt=SDL_GetTicks()-75;
+      clearFrame();drawMatchOnScreen(renderer,app);presentFrame();
+      if(!saveFrame(argv[11])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
+    }
     presentFrame();
     for(auto& image:app.textures)if(image.second)SDL_DestroyTexture(image.second);
     app.audio.shutdown();destroyRenderers(); SDL_DestroyWindow(window); SDL_Quit(); return 0;
   }
   auto observedPhase=app.game.phase;
+  int observedRound=app.game.round;
+  int observedCurrentPlayer=app.game.currentPlayer;
+  std::array<bool,2> observedPassed{{app.game.players[0].passed,app.game.players[1].passed}};
+  std::array<int,2> observedRoundWins{{app.game.players[0].roundWins,app.game.players[1].roundWins}};
   while(running) {
     SDL_Event event;
     while(SDL_PollEvent(&event)) {
@@ -1845,7 +1987,7 @@ int main(int argc,char** argv) {
         app.selectDownAt=0;app.selectLongPressed=false;
       }
     }
-    if(app.selectDownAt&&!app.selectLongPressed&&
+    if(app.selectDownAt&&!app.selectLongPressed&&app.activeNotification.empty()&&
        (app.screen==Screen::Match||app.screen==Screen::DeckBuilder)&&
        SDL_TICKS_PASSED(SDL_GetTicks(),app.selectDownAt+500)) {
       app.cardDetailsOpen=true;app.selectLongPressed=true;app.audio.play("open");
@@ -1856,8 +1998,7 @@ int main(int argc,char** argv) {
       return SDL_TICKS_PASSED(now,effect.startedAt+effect.duration);
     }),app.cardEffects.end());
     updateWeatherTransitions(app);
-    if(app.screen==Screen::Match && !app.leaderSelectionMode && !app.leaderRevealOpen && !app.pauseOpen && !app.passConfirmationOpen &&
-       app.game.phase==gwent::Phase::OpponentTurn && SDL_GetTicks()>=app.aiAt)performAi(app);
+    const auto previousPhase=observedPhase;
     if(app.screen==Screen::Match&&app.game.phase!=observedPhase) {
       if(app.game.phase==gwent::Phase::Mulligan)app.audio.play("redraw");
       else if(app.game.phase==gwent::Phase::PlayerTurn)app.audio.play("turn_me");
@@ -1866,6 +2007,15 @@ int main(int argc,char** argv) {
       else if(app.game.phase==gwent::Phase::MatchResult)app.audio.play(app.game.matchWinner==0?"game_win":"game_lose");
       observedPhase=app.game.phase;
     }
+    queueGameplayNotifications(app,previousPhase,observedRound,observedCurrentPlayer,
+                               observedPassed,observedRoundWins);
+    observedRound=app.game.round;observedCurrentPlayer=app.game.currentPlayer;
+    observedPassed={app.game.players[0].passed,app.game.players[1].passed};
+    observedRoundWins={app.game.players[0].roundWins,app.game.players[1].roundWins};
+    updateNotification(app,now);
+    if(app.screen==Screen::Match&&app.activeNotification.empty()&&
+       !app.leaderSelectionMode&&!app.leaderRevealOpen&&!app.pauseOpen&&!app.passConfirmationOpen&&
+       app.game.phase==gwent::Phase::OpponentTurn&&SDL_GetTicks()>=app.aiAt)performAi(app);
     app.audio.playMusic(app.screen==Screen::Match?"match":"menu");
     SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);
     if(app.screen==Screen::DeckSelect)drawDeckSelect(renderer,app);
