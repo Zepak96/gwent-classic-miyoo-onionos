@@ -6,6 +6,8 @@ root = pathlib.Path(sys.argv[1])
 manifest = json.loads((root / "cards-manifest.json").read_text(encoding="utf-8"))
 cards = json.loads((root / "cards.json").read_text(encoding="utf-8"))
 ability_text = json.loads((root / "ability-text.json").read_text(encoding="utf-8"))
+card_names_pl = json.loads((root / "card-names-pl.json").read_text(encoding="utf-8"))
+ability_text_pl = json.loads((root / "ability-text-pl.json").read_text(encoding="utf-8"))
 assert len(cards) == manifest["record_count"] == 216
 required = {"name", "id", "deck", "row", "strength", "ability", "filename", "count"}
 assert all(required <= set(card) for card in cards)
@@ -19,6 +21,10 @@ card_abilities = {tag for card in cards for tag in card["ability"].split()}
 assert card_abilities - set(ability_text) == {"vildkarrl"}
 assert all(item["name"] for item in ability_text.values())
 assert all("description" in item for item in ability_text.values())
+assert {card["name"].strip() for card in cards} <= set(card_names_pl)
+assert all(card_names_pl[card["name"].strip()].strip() for card in cards)
+assert set(ability_text) == set(ability_text_pl)
+assert all(item["name"].strip() and item["description"].strip() for item in ability_text_pl.values())
 asset_root = root.parent / "assets" / "gwent-classic" / "img"
 for icon in ("ui_exit", "ui_music", "ui_notification", "ui_sfx", "ui_trash", "ui_view"):
     assert (asset_root / "icons" / f"{icon}.png").is_file(), f"Missing rasterized UI icon: {icon}"

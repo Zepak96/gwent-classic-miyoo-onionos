@@ -45,6 +45,11 @@ const std::unordered_map<char,Glyph>& font() {
     {'(',{2,4,8,8,8,4,2}},{')',{8,4,2,2,2,4,8}},{'\'',{4,4,8,0,0,0,0}},
     {'"',{10,10,0,0,0,0,0}},{'=',{0,31,0,31,0,0,0}},{'*',{0,21,14,31,14,21,0}},
     {'<',{2,4,8,16,8,4,2}},{'>',{8,4,2,1,2,4,8}},{'_',{0,0,0,0,0,0,31}},
+    {'\x01',{14,17,17,31,17,19,21}},{'\x02',{2,14,17,16,16,17,14}},
+    {'\x03',{14,17,16,30,16,17,15}},{'\x04',{16,16,16,21,16,16,31}},
+    {'\x05',{2,17,25,21,19,17,17}},{'\x06',{2,14,17,17,17,17,14}},
+    {'\x07',{2,15,16,14,1,1,30}},{'\x08',{2,31,1,2,4,8,31}},
+    {'\x09',{4,31,1,2,4,8,31}},
     {'[',{14,8,8,8,8,8,14}},{']',{14,2,2,2,2,2,14}},{' ',{0,0,0,0,0,0,0}}
   };
   return glyphs;
@@ -57,9 +62,19 @@ std::string ascii(const std::string& value) {
     if(i+1<value.size()) {
       const unsigned char b=static_cast<unsigned char>(value[i+1]);
       char base='?';
-      if(a==0xC4) { if(b==0x85||b==0x84)base='A'; else if(b==0x87||b==0x86)base='C'; else if(b==0x99||b==0x98)base='E'; }
-      if(a==0xC5) { if(b==0x82||b==0x81)base='L'; else if(b==0x84||b==0x83)base='N'; else if(b==0x9B||b==0x9A)base='S'; else if(b==0xBA||b==0xB9||b==0xBC||b==0xBB)base='Z'; }
-      if(a==0xC3 && (b==0xB3||b==0x93))base='O';
+      if(a==0xC4) {
+        if(b==0x85||b==0x84)base='\x01';
+        else if(b==0x87||b==0x86)base='\x02';
+        else if(b==0x99||b==0x98)base='\x03';
+      }
+      if(a==0xC5) {
+        if(b==0x82||b==0x81)base='\x04';
+        else if(b==0x84||b==0x83)base='\x05';
+        else if(b==0x9B||b==0x9A)base='\x07';
+        else if(b==0xBA||b==0xB9)base='\x08';
+        else if(b==0xBC||b==0xBB)base='\x09';
+      }
+      if(a==0xC3 && (b==0xB3||b==0x93))base='\x06';
       out.push_back(base); i+=2;
     } else { out.push_back('?'); ++i; }
   }
@@ -68,6 +83,18 @@ std::string ascii(const std::string& value) {
 void color(SDL_Renderer* r,Color c) { SDL_SetRenderDrawColor(r,c.r,c.g,c.b,c.a); }
 void box(SDL_Renderer* r,int x,int y,int w,int h,Color c) { color(r,c); SDL_Rect q{x,y,w,h}; SDL_RenderFillRect(r,&q); }
 void frame(SDL_Renderer* r,int x,int y,int w,int h,Color c) { color(r,c); SDL_Rect q{x,y,w,h}; SDL_RenderDrawRect(r,&q); }
+void polishMark(SDL_Renderer* r,char ch,int x,int y,int scale,Color c) {
+  if(ch<'\x01'||ch>'\x09')return;
+  color(r,c);
+  if(ch=='\x01'||ch=='\x03') {
+    SDL_Rect lower{x+4*scale,y+6*scale,scale,scale};SDL_RenderFillRect(r,&lower);
+  } else if(ch=='\x09') {
+    SDL_Rect dot{x+2*scale,y-2*scale,scale,scale};SDL_RenderFillRect(r,&dot);
+  } else {
+    SDL_Rect first{x+3*scale,y-scale,scale,scale};SDL_Rect second{x+2*scale,y-2*scale,scale,scale};
+    SDL_RenderFillRect(r,&first);SDL_RenderFillRect(r,&second);
+  }
+}
 void text(SDL_Renderer* r,int x,int y,const std::string& value,Color c,int scale=1) {
   color(r,c); const std::string s=ascii(value); int cx=x;
   for(char ch:s) {
@@ -75,6 +102,7 @@ void text(SDL_Renderer* r,int x,int y,const std::string& value,Color c,int scale
     for(int row=0;row<7;++row) for(int col=0;col<5;++col) if(g[row]&(1u<<(4-col))) {
       SDL_Rect p{cx+col*scale,y+row*scale,scale,scale}; SDL_RenderFillRect(r,&p);
     }
+    polishMark(r,ch,cx,y,scale,c);
     cx+=(6*scale);
   }
 }
@@ -85,6 +113,7 @@ void narrowText(SDL_Renderer* r,int x,int y,const std::string& value,Color c,int
     for(int row=0;row<7;++row)for(int col=0;col<5;++col)if(g[row]&(1u<<(4-col))) {
       SDL_Rect p{cx+(col*advance)/5,y+row,1,1};SDL_RenderFillRect(r,&p);
     }
+    polishMark(r,ch,cx,y,1,c);
     cx+=advance;
   }
 }
@@ -243,26 +272,30 @@ std::string tr(const App& a,const std::string& key) {
   const bool pl=a.language==Language::Polish;
   if(key=="title")return pl?"GWINT KLASYCZNY":"GWENT CLASSIC";
   if(key=="start")return pl?"ENTER - ROZPOCZNIJ":"ENTER - START";
-  if(key=="choose")return pl?"WYBIERZ TALIE":"CHOOSE A DECK";
+  if(key=="choose")return pl?"WYBIERZ TALIĘ":"CHOOSE A DECK";
   if(key=="opponent")return pl?"PRZECIWNIK":"OPPONENT";
   if(key=="opponent_short")return pl?"RYWAL":"OPPONENT";
+  if(key=="player_short")return pl?"TY":"YOU";
   if(key=="ai")return pl?"PRZECIWNIK AI":"AI OPPONENT";
-  if(key=="language")return pl?"JEZYK":"LANGUAGE";
+  if(key=="language")return pl?"JĘZYK":"LANGUAGE";
   if(key=="instructions")return pl?"LEWO/PRAWO - TALIA":"LEFT/RIGHT - DECK";
   if(key=="confirm")return pl?"ENTER - GRA   Z - JEZYK":"ENTER - PLAY   Z - LANGUAGE";
   if(key=="mulligan")return pl?"WYBIERZ DO 2 KART DO WYMIANY":"CHOOSE UP TO 2 CARDS TO MULLIGAN";
-  if(key=="mulligan_controls")return pl?"A: WYBIERZ   START: ZATWIERDZ / POMIN":"A: MARK CARD   START: CONFIRM / SKIP";
-  if(key=="mulligan_details")return pl?"X: POWIEKSZ KARTE   LEWO/PRAWO: WYBOR":"X: ENLARGE CARD   LEFT/RIGHT: SELECT";
+  if(key=="mulligan_controls")return pl?"A: WYBIERZ   START: ZATWIERDŹ / POMIŃ":"A: MARK CARD   START: CONFIRM / SKIP";
+  if(key=="mulligan_details")return pl?"X: POWIĘKSZ KARTĘ   LEWO/PRAWO: WYBÓR":"X: ENLARGE CARD   LEFT/RIGHT: SELECT";
   if(key=="choose_first")return pl?"SCOIA'TAEL WYBIERA KOLEJKE: LEWO/PRAWO, ENTER":"SCOIA'TAEL CHOOSES FIRST: LEFT/RIGHT, ENTER";
   if(key=="human_first")return pl?"ZACZYNASZ TY":"YOU START";
   if(key=="ai_first")return pl?"ZACZYNA PRZECIWNIK":"OPPONENT STARTS";
   if(key=="skellige_revival")return pl?"SKELLIGE: WYBIERZ JEDNOSTKE Z CMENTARZA":"SKELLIGE: CHOOSE A UNIT FROM THE GRAVEYARD";
   if(key=="skellige_agile")return pl?"ZWINNA: GORA/DOL WYBIERA RZAD":"AGILE: UP/DOWN SELECTS ROW";
-  if(key=="melee")return pl?"WALKA WRECZ":"MELEE";
+  if(key=="melee")return pl?"WALKA WRĘCZ":"MELEE";
   if(key=="ranged")return pl?"DYSTANSOWY":"RANGED";
   if(key=="controls")return pl?"A GRAJ  B WROC  X PODGLAD  Y LIDER":"A PLAY  B BACK  X INSPECT  Y LEADER";
   if(key=="pass")return pl?"SELECT - PASUJ (POTWIERDZ)":"SELECT - PASS (CONFIRM)";
   if(key=="round")return pl?"RUNDA":"ROUND";
+  if(key=="round_complete")return pl?"RUNDA ZAKOŃCZONA":"ROUND COMPLETE";
+  if(key=="passed")return pl?"SPASOWANO":"PASSED";
+  if(key=="pass_button")return pl?"PASUJ":"PASS";
   if(key=="your_turn")return pl?"TWOJ RUCH":"YOUR TURN";
   if(key=="ai_turn")return pl?"RUCH PRZECIWNIKA":"OPPONENT TURN";
   if(key=="continue")return pl?"ENTER - DALEJ":"ENTER - CONTINUE";
@@ -279,11 +312,11 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="deck_invalid")return pl?"TALIA NIEPOPRAWNA":"DECK IS INVALID";
   if(key=="deck_saved")return pl?"ZAPISANO TALIE":"DECK SAVED";
   if(key=="deck_slot")return pl?"SLOT TALII":"DECK SLOT";
-  if(key=="deck_controls")return pl?"GORA/DOL: KARTA  A: DODAJ  B: USUN":"UP/DOWN: CARD  A: ADD  B: REMOVE";
+  if(key=="deck_controls")return pl?"GÓRA/DÓŁ: KARTA  A: DODAJ  B: USUŃ":"UP/DOWN: CARD  A: ADD  B: REMOVE";
   if(key=="deck_controls2")return pl?"L: LIDER  F: FRAKCJA  SELECT: ZAPISZ":"L: LEADER  F: FACTION  SELECT: SAVE";
   if(key=="deck_need_cards")return pl?"MIN. 22 JEDNOSTKI / MAX. 10 SPECJALNYCH":"MIN 22 UNITS / MAX 10 SPECIALS";
   if(key=="deck_custom")return pl?"WLASNA TALIA":"CUSTOM DECK";
-  if(key=="card_details")return pl?"SZCZEGOLY KARTY":"CARD DETAILS";
+  if(key=="card_details")return pl?"SZCZEGÓŁY KARTY":"CARD DETAILS";
   if(key=="leader_reveal")return pl?"KARTY Z REKI PRZECIWNIKA":"OPPONENT'S REVEALED CARDS";
   if(key=="leader_continue")return pl?"A / ENTER - KONTYNUUJ":"A / ENTER - CONTINUE";
   if(key=="leader_choose_target")return pl?"WYBIERZ KARTE":"CHOOSE A CARD";
@@ -300,14 +333,14 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="pause_load")return pl?"WCZYTAJ MECZ":"LOAD MATCH";
   if(key=="pause_language")return pl?"JEZYK":"LANGUAGE";
   if(key=="pause_sfx")return pl?"EFEKTY DZWIEKOWE":"SOUND EFFECTS";
-  if(key=="pause_exit")return pl?"WROC DO MENU TALII":"RETURN TO DECK MENU";
-  if(key=="pause_controls")return pl?"GORA/DOL: WYBOR  A: ZMIEN  B: WROC":"UP/DOWN: SELECT  A: CHANGE  B: BACK";
-  if(key=="pass_confirm")return pl?"SPASOWAC TE RUNDE?":"PASS THIS ROUND?";
+  if(key=="pause_exit")return pl?"WRÓĆ DO MENU TALII":"RETURN TO DECK MENU";
+  if(key=="pause_controls")return pl?"GÓRA/DÓŁ: WYBÓR  A: ZMIEŃ  B: WRÓĆ":"UP/DOWN: SELECT  A: CHANGE  B: BACK";
+  if(key=="pass_confirm")return pl?"SPASOWAĆ TĘ RUNDĘ?":"PASS THIS ROUND?";
   if(key=="pass_confirm_controls")return pl?"A: POTWIERDZ  B: ANULUJ":"A: CONFIRM  B: CANCEL";
   if(key=="on")return "ON";
   if(key=="off")return "OFF";
-  if(key=="power")return pl?"SILA":"POWER";
-  if(key=="row")return pl?"RZAD":"ROW";
+  if(key=="power")return pl?"SIŁA":"POWER";
+  if(key=="row")return pl?"RZĄD":"ROW";
   if(key=="special")return pl?"SPECJALNA":"SPECIAL";
   if(key=="siege")return pl?"OBLEZENIE":"SIEGE";
   if(key=="close_card")return pl?"B / ESC - ZAMKNIJ":"B / ESC - CLOSE";
@@ -316,6 +349,13 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="loaded")return pl?"WCZYTANO ZAPIS":"SAVE LOADED";
   if(key=="no_save")return pl?"BRAK POPRAWNEGO ZAPISU":"NO VALID SAVE FOUND";
   return key;
+}
+std::string displayCardName(const App& a,const gwent::Card& card) {
+  if(card.referenceIndex>=0) {
+    const auto& localized=gwent::referenceCardName(card.referenceIndex,a.language==Language::Polish);
+    if(!localized.empty())return localized;
+  }
+  return card.name;
 }
 bool loadSavedMatch(App& a) {
   gwent::Game restored;std::string error;
@@ -534,7 +574,7 @@ void doHumanPlay(App& a) {
     animatePlayedCard(a,card,0,a.handIndex,handSizeBefore);
     queueTriggeredEffects(a,before,card,0);
     playCardSound(a,card);
-    a.status=card.name+" - PLAYED"; a.handIndex=std::min(a.handIndex,static_cast<int>(a.game.players[0].hand.size())-1);
+    a.status=displayCardName(a,card)+(a.language==Language::Polish?" - ZAGRANO":" - PLAYED"); a.handIndex=std::min(a.handIndex,static_cast<int>(a.game.players[0].hand.size())-1);
   } else a.status="ILLEGAL PLAY";
 }
 void performAi(App& a) {
@@ -553,7 +593,7 @@ void performAi(App& a) {
     const auto before=a.game;
     success=gwent::playCard(a.game,1,action.cardId,action.target,action.selectedCardId);
     if(success) { animatePlayedCard(a,card,1,cardIndex,handSizeBefore);queueTriggeredEffects(a,before,card,1);playCardSound(a,card); }
-    a.status="OPPONENT PLAYED "+card.name;
+    a.status=(a.language==Language::Polish?"RYWAL ZAGRYWA ":"OPPONENT PLAYED ")+displayCardName(a,card);
   }
   if(!success) {
     // Do not disguise an invalid ported AI action as a voluntary source-game
@@ -574,7 +614,7 @@ void drawCardTile(SDL_Renderer* r,const App& app,int x,int y,int w,int h,const g
   if(w<45||h<60)box(r,x,y,w,h,selected?Color{101,79,44}:base);
   frame(r,x,y,w,h,selected?paper:gold);
   if(dim) box(r,x+2,y+2,w-4,h-4,Color{20,24,24,130});
-  const std::string name=shortName(card.name,std::max(3,(w-6)/6));
+  const std::string name=shortName(displayCardName(app,card),std::max(3,(w-6)/6));
   if(w<45||h<60) {
     text(r,x+3,y+5,name,card.hero?paper:paper,1);
     if(card.kind==gwent::Kind::Unit) text(r,x+3,y+h-12,std::to_string(card.power)+(card.hero?" H":""),gold,1);
@@ -741,8 +781,14 @@ void drawCardPreview(SDL_Renderer* r,const App& a,const gwent::Card& card) {
   // Give the enlarged card enough pixels for its printed name and flavor text
   // to survive the Miyoo's 640x480 output without competing with board labels.
   drawImage(r,a,"img/lg/"+gwent::referenceCardImage(card.referenceIndex),489,15,127,241);
-  const std::string& title=gwent::referenceCardAbilityTitle(card.referenceIndex);
-  const std::string& description=gwent::referenceCardDescription(card.referenceIndex);
+  const bool polish=a.language==Language::Polish;
+  const std::string& title=gwent::referenceCardAbilityTitle(card.referenceIndex,polish);
+  const std::string& description=gwent::referenceCardDescription(card.referenceIndex,polish);
+  const auto nameLines=wrapDetailText(displayCardName(a,card),19);
+  const int titleHeight=std::min(25,static_cast<int>(nameLines.size())*8+4);
+  box(r,489,15,127,titleHeight,Color{8,8,8,235});
+  for(std::size_t i=0;i<nameLines.size()&&i<2;++i)
+    centeredTextInBox(r,491,16+static_cast<int>(i)*8,123,8,nameLines[i],paper,1);
   if(title.empty()&&description.empty())return;
   box(r,435,266,186,90,Color{12,12,12,255});
   box(r,435,266,186,1,Color{255,255,255,110});
@@ -799,18 +845,21 @@ std::vector<std::string> wrapDetailText(const std::string& value,std::size_t lim
 void drawCardDetails(SDL_Renderer* r,const App& a,const gwent::Card& card) {
   box(r,0,0,W,H,Color{0,0,0,255});
   drawImage(r,a,"img/lg/"+gwent::referenceCardImage(card.referenceIndex),8,8,246,465);
+  box(r,12,12,238,24,Color{8,8,8,235});
+  centeredTextInBox(r,15,14,232,20,displayCardName(a,card),paper,1);
   frame(r,7,7,248,467,gold);
   box(r,264,23,354,434,Color{20,20,20,250});
   frame(r,264,23,354,434,Color{143,108,54});
   text(r,280,40,tr(a,"card_details"),gold,2);
-  const auto nameLines=wrapDetailText(card.name,27);
+  const auto nameLines=wrapDetailText(displayCardName(a,card),27);
   int y=68;
   for(const auto& line:nameLines) { text(r,280,y,line,paper,2);y+=18; }
   std::string row=card.row==gwent::Row::Ranged?tr(a,"ranged"):card.row==gwent::Row::Siege?tr(a,"siege"):card.row==gwent::Row::Melee?tr(a,"melee"):tr(a,"special");
   text(r,280,y+4,tr(a,"power")+" "+std::to_string(card.power)+"  "+tr(a,"row")+" "+row,Color{235,207,164},1);
   y+=28;
-  const auto& title=gwent::referenceCardAbilityTitle(card.referenceIndex);
-  const auto& description=gwent::referenceCardDescription(card.referenceIndex);
+  const bool polish=a.language==Language::Polish;
+  const auto& title=gwent::referenceCardAbilityTitle(card.referenceIndex,polish);
+  const auto& description=gwent::referenceCardDescription(card.referenceIndex,polish);
   if(!title.empty()) {
     for(const auto& line:wrapDetailText(title,27)) { text(r,280,y,line,gold,2);y+=18; }
     y+=4;
@@ -874,13 +923,13 @@ void drawTitle(SDL_Renderer* r,const App& a) {
   drawImage(r,a,"img/board.jpg",0,0,W,H);box(r,0,0,W,H,Color{13,19,20,205});box(r,0,0,W,5,gold);box(r,0,H-5,W,5,gold);
   box(r,54,54,532,372,panel); frame(r,54,54,532,372,gold); frame(r,61,61,518,358,Color{95,83,58});
   text(r,134,103,tr(a,"title"),gold,3);
-  text(r,132,151,"THE WITCHER 3 - CLASSIC GWENT",paper,1);
-  text(r,116,177,"A SINGLE PLAYER PORT FOR MIYOO MINI PLUS",muted,1);
+  text(r,132,151,a.language==Language::Polish?"WIEDŹMIN 3 - GWINT KLASYCZNY":"THE WITCHER 3 - CLASSIC GWENT",paper,1);
+  text(r,116,177,a.language==Language::Polish?"PORT DLA JEDNEGO GRACZA NA MIYOO MINI PLUS":"A SINGLE PLAYER PORT FOR MIYOO MINI PLUS",muted,1);
   box(r,118,231,404,2,gold);
   text(r,202,266,tr(a,"start"),paper,2);
-  text(r,164,309,"D-PAD / ARROWS TO MOVE",muted,1);
-  text(r,174,332,"X / ENTER TO SELECT",muted,1);
-  text(r,250,389,"1.0 - PORT IN PROGRESS",gold,1);
+  text(r,164,309,a.language==Language::Polish?"KRZYŻAK / STRZAŁKI - RUCH":"D-PAD / ARROWS TO MOVE",muted,1);
+  text(r,174,332,a.language==Language::Polish?"X / ENTER - WYBIERZ":"X / ENTER TO SELECT",muted,1);
+  text(r,250,389,a.language==Language::Polish?"1.0 - PORT W TRAKCIE":"1.0 - PORT IN PROGRESS",gold,1);
 }
 void drawDeckSelect(SDL_Renderer* r,const App& a) {
   box(r,0,0,W,H,ink); box(r,0,0,W,5,gold); box(r,0,H-5,W,5,gold);
@@ -893,11 +942,13 @@ void drawDeckSelect(SDL_Renderer* r,const App& a) {
   text(r,57,83,"<",gold,2); text(r,565,83,">",gold,2);
   const bool custom=a.userDeckSelected;
   text(r,104,87,custom?tr(a,"deck_custom"):factionName(selected.faction,a.language==Language::Polish),paper,2);
-  text(r,104,115,"LEADER: "+(custom?([&](){gwent::Card c;gwent::referenceLeader(a.editDeck.leaderReferenceIndex,c);return c.name;})():leader.name),muted,1);
-  text(r,104,139,"CARDS: "+std::to_string(custom?gwent::makeReferenceDeck(a.editDeck.cardCounts).size():gwent::makeReferenceDeck(selected).size()),muted,1);
+  gwent::Card deckLeader=leader;
+  if(custom)gwent::referenceLeader(a.editDeck.leaderReferenceIndex,deckLeader);
+  text(r,104,115,(a.language==Language::Polish?"DOWODCA: ":"LEADER: ")+displayCardName(a,deckLeader),muted,1);
+  text(r,104,139,(a.language==Language::Polish?"KARTY: ":"CARDS: ")+std::to_string(custom?gwent::makeReferenceDeck(a.editDeck.cardCounts).size():gwent::makeReferenceDeck(selected).size()),muted,1);
   box(r,73,174,493,1,Color{65,72,67});
   text(r,74,193,tr(a,"opponent"),muted,1);
-  text(r,74,215,factionName(opponent.faction,a.language==Language::Polish)+" / "+opponentLeader.name,paper,1);
+  text(r,74,215,factionName(opponent.faction,a.language==Language::Polish)+" / "+displayCardName(a,opponentLeader),paper,1);
   text(r,74,251,tr(a,"language"),muted,1); text(r,226,251,a.language==Language::Polish?"POLSKI":"ENGLISH",gold,1);
   text(r,25,332,custom?tr(a,"deck_slot")+" "+std::to_string(a.deckSlot)+"  B: EDIT  P: PREMADE":tr(a,"instructions"),paper,1);
   text(r,119,370,tr(a,"confirm"),gold,1);
@@ -916,11 +967,11 @@ void drawDeckBuilder(SDL_Renderer* r,const App& a) {
   box(r,0,0,W,STAGE_H,Color{10,10,10,242});
   const std::string factionKey=[&](){switch(a.editDeck.faction){case gwent::Faction::NorthernRealms:return std::string("realms");case gwent::Faction::Nilfgaard:return std::string("nilfgaard");case gwent::Faction::Monsters:return std::string("monsters");case gwent::Faction::Scoiatael:return std::string("scoiatael");case gwent::Faction::Skellige:return std::string("skellige");default:return std::string("realms");}}();
   const std::string descriptions[]={
-    "Draw a card from your deck whenever you win a round.",
-    "Wins any round that ends in a draw.",
-    "Decides who takes first turn.",
-    "Keeps a random Unit Card out after each round.",
-    "2 random cards from the graveyard are placed on the battlefield at the start of the third round."
+    pl?"Dobierz kartę ze swojej talii po wygranej rundzie.":"Draw a card from your deck whenever you win a round.",
+    pl?"Wygrywa każdą rundę zakończoną remisem.":"Wins any round that ends in a draw.",
+    pl?"Decyduje, kto wykonuje pierwszy ruch.":"Decides who takes first turn.",
+    pl?"Po rundzie pozostawia losową jednostkę na polu bitwy.":"Keeps a random Unit Card out after each round.",
+    pl?"Na początku trzeciej rundy przywraca 2 losowe karty z cmentarza na pole bitwy.":"2 random cards from the graveyard are placed on the battlefield at the start of the third round."
   };
   const int factionIndex=std::clamp(static_cast<int>(a.editDeck.faction),0,4);
   drawImage(r,a,"img/icons/deck_shield_"+factionKey+".png",18,9,21,21);
@@ -1014,7 +1065,7 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     const int statsY=owner==1?87:222;
     drawImage(r,a,"img/icons/profile.png",48,statsY+4,32,32);
     drawImage(r,a,"img/icons/icon_player_border.png",44,statsY+1,39,39);
-    if(owner==0)text(r,91,statsY+27,"GERALT",paper,1);
+    if(owner==0)text(r,91,statsY+27,shortName(displayCardName(a,player.leader),9),paper,1);
     else text(r,91,statsY+3,tr(a,"opponent_short"),paper,1);
     const int gemY=statsY+(owner==1?25:6);
     for(int gem=0;gem<2;++gem)
@@ -1053,9 +1104,9 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     centeredTextInBox(r,x,y+29,28,13,count,paper,1);
   };
   drawPile(1,true,23);drawPile(1,false,23);drawPile(0,true,275);drawPile(0,false,275);
-  box(r,107,295,34,15,Color{20,20,20,230});frame(r,107,295,34,15,Color{143,108,54});text(r,112,299,"PASS",paper,1);
-  if(me.passed)text(r,110,282,"PASSED",paper,1);
-  if(op.passed)text(r,110,80,"PASSED",paper,1);
+  box(r,107,295,34,15,Color{20,20,20,230});frame(r,107,295,34,15,Color{143,108,54});text(r,112,299,tr(a,"pass_button"),paper,1);
+  if(me.passed)text(r,110,282,tr(a,"passed"),paper,1);
+  if(op.passed)text(r,110,80,tr(a,"passed"),paper,1);
   drawImage(r,a,"img/icons/ui_music.png",90,313,16,16);drawImage(r,a,"img/icons/ui_sfx.png",110,313,16,16);drawImage(r,a,"img/icons/ui_notification.png",128,313,16,16);
   if(!a.audio.enabled()) { color(r,gold);SDL_RenderDrawLine(r,110,313,126,329); }
   const int count=static_cast<int>(me.hand.size());
@@ -1104,8 +1155,8 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     const bool done=a.game.phase==gwent::Phase::MatchResult;
     const bool won=a.game.matchWinner==0;
     drawImage(r,a,std::string("img/icons/end_")+(done?(won?"win":"lose"):(won?"win":"lose"))+".png",210,21,220,102);
-    text(r,213,139,done?tr(a,won?"victory":"defeat"):"ROUND COMPLETE",gold,2);
-    text(r,220,174,"YOU "+std::to_string(me.score)+"  -  "+std::to_string(op.score)+" OPPONENT",paper,1);
+    text(r,213,139,done?tr(a,won?"victory":"defeat"):tr(a,"round_complete"),gold,2);
+    text(r,220,174,tr(a,"player_short")+" "+std::to_string(me.score)+"  -  "+std::to_string(op.score)+" "+tr(a,"opponent_short"),paper,1);
     text(r,265,217,tr(a,"continue"),muted,1);
   }
   const bool showHand=a.game.phase!=gwent::Phase::RoundResult&&a.game.phase!=gwent::Phase::MatchResult;
@@ -1153,7 +1204,7 @@ void drawMatch(SDL_Renderer* r,const App& a) {
       const auto& card=cards[static_cast<std::size_t>(selected)];
       drawImage(r,a,"img/lg/"+gwent::referenceCardImage(card.referenceIndex),521,77,96,168);
       frame(r,520,76,98,170,gold);
-      text(r,28,207,card.name+"  "+std::to_string(card.power),paper,1);
+      text(r,28,207,displayCardName(a,card)+"  "+std::to_string(card.power),paper,1);
       if(!a.leaderSelections.empty()) {
         std::string chosen;
         for(const auto& id:a.leaderSelections) {
@@ -1180,7 +1231,7 @@ void drawMatch(SDL_Renderer* r,const App& a) {
       const int height=static_cast<int>(width*1.72);
       drawImage(r,a,"img/lg/"+gwent::referenceCardImage(cards[i].referenceIndex),x,58,width,height);
       frame(r,x-1,57,width+2,height+2,gold);
-      const auto names=wrapDetailText(cards[i].name,16);
+      const auto names=wrapDetailText(displayCardName(a,cards[i]),16);
       for(std::size_t line=0;line<names.size();++line)
         centeredTextInBox(r,x-8,58+height+8+static_cast<int>(line)*8,width+16,8,names[line],paper,1);
     }
@@ -1371,7 +1422,7 @@ void handleMatchKey(App& a,SDL_Keycode key) {
           animatePlayedCard(a,card,0,a.handIndex,handSizeBefore);
           queueTriggeredEffects(a,before,card,0);
           playCardSound(a,card);
-          a.status=card.name+" - PLAYED"; a.handIndex=std::min(a.handIndex,static_cast<int>(a.game.players[0].hand.size())-1);
+          a.status=displayCardName(a,card)+(a.language==Language::Polish?" - ZAGRANO":" - PLAYED"); a.handIndex=std::min(a.handIndex,static_cast<int>(a.game.players[0].hand.size())-1);
         } else a.status="ILLEGAL TARGET";
       }
       a.targetMode=false; a.selectedTargets.clear();
@@ -1669,6 +1720,7 @@ int main(int argc,char** argv) {
     app.screen=Screen::DeckBuilder;drawDeckBuilder(renderer,app);presentFrame();
     if(argc>3&&!saveFrame(argv[3])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
     if(argc>4) {
+      app.language=Language::Polish;
       clearFrame();
       const auto& catalog=gwent::referenceCardCatalog();
       const auto ciri=std::find_if(catalog.begin(),catalog.end(),[](const gwent::Card& card){return card.name=="Cirilla Fiona Elen Riannon";});

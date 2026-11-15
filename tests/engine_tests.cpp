@@ -383,6 +383,14 @@ static void referenceCatalog() {
   assert(std::count_if(catalog.begin(), catalog.end(), [](const Card& c){return c.kind==Kind::Leader;}) >= 20);
   auto geralt = std::find_if(catalog.begin(), catalog.end(), [](const Card& c){return c.name=="Geralt of Rivia";});
   assert(geralt != catalog.end() && geralt->muster && geralt->group=="Roach");
+  assert(referenceCardName(geralt->referenceIndex)=="Geralt of Rivia");
+  assert(referenceCardName(geralt->referenceIndex,true)=="Geralt z Rivii");
+  assert(!referenceCardAbilityTitle(geralt->referenceIndex,true).empty());
+  assert(referenceCardDescription(geralt->referenceIndex,true).find("Wyszukuje")!=std::string::npos);
+  for(const auto& card:catalog) {
+    assert(!referenceCardName(card.referenceIndex).empty());
+    assert(!referenceCardName(card.referenceIndex,true).empty());
+  }
   auto roach = std::find_if(catalog.begin(), catalog.end(), [](const Card& c){return c.name=="Roach";});
   assert(roach != catalog.end());
   auto blueStripes = std::find_if(catalog.begin(), catalog.end(), [](const Card& c){return c.name=="Blue Stripes Commando";});

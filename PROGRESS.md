@@ -140,3 +140,7 @@ Przeniesiono reguły `Player.canPlay()`, `Player.endTurn()` i `Game.startRound()
 ## Uzupełnienie celów animacji kart — 15.11.2026
 
 Porównanie z `abilities.js` i `Card.animate()` wykazało, że nakładki muszą pojawiać się na kartach dotkniętych zdolnością, a nie wyłącznie na karcie zagranej. Renderer obsługuje teraz nakładkę Więzi na wszystkie pasujące karty w rzędzie, Muster na każdej nowo przywołanej kopii, Medyka na wskrzeszonej jednostce oraz Pożogę równolegle na jednostkach usuwanych z planszy, zachowując ich pozycje sprzed zmiany stanu. Build, CTest (2/2) i `--input-test` przechodzą. To nadal częściowy port animacji; pełne przejścia, kolejność ruchu, karuzela, komunikaty i ekrany końca gry są otwarte. Nie robiono builda ARM ani zapisu na SD.
+
+## Lokalizacja katalogu kart PL/EN — 15.11.2026
+
+Generator katalogu kompiluje teraz osobne nazwy kart oraz tytuły/opisy zdolności po polsku i angielsku; UI wybiera tekst według ustawienia języka, a wybrane nazwy są nakładane nad oryginalną ilustracją w podglądzie i inspektorze. Dodano polskie glify bitmapowe i kontrolę, że każda nazwa katalogowa oraz każda zdolność źródłowa ma wpis PL. Test sprawdza Geralta w obu językach i obecność tłumaczeń dla wszystkich 258 instancji kart. Desktop build, CTest (2/2), `--input-test` oraz zrzut smoke 640×480 przeszły. Lokalizacja statycznych komunikatów UI nie jest jeszcze pełna, a tłumaczenia nazw wymagają weryfikacji względem oficjalnej polskiej wersji gry; parytet i build ARM pozostają otwarte.

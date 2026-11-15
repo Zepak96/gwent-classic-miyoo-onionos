@@ -7,10 +7,14 @@ import unicodedata
 source = pathlib.Path(sys.argv[1])
 premade_source = pathlib.Path(sys.argv[2])
 ability_source = pathlib.Path(sys.argv[3])
-output = pathlib.Path(sys.argv[4])
+card_names_pl_source = pathlib.Path(sys.argv[4])
+ability_text_pl_source = pathlib.Path(sys.argv[5])
+output = pathlib.Path(sys.argv[6])
 records = json.loads(source.read_text(encoding="utf-8"))
 premade = json.loads(premade_source.read_text(encoding="utf-8"))
 ability_text = json.loads(ability_source.read_text(encoding="utf-8"))
+card_names_pl = json.loads(card_names_pl_source.read_text(encoding="utf-8"))
+ability_text_pl = json.loads(ability_text_pl_source.read_text(encoding="utf-8"))
 
 factions = {
     "realms": "NorthernRealms", "nilfgaard": "Nilfgaard", "scoiatael": "Scoiatael",
@@ -36,32 +40,37 @@ def enum_kind(record, ability, row):
                 return kind
     return "Unit"
 
-def card_description(record):
+def localized_ability(tag, polish):
+    if polish:
+        return ability_text_pl.get(tag, ability_text.get(tag, {}))
+    return ability_text.get(tag, {})
+
+def card_description(record, polish=False):
     ability = record["ability"].split()
     hero = bool(ability and ability[0] == "hero")
     if hero:
         ability = ability[1:]
     parts = []
     if record["row"] == "agile":
-        parts.append(ability_text.get("agile", {}).get("description", ""))
-    parts.extend(ability_text.get(tag, {}).get("description", "") for tag in reversed(ability))
+        parts.append(localized_ability("agile", polish).get("description", ""))
+    parts.extend(localized_ability(tag, polish).get("description", "") for tag in reversed(ability))
     if hero:
-        parts.append(ability_text.get("hero", {}).get("description", ""))
+        parts.append(localized_ability("hero", polish).get("description", ""))
     return "".join(parts).strip()
 
-def card_ability_title(record):
+def card_ability_title(record, polish=False):
     ability = record["ability"].split()
     hero = bool(ability and ability[0] == "hero")
     if hero:
         ability = ability[1:]
     if record["row"] == "leader":
-        return "Leader Ability"
+        return "Zdolność dowódcy" if polish else "Leader Ability"
     if ability:
-        return ability_text.get(ability[-1], {}).get("name", ability[-1])
+        return localized_ability(ability[-1], polish).get("name", ability[-1])
     if record["row"] == "agile":
-        return ability_text.get("agile", {}).get("name", "agile")
+        return localized_ability("agile", polish).get("name", "agile")
     if hero:
-        return ability_text.get("hero", {}).get("name", "hero")
+        return localized_ability("hero", polish).get("name", "hero")
     return ""
 
 cards = []
@@ -121,18 +130,37 @@ output.write_text(
     '  static const std::string empty;\n'
     '  return sourceIndex >= 0 && sourceIndex < static_cast<int>(images.size()) ? images[static_cast<std::size_t>(sourceIndex)] : empty;\n'
     '}\n'
-    'const std::string& referenceCardAbilityTitle(int sourceIndex) {\n'
-    '  static const std::vector<std::string> titles = {\n' + ",\n".join(
+    'const std::string& referenceCardName(int sourceIndex, bool polish) {\n'
+    '  static const std::vector<std::string> english = {\n' + ",\n".join(
+        '    ' + cpp_string(item["name"].strip()) for item in records
+    ) + '\n  };\n'
+    '  static const std::vector<std::string> polishNames = {\n' + ",\n".join(
+        '    ' + cpp_string(card_names_pl.get(item["name"].strip(), item["name"].strip())) for item in records
+    ) + '\n  };\n'
+    '  static const std::string empty;\n'
+    '  const auto& names = polish ? polishNames : english;\n'
+    '  return sourceIndex >= 0 && sourceIndex < static_cast<int>(names.size()) ? names[static_cast<std::size_t>(sourceIndex)] : empty;\n'
+    '}\n'
+    'const std::string& referenceCardAbilityTitle(int sourceIndex, bool polish) {\n'
+    '  static const std::vector<std::string> english = {\n' + ",\n".join(
         '    ' + cpp_string(card_ability_title(item)) for item in records
     ) + '\n  };\n'
-    '  static const std::string empty;\n'
-    '  return sourceIndex >= 0 && sourceIndex < static_cast<int>(titles.size()) ? titles[static_cast<std::size_t>(sourceIndex)] : empty;\n'
-    '}\n'
-    'const std::string& referenceCardDescription(int sourceIndex) {\n'
-    '  static const std::vector<std::string> descriptions = {\n' + ",\n".join(
-        '    ' + cpp_string(card_description(item)) for item in records
+    '  static const std::vector<std::string> polishTitles = {\n' + ",\n".join(
+        '    ' + cpp_string(card_ability_title(item, True)) for item in records
     ) + '\n  };\n'
     '  static const std::string empty;\n'
+    '  const auto& titles = polish ? polishTitles : english;\n'
+    '  return sourceIndex >= 0 && sourceIndex < static_cast<int>(titles.size()) ? titles[static_cast<std::size_t>(sourceIndex)] : empty;\n'
+    '}\n'
+    'const std::string& referenceCardDescription(int sourceIndex, bool polish) {\n'
+    '  static const std::vector<std::string> english = {\n' + ",\n".join(
+        '    ' + cpp_string(card_description(item)) for item in records
+    ) + '\n  };\n'
+    '  static const std::vector<std::string> polishDescriptions = {\n' + ",\n".join(
+        '    ' + cpp_string(card_description(item, True)) for item in records
+    ) + '\n  };\n'
+    '  static const std::string empty;\n'
+    '  const auto& descriptions = polish ? polishDescriptions : english;\n'
     '  return sourceIndex >= 0 && sourceIndex < static_cast<int>(descriptions.size()) ? descriptions[static_cast<std::size_t>(sourceIndex)] : empty;\n'
     '}\n}\n',
     encoding="utf-8"

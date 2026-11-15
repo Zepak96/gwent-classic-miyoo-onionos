@@ -12,8 +12,9 @@ struct ReferenceDeck {
 const std::vector<Card>& referenceCardCatalog();
 const std::vector<ReferenceDeck>& referencePremadeDecks();
 const std::string& referenceCardImage(int sourceIndex);
-const std::string& referenceCardAbilityTitle(int sourceIndex);
-const std::string& referenceCardDescription(int sourceIndex);
+const std::string& referenceCardName(int sourceIndex, bool polish = false);
+const std::string& referenceCardAbilityTitle(int sourceIndex, bool polish = false);
+const std::string& referenceCardDescription(int sourceIndex, bool polish = false);
 std::vector<Card> makeReferenceDeck(const ReferenceDeck& recipe);
 bool referenceLeader(int sourceIndex, Card& leader);
 }

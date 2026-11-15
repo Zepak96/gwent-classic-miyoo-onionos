@@ -43,6 +43,15 @@ source behavior. A build or screenshot alone does not count as parity.
 - [ ] No illegal action may be silently converted into a pass.
 - [ ] Repeatable simulations cover every premade deck and every leader action.
 
+## Localization — source card data and UI strings
+
+- [ ] Every source card title and ability title/description matches the official
+  Polish game text; English source text remains available in English mode.
+- [ ] Every menu, board label, interaction prompt, status, notification, and
+  accessibility hint is translated and checked at 640×480.
+- [ ] Original card artwork with printed English titles is covered by readable
+  localized overlays wherever cards are enlarged or inspected.
+
 ## Screens and interactions — `index.html`, `style.css`, `gwent.js`
 
 - [ ] Initial DeckMaker screen; faction description/change; bank and deck arrays;

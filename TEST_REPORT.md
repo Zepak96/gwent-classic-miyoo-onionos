@@ -140,3 +140,11 @@ Ported the reference `Player.canPlay()`, `Player.endTurn()`, and `Game.startRoun
 - Extended the original PNG/timing overlays to each matching Bond unit, newly summoned Muster unit, revived Medic target, and each Scorch target at its pre-action board location.
 - Desktop build succeeded; CTest passed 2/2; dummy SDL `--input-test` passed.
 - This remains partial animation parity. Cross-build, physical device, and SD copy were not performed. See `docs/REFERENCE_ANIMATIONS.md` for open animation behavior.
+
+## Polish and English catalog rendering — 15.11.2026
+
+- Updated CMake catalog generation to include `data/card-names-pl.json` and `data/ability-text-pl.json`.
+- Added locale-aware card names, ability titles and descriptions; the UI uses localized names in its detail/preview, deck and match labels and adds a localized name strip over enlarged source artwork. Added bitmap glyphs for Polish diacritics.
+- Catalog validation checks complete name-map and ability-map coverage; engine tests check Geralt's English/Polish name and translated ability description across the catalog.
+- Fresh desktop configure/build passed; CTest passed 2/2; SDL `--input-test` passed; 640×480 Polish detail/deck smoke frames were generated and visually inspected.
+- This does not complete UI localization: several static prompts and labels remain English, official Polish text still requires a source-by-source review, and no ARM/SD/device validation was performed.

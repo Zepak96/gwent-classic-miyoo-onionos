@@ -16,8 +16,9 @@ add_custom_command(
   OUTPUT ${GWENT_CATALOG_SOURCE}
   COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_catalog.py
           ${CMAKE_CURRENT_SOURCE_DIR}/data/cards.json ${CMAKE_CURRENT_SOURCE_DIR}/data/premade-decks.json
-          ${CMAKE_CURRENT_SOURCE_DIR}/data/ability-text.json ${GWENT_CATALOG_SOURCE}
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_catalog.py ${CMAKE_CURRENT_SOURCE_DIR}/data/cards.json ${CMAKE_CURRENT_SOURCE_DIR}/data/premade-decks.json ${CMAKE_CURRENT_SOURCE_DIR}/data/ability-text.json
+          ${CMAKE_CURRENT_SOURCE_DIR}/data/ability-text.json ${CMAKE_CURRENT_SOURCE_DIR}/data/card-names-pl.json
+          ${CMAKE_CURRENT_SOURCE_DIR}/data/ability-text-pl.json ${GWENT_CATALOG_SOURCE}
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_catalog.py ${CMAKE_CURRENT_SOURCE_DIR}/data/cards.json ${CMAKE_CURRENT_SOURCE_DIR}/data/premade-decks.json ${CMAKE_CURRENT_SOURCE_DIR}/data/ability-text.json ${CMAKE_CURRENT_SOURCE_DIR}/data/card-names-pl.json ${CMAKE_CURRENT_SOURCE_DIR}/data/ability-text-pl.json
   VERBATIM
 )
 
