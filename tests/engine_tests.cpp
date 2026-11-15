@@ -1,4 +1,5 @@
 #include "gwent/game.hpp"
+#include <algorithm>
 #include <cassert>
 #include <utility>
 
@@ -77,4 +78,20 @@ static void abilitiesAndValidation() {
   deck.push_back(Card{"wrong","",Kind::Unit,Row::Melee,Faction::Nilfgaard,1});
   assert(!validateDeck(deck,Faction::NorthernRealms).empty());
 }
-int main() { scoreRules(); turnsAndRounds(); abilitiesAndValidation(); }
+static void openingHandAndMulligan() {
+  std::vector<Card> a, b;
+  for (int i = 0; i < 24; ++i) { a.push_back(unit("a" + std::to_string(i), i % 10)); b.push_back(unit("b" + std::to_string(i), i % 10)); }
+  Game g; beginMatch(g, a, Faction::NorthernRealms, b, Faction::Monsters, 0x12345678, 1);
+  assert(g.phase == Phase::Mulligan && g.currentPlayer == 1);
+  assert(g.players[0].hand.size() == 10 && g.players[0].deck.size() == 14);
+  const auto first = g.players[0].hand[0].id;
+  const auto second = g.players[0].hand[1].id;
+  assert(!replaceMulliganCards(g, 0, {first, "not-in-hand"}));
+  assert(g.players[0].hand.size() == 10 && !g.players[0].mulliganDone);
+  assert(replaceMulliganCards(g, 0, {first, second}));
+  assert(g.players[0].hand.size() == 10 && g.players[0].deck.size() == 14);
+  assert(std::find_if(g.players[0].hand.begin(), g.players[0].hand.end(), [&](const Card& c){return c.id==first;}) == g.players[0].hand.end());
+  assert(replaceMulliganCards(g, 1, {}));
+  assert(g.phase == Phase::OpponentTurn && g.currentPlayer == 1);
+}
+int main() { scoreRules(); turnsAndRounds(); abilitiesAndValidation(); openingHandAndMulligan(); }

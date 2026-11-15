@@ -4,7 +4,7 @@ Data raportu: 2026-11-15.
 
 ## Wynik
 
-Testy automatyczne C++ obejmują teraz podstawowe punktowanie, pogodę, róg, Bohaterów, Morale, Więź (3 kopie), pasowanie, remis, Nilfgaard, Szpiega, Medyka, Manekina, Zbiórkę i część walidacji talii. Zmiany są jeszcze lokalne i czekają na wynik kolejnego GitHub Actions CI. Ostatni zweryfikowany build (`a68363b3b6733fa06dc54f94482b773d98129cd5`) zakończył się sukcesem z 1/1 testów, ale dotyczył starszej wersji kodu. Zakres nadal nie pokrywa wszystkich kart i zasad.
+Testy automatyczne C++ obejmują teraz podstawowe punktowanie, pogodę, róg, Bohaterów, Morale, Więź (3 kopie), pasowanie, remis, Nilfgaard, Szpiega, Medyka, Manekina, Zbiórkę, rozdanie i wymianę kart oraz część walidacji talii. Commit `f747fa2` został zbudowany w GitHub Actions; `ctest` zaliczył 1/1 testów. Wciąż jest to jeden program testowy z kilkoma asercjami; zakres nadal nie pokrywa wszystkich kart i zasad.
 
 | Obszar | Status | Uwagi |
 |---|---|---|

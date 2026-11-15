@@ -16,6 +16,12 @@ std::uint32_t nextRandom(Game& g) {
 auto findCard(std::vector<Card>& cards, const std::string& id) {
   return std::find_if(cards.begin(), cards.end(), [&](const Card& c) { return c.id == id; });
 }
+void shuffleDeck(Game& g, std::vector<Card>& deck) {
+  for (std::size_t n = deck.size(); n > 1; --n) {
+    const std::size_t other = nextRandom(g) % n;
+    std::swap(deck[n - 1], deck[other]);
+  }
+}
 int cardPower(const Card& c, const std::vector<Card>& row, bool weather, bool horn) {
   if (c.hero) return c.power; // Heroes ignore all row effects.
   int power = weather ? std::min(c.power, 1) : c.power;
@@ -86,6 +92,54 @@ int calculateScore(const Player& p, const std::array<bool, 3>& weather,
     for (const auto& c : p.board[r])
       if (c.kind == Kind::Unit) total += cardPower(c, p.board[r], weather[r], horn[r]);
   return total;
+}
+
+void beginMatch(Game& g, std::vector<Card> playerDeck, Faction playerFaction,
+                std::vector<Card> opponentDeck, Faction opponentFaction,
+                std::uint64_t seed, int firstPlayer) {
+  g = Game{};
+  g.rngState = seed ? seed : 1;
+  g.firstPlayer = (firstPlayer == 1) ? 1 : 0;
+  for (int i = 0; i < 2; ++i) {
+    auto& p = g.players[i];
+    p.deck = i == 0 ? std::move(playerDeck) : std::move(opponentDeck);
+    p.faction = i == 0 ? playerFaction : opponentFaction;
+    shuffleDeck(g, p.deck);
+    for (int n = 0; n < 10 && !p.deck.empty(); ++n) {
+      p.hand.push_back(p.deck.back()); p.deck.pop_back();
+    }
+  }
+  g.currentPlayer = g.firstPlayer;
+  g.phase = Phase::Mulligan;
+}
+
+bool replaceMulliganCards(Game& g, int who, const std::vector<std::string>& ids) {
+  if (g.phase != Phase::Mulligan || who < 0 || who > 1 || g.players[who].mulliganDone || ids.size() > 2)
+    return false;
+  auto& player = g.players[who];
+  std::vector<Card> replacements;
+  for (const auto& id : ids) {
+    if (std::find_if(replacements.begin(), replacements.end(), [&](const Card& c) { return c.id == id; }) != replacements.end())
+      return false;
+    auto card = findCard(player.hand, id);
+    if (card == player.hand.end()) return false;
+    replacements.push_back(*card);
+  }
+  // Validate the whole selection before changing any state.
+  for (const auto& card : replacements) {
+    auto found = findCard(player.hand, card.id);
+    player.hand.erase(found);
+    player.deck.insert(player.deck.begin(), card);
+  }
+  for (std::size_t i = 0; i < replacements.size() && !player.deck.empty(); ++i) {
+    player.hand.push_back(player.deck.back()); player.deck.pop_back();
+  }
+  player.mulliganDone = true;
+  if (g.players[0].mulliganDone && g.players[1].mulliganDone) {
+    g.currentPlayer = g.firstPlayer;
+    g.phase = g.currentPlayer == 0 ? Phase::PlayerTurn : Phase::OpponentTurn;
+  }
+  return true;
 }
 
 bool playCard(Game& g, int who, const std::string& id, Row target, const std::string& selectedId) {

@@ -30,6 +30,7 @@ struct Player {
   std::vector<Card> deck, hand, graveyard;
   std::array<std::vector<Card>, 3> board;
   bool passed{false};
+  bool mulliganDone{false};
   int score{0};
   int roundWins{0};
   int roundLosses{0};
@@ -52,6 +53,10 @@ int calculateScore(const Player&, const std::array<bool,3>& weather,
                    const std::array<bool,3>& horn);
 bool playCard(Game&, int playerIndex, const std::string& cardId, Row target = Row::None,
               const std::string& selectedCardId = {});
+void beginMatch(Game&, std::vector<Card> playerDeck, Faction playerFaction,
+                std::vector<Card> opponentDeck, Faction opponentFaction,
+                std::uint64_t seed, int firstPlayer = 0);
+bool replaceMulliganCards(Game&, int playerIndex, const std::vector<std::string>& cardIds);
 bool pass(Game&, int playerIndex);
 bool startNextRound(Game&);
 std::string validateDeck(const std::vector<Card>& deck, Faction faction);
