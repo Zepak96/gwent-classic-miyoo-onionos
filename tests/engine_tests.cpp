@@ -71,6 +71,68 @@ static void turnsAndRounds() {
   assert(pass(nilfgaard,0)); assert(pass(nilfgaard,1));
   assert(nilfgaard.players[0].roundWins==1 && nilfgaard.players[1].roundLosses==1);
 }
+static void factionStartAndSkelligeRoundThree() {
+  std::vector<Card> deck;
+  for(int i=0;i<24;++i)deck.push_back(unit("scoia-deck-"+std::to_string(i),1));
+  Card scoiaLeader0; scoiaLeader0.id="scoia-leader-0"; scoiaLeader0.kind=Kind::Leader; scoiaLeader0.faction=Faction::Scoiatael;
+  Card scoiaLeader1; scoiaLeader1.id="scoia-leader-1"; scoiaLeader1.kind=Kind::Leader; scoiaLeader1.faction=Faction::NorthernRealms;
+  Game scoiatael;
+  beginMatchWithLeaders(scoiatael,deck,scoiaLeader0,deck,scoiaLeader1,0x12345,1);
+  assert(scoiatael.scoiataelChoicePending && scoiatael.firstPlayer==0);
+  assert(chooseScoiataelFirstPlayer(scoiatael,1));
+  assert(!scoiatael.scoiataelChoicePending && scoiatael.firstPlayer==1);
+  assert(!chooseScoiataelFirstPlayer(scoiatael,0));
+
+  Card ordinaryLeader; ordinaryLeader.id="nr-leader"; ordinaryLeader.kind=Kind::Leader; ordinaryLeader.faction=Faction::NorthernRealms;
+  Card aiScoiaLeader; aiScoiaLeader.id="ai-scoia-leader"; aiScoiaLeader.kind=Kind::Leader; aiScoiaLeader.faction=Faction::Scoiatael;
+  Game aiScoia;
+  beginMatchWithLeaders(aiScoia,deck,ordinaryLeader,deck,aiScoiaLeader,0x12345,0);
+  assert(!aiScoia.scoiataelChoicePending && (aiScoia.firstPlayer==0||aiScoia.firstPlayer==1));
+  Game mirrorScoia;
+  beginMatchWithLeaders(mirrorScoia,deck,scoiaLeader0,deck,aiScoiaLeader,0x12345,0);
+  assert(!mirrorScoia.scoiataelChoicePending); // The reference skips faction perks when both decks are Scoia'tael.
+
+  Game northern;
+  northern.phase=Phase::RoundResult; northern.players[0].faction=Faction::NorthernRealms;
+  northern.players[0].score=8; northern.players[1].score=2;
+  northern.players[0].deck.push_back(unit("northern-draw",2));
+  assert(startNextRound(northern));
+  assert(northern.players[0].hand.size()==1 && northern.players[0].deck.empty());
+
+  Game monsters;
+  monsters.phase=Phase::RoundResult; monsters.players[0].faction=Faction::Monsters;
+  monsters.players[0].score=8; monsters.players[1].score=2;
+  monsters.players[0].board[0]={unit("monster-1",2),unit("monster-2",3)};
+  monsters.players[0].board[1].push_back(unit("monster-3",4,Row::Ranged));
+  assert(startNextRound(monsters));
+  int retained=0;
+  for(const auto& row:monsters.players[0].board)for(const auto& card:row)if(card.kind==Kind::Unit&&!card.hero)++retained;
+  assert(retained==1 && monsters.players[0].graveyard.size()==2);
+
+  Game skellige;
+  skellige.phase=Phase::RoundResult; skellige.round=2; skellige.firstPlayer=0;
+  skellige.players[0].faction=Faction::Skellige;
+  skellige.players[0].graveyard.push_back(unit("skellige-normal",5,Row::Siege));
+  auto agile=unit("skellige-agile",7,Row::None); agile.agile=true;
+  skellige.players[0].graveyard.push_back(agile);
+  assert(startNextRound(skellige));
+  assert(skellige.round==3 && skellige.phase==Phase::RoundSetup && skellige.skelligeRevivesRemaining==2);
+  assert(!chooseSkelligeRevive(skellige,0,"skellige-agile",Row::None));
+  assert(chooseSkelligeRevive(skellige,0,"skellige-agile",Row::Ranged));
+  assert(skellige.skelligeRevivesRemaining==1 && skellige.players[0].board[1].size()==1);
+  assert(chooseSkelligeRevive(skellige,0,"skellige-normal"));
+  assert(skellige.skelligeRevivesRemaining==0 && skellige.phase==Phase::PlayerTurn);
+  assert(skellige.players[0].board[2].size()==1 && skellige.players[0].graveyard.empty());
+
+  Game aiSkellige;
+  aiSkellige.phase=Phase::RoundResult; aiSkellige.round=2; aiSkellige.players[1].faction=Faction::Skellige;
+  aiSkellige.players[1].graveyard={unit("ai-skellige-1",3),unit("ai-skellige-2",4,Row::Ranged),unit("ai-skellige-3",5,Row::Siege)};
+  assert(startNextRound(aiSkellige));
+  assert(aiSkellige.phase==Phase::PlayerTurn && aiSkellige.players[1].graveyard.size()==1);
+  int aiRetained=0;
+  for(const auto& row:aiSkellige.players[1].board)aiRetained+=static_cast<int>(row.size());
+  assert(aiRetained==2);
+}
 static void abilitiesAndValidation() {
   Game spy; auto s=unit("spy",3); s.spy=true; spy.players[0].hand.push_back(s);
   spy.players[0].deck={unit("draw1",1),unit("draw2",1)};
@@ -329,4 +391,4 @@ static void leaderAbilities() {
   assert(crach.players[0].deck.size()==1 && crach.players[1].deck.size()==1);
   assert(crach.players[0].graveyard.empty() && crach.players[1].graveyard.empty());
 }
-int main() { scoreRules(); turnsAndRounds(); abilitiesAndValidation(); openingHandAndMulligan(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); avengerCards(); leaderAbilities(); }
+int main() { scoreRules(); turnsAndRounds(); factionStartAndSkelligeRoundThree(); abilitiesAndValidation(); openingHandAndMulligan(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); avengerCards(); leaderAbilities(); }

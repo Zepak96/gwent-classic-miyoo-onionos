@@ -101,6 +101,13 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="confirm")return pl?"ENTER - GRA   Z - JEZYK":"ENTER - PLAY   Z - LANGUAGE";
   if(key=="mulligan")return pl?"WYBIERZ DO 2 KART DO WYMIANY":"CHOOSE UP TO 2 CARDS TO MULLIGAN";
   if(key=="confirm_mulligan")return pl?"SPACJA - ZAZNACZ   ENTER - ZATWIERDZ":"SPACE - MARK   ENTER - CONFIRM";
+  if(key=="choose_first")return pl?"SCOIA'TAEL WYBIERA KOLEJKE: LEWO/PRAWO, ENTER":"SCOIA'TAEL CHOOSES FIRST: LEFT/RIGHT, ENTER";
+  if(key=="human_first")return pl?"ZACZYNASZ TY":"YOU START";
+  if(key=="ai_first")return pl?"ZACZYNA PRZECIWNIK":"OPPONENT STARTS";
+  if(key=="skellige_revival")return pl?"SKELLIGE: WYBIERZ JEDNOSTKE Z CMENTARZA":"SKELLIGE: CHOOSE A UNIT FROM THE GRAVEYARD";
+  if(key=="skellige_agile")return pl?"ZWINNA: GORA/DOL WYBIERA RZAD":"AGILE: UP/DOWN SELECTS ROW";
+  if(key=="melee")return pl?"WALKA WRECZ":"MELEE";
+  if(key=="ranged")return pl?"DYSTANSOWY":"RANGED";
   if(key=="controls")return pl?"STRZALKI - RUCH   ENTER/X - GRAJ   L - LIDER":"ARROWS - MOVE   ENTER/X - PLAY   L - LEADER";
   if(key=="pass")return pl?"BACKSPACE - PASUJ   ESC - MENU":"BACKSPACE - PASS   ESC - MENU";
   if(key=="round")return pl?"RUNDA":"ROUND";
@@ -302,7 +309,31 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     if(!abilities.empty())text(r,18,358,abilities,muted,1);
   }
   if(a.game.phase==gwent::Phase::Mulligan) {
-    box(r,0,366,W,45,panel); text(r,18,373,tr(a,"mulligan"),paper,1); text(r,18,390,tr(a,"confirm_mulligan"),gold,1);
+    box(r,0,366,W,45,panel);
+    if(a.game.scoiataelChoicePending) {
+      text(r,18,373,tr(a,"choose_first"),paper,1);
+      text(r,18,390,a.game.firstPlayer==0?tr(a,"human_first"):tr(a,"ai_first"),gold,1);
+    } else {
+      text(r,18,373,tr(a,"mulligan"),paper,1); text(r,18,390,tr(a,"confirm_mulligan"),gold,1);
+    }
+  } else if(a.game.phase==gwent::Phase::RoundSetup) {
+    std::vector<const gwent::Card*> candidates;
+    for(const auto& card:me.graveyard)if(card.kind==gwent::Kind::Unit&&!card.hero&&(card.row!=gwent::Row::None||card.agile))candidates.push_back(&card);
+    box(r,65,267,510,151,ink); frame(r,65,267,510,151,gold);
+    text(r,82,278,tr(a,"skellige_revival"),gold,1);
+    if(!candidates.empty()) {
+      const int selected=std::clamp(a.targetIndex,0,static_cast<int>(candidates.size())-1);
+      const int start=std::clamp(selected-4,0,std::max(0,static_cast<int>(candidates.size())-9));
+      for(int i=start;i<std::min(static_cast<int>(candidates.size()),start+9);++i) {
+        const int x=82+(i-start)*53;
+        const auto* card=candidates[static_cast<std::size_t>(i)];
+        box(r,x,300,49,75,i==selected?panelLight:panel); frame(r,x,300,49,75,i==selected?gold:Color{64,70,63});
+        text(r,x+4,307,shortName(card->name,7),paper,1); text(r,x+4,330,"POWER",muted,1); text(r,x+4,346,std::to_string(card->power),gold,1);
+      }
+      const auto* selectedCard=candidates[static_cast<std::size_t>(selected)];
+      text(r,82,385,selectedCard->name+"  "+std::to_string(selectedCard->power),paper,1);
+      text(r,352,385,selectedCard->agile?tr(a,"skellige_agile")+" "+tr(a,a.rowIndex==0?"melee":"ranged"):"ENTER - RETURN",muted,1);
+    }
   } else {
     text(r,18,372,tr(a,"controls"),paper,1); text(r,18,391,tr(a,"pass"),muted,1);
   static const char* rows[]={"MELEE","RANGED","SIEGE"};
@@ -325,12 +356,35 @@ void handleMatchKey(App& a,SDL_Keycode key) {
   }
   if(a.game.phase==gwent::Phase::RoundResult) {
     if(key==SDLK_RETURN||key==SDLK_x||key==SDLK_SPACE) {
-      gwent::startNextRound(a.game); a.handIndex=0; a.status=tr(a,"your_turn");
+      gwent::startNextRound(a.game); a.handIndex=0; a.rowIndex=0; a.targetIndex=0; a.status=tr(a,"your_turn");
       if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+400;
     }
     return;
   }
+  if(a.game.phase==gwent::Phase::RoundSetup) {
+    std::vector<const gwent::Card*> candidates;
+    for(const auto& card:a.game.players[0].graveyard)if(card.kind==gwent::Kind::Unit&&!card.hero&&(card.row!=gwent::Row::None||card.agile))candidates.push_back(&card);
+    if(candidates.empty())return;
+    a.targetIndex=std::clamp(a.targetIndex,0,static_cast<int>(candidates.size())-1);
+    if(key==SDLK_LEFT||key==SDLK_a)a.targetIndex=(a.targetIndex+static_cast<int>(candidates.size())-1)%static_cast<int>(candidates.size());
+    else if(key==SDLK_RIGHT||key==SDLK_d)a.targetIndex=(a.targetIndex+1)%static_cast<int>(candidates.size());
+    else if((key==SDLK_UP||key==SDLK_DOWN)&&candidates[static_cast<std::size_t>(a.targetIndex)]->agile)a.rowIndex=1-a.rowIndex;
+    else if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x) {
+      const auto* card=candidates[static_cast<std::size_t>(a.targetIndex)];
+      const auto row=card->agile?static_cast<gwent::Row>(a.rowIndex):gwent::Row::None;
+      if(gwent::chooseSkelligeRevive(a.game,0,card->id,row)) {
+        a.status="SKELLIGE REVIVED: "+card->name; a.targetIndex=0;
+        if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+450;
+      }
+    }
+    return;
+  }
   if(a.game.phase==gwent::Phase::Mulligan) {
+    if(a.game.scoiataelChoicePending) {
+      if(key==SDLK_LEFT||key==SDLK_a||key==SDLK_RIGHT||key==SDLK_d)a.game.firstPlayer=1-a.game.firstPlayer;
+      else if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x)gwent::chooseScoiataelFirstPlayer(a.game,a.game.firstPlayer);
+      return;
+    }
     auto& hand=a.game.players[0].hand;
     if(key==SDLK_LEFT||key==SDLK_a)a.handIndex=(a.handIndex+static_cast<int>(hand.size())-1)%static_cast<int>(hand.size());
     else if(key==SDLK_RIGHT||key==SDLK_d)a.handIndex=(a.handIndex+1)%static_cast<int>(hand.size());

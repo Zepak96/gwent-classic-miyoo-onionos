@@ -9,7 +9,7 @@ namespace gwent {
 enum class Row : std::uint8_t { Melee, Ranged, Siege, None };
 enum class Kind : std::uint8_t { Unit, Leader, Weather, ClearWeather, CommanderHorn, Scorch, Mardroeme, Decoy };
 enum class Faction : std::uint8_t { NorthernRealms, Nilfgaard, Scoiatael, Monsters, Skellige, Neutral };
-enum class Phase : std::uint8_t { Mulligan, PlayerTurn, OpponentTurn, RoundResult, MatchResult };
+enum class Phase : std::uint8_t { Mulligan, RoundSetup, PlayerTurn, OpponentTurn, RoundResult, MatchResult };
 
 struct Card {
   std::string id;
@@ -59,6 +59,10 @@ struct Game {
   std::array<std::array<bool, 3>, 2> horn{{{false, false, false}, {false, false, false}}};
   std::vector<ActiveWeather> weatherCards;
   bool randomRespawn{false};
+  bool scoiataelChoicePending{false};
+  int skelligeRevivesRemaining{0};
+  int skelligeRevivePlayer{-1};
+  bool factionAbilitiesInitialized{false};
   std::array<std::vector<Card>, 2> revealedCards;
   std::uint64_t rngState{1};
   std::string lastError;
@@ -78,11 +82,13 @@ void beginMatchWithLeaders(Game&, std::vector<Card> playerDeck, Card playerLeade
                            std::uint64_t seed, int firstPlayer = -1);
 bool assignLeader(Game&, int playerIndex, const Card& leader);
 void resolveLeaderPassives(Game&);
+bool chooseScoiataelFirstPlayer(Game&, int firstPlayer);
 bool activateLeader(Game&, int playerIndex, Row target = Row::None,
                     const std::vector<std::string>& selectedCardIds = {});
 bool replaceMulliganCards(Game&, int playerIndex, const std::vector<std::string>& cardIds);
 bool pass(Game&, int playerIndex);
 bool startNextRound(Game&);
+bool chooseSkelligeRevive(Game&, int playerIndex, const std::string& cardId, Row target = Row::None);
 std::string validateDeck(const std::vector<Card>& deck, Faction faction);
 std::string validateDeck(const std::vector<Card>& deck, const Card& leader, Faction faction);
 const std::vector<Card>& referenceCardCatalog();
