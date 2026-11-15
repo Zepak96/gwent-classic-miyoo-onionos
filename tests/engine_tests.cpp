@@ -350,6 +350,18 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
   assert(choiceA.pass==choiceB.pass && choiceA.cardId==choiceB.cardId && choiceA.target==choiceB.target &&
          choiceA.activateLeader==choiceB.activateLeader && choiceA.leaderSelection==choiceB.leaderSelection);
 
+  Game difficultyChoice;
+  difficultyChoice.phase=Phase::OpponentTurn;difficultyChoice.currentPlayer=1;
+  difficultyChoice.players[1].hand={unit("weak",1),unit("strong",10)};
+  const auto hardChoice=chooseAiAction(difficultyChoice,1,AiDifficulty::Hard);
+  assert(!hardChoice.pass && hardChoice.cardId=="strong");
+  for(const auto level:{AiDifficulty::Easy,AiDifficulty::Normal,AiDifficulty::Hard}) {
+    Game preview=difficultyChoice;
+    const auto action=chooseAiAction(preview,1,level);
+    assert(action.pass || action.activateLeader ||
+           playCard(preview,1,action.cardId,action.target,action.selectedCardId));
+  }
+
   Game leaderChoice;
   leaderChoice.players[0].leader.id="foltest_siegemaster";
   leaderChoice.players[0].leader.kind=Kind::Leader;
@@ -363,21 +375,23 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
   const auto& recipes=referencePremadeDecks();
   const auto deck0=makeReferenceDeck(recipes[0]);
   const auto deck1=makeReferenceDeck(recipes[2]);
-  Game game;
-  beginMatch(game,deck0,recipes[0].faction,deck1,recipes[2].faction,0x987654,0);
-  const auto aiMulligan=chooseAiMulligan(game,1);
-  assert(aiMulligan.size()<=2);
-  assert(replaceMulliganCards(game,0,{})); assert(replaceMulliganCards(game,1,aiMulligan));
-  int actions=0;
-  while(game.phase!=Phase::MatchResult && actions<500) {
-    if(game.phase==Phase::RoundResult) { assert(startNextRound(game)); continue; }
-    const int actor=game.currentPlayer;
-    const auto action=chooseAiAction(game,actor);
-    const bool ok=action.pass ? pass(game,actor) : action.activateLeader ? activateLeader(game,actor,action.target,action.leaderSelection) :
-      playCard(game,actor,action.cardId,action.target,action.selectedCardId);
-    assert(ok); ++actions;
+  for(const auto level:{AiDifficulty::Easy,AiDifficulty::Normal,AiDifficulty::Hard}) {
+    Game game;
+    beginMatch(game,deck0,recipes[0].faction,deck1,recipes[2].faction,0x987654+static_cast<int>(level),0);
+    const auto aiMulligan=chooseAiMulligan(game,1);
+    assert(aiMulligan.size()<=2);
+    assert(replaceMulliganCards(game,0,{})); assert(replaceMulliganCards(game,1,aiMulligan));
+    int actions=0;
+    while(game.phase!=Phase::MatchResult && actions<500) {
+      if(game.phase==Phase::RoundResult) { assert(startNextRound(game)); continue; }
+      const int actor=game.currentPlayer;
+      const auto action=chooseAiAction(game,actor,level);
+      const bool ok=action.pass ? pass(game,actor) : action.activateLeader ? activateLeader(game,actor,action.target,action.leaderSelection) :
+        playCard(game,actor,action.cardId,action.target,action.selectedCardId);
+      assert(ok); ++actions;
+    }
+    assert(game.phase==Phase::MatchResult && actions<500);
   }
-  assert(game.phase==Phase::MatchResult && actions<500);
 }
 static Card leader(std::string id) {
   Card card; card.id=id; card.name=id; card.kind=Kind::Leader; card.faction=Faction::NorthernRealms; card.abilities={id}; return card;

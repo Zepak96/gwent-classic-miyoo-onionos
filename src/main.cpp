@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <unordered_map>
@@ -128,8 +129,9 @@ struct App {
     int fromX{0},fromY{0},toX{0},toY{0};
     Uint32 startedAt{0};
   };
-  Screen screen{Screen::DeckBuilder};
+  Screen screen{Screen::Title};
   Language language{Language::Polish};
+  gwent::AiDifficulty aiDifficulty{gwent::AiDifficulty::Normal};
   std::size_t deckIndex{0};
   int deckSlot{1};
   bool userDeckSelected{false};
@@ -186,6 +188,7 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="opponent")return pl?"PRZECIWNIK":"OPPONENT";
   if(key=="opponent_short")return pl?"RYWAL":"OPPONENT";
   if(key=="ai")return pl?"PRZECIWNIK AI":"AI OPPONENT";
+  if(key=="difficulty")return pl?"POZIOM AI (GORA/DOL)":"AI LEVEL (UP/DOWN)";
   if(key=="language")return pl?"JEZYK":"LANGUAGE";
   if(key=="instructions")return pl?"LEWO/PRAWO - TALIA":"LEFT/RIGHT - DECK";
   if(key=="confirm")return pl?"ENTER - GRA   Z - JEZYK":"ENTER - PLAY   Z - LANGUAGE";
@@ -258,6 +261,26 @@ std::string factionName(gwent::Faction faction,bool pl) {
 }
 std::string userDeckPath(const App& a,int slot) {
   return a.dataDirectory+"deck-"+std::to_string(slot)+".gwd";
+}
+std::string difficultyName(gwent::AiDifficulty difficulty) {
+  switch(difficulty) {
+    case gwent::AiDifficulty::Easy:return "EASY";
+    case gwent::AiDifficulty::Hard:return "HARD";
+    default:return "NORMAL";
+  }
+}
+void saveSettings(const App& a) {
+  if(a.dataDirectory.empty())return;
+  std::ofstream settings(a.dataDirectory+"settings-v1.cfg",std::ios::trunc);
+  if(settings)settings<<static_cast<int>(a.language)<<' '<<static_cast<int>(a.aiDifficulty)<<'\n';
+}
+void loadSettings(App& a) {
+  if(a.dataDirectory.empty())return;
+  std::ifstream settings(a.dataDirectory+"settings-v1.cfg");
+  int language=0,difficulty=1;
+  if(!(settings>>language>>difficulty))return;
+  if(language>=0&&language<=1)a.language=static_cast<Language>(language);
+  if(difficulty>=0&&difficulty<=2)a.aiDifficulty=static_cast<gwent::AiDifficulty>(difficulty);
 }
 void playCardSound(App& a,const gwent::Card& card) {
   std::string key;
@@ -372,7 +395,7 @@ void doHumanPlay(App& a) {
 }
 void performAi(App& a) {
   if(a.game.phase!=gwent::Phase::OpponentTurn) return;
-  const auto action=gwent::chooseAiAction(a.game,1);
+  const auto action=gwent::chooseAiAction(a.game,1,a.aiDifficulty);
   bool success=false;
   if(action.pass) { success=gwent::pass(a.game,1);a.audio.play("pass");a.status=tr(a,"ai_turn")+" - PASS"; }
   else if(action.activateLeader) {
@@ -607,8 +630,8 @@ void drawDeckSelect(SDL_Renderer* r,const App& a) {
   box(r,73,174,493,1,Color{65,72,67});
   text(r,74,193,tr(a,"opponent"),muted,1);
   text(r,74,215,factionName(opponent.faction,a.language==Language::Polish)+" / "+opponentLeader.name,paper,1);
-  text(r,74,251,tr(a,"ai"),muted,1);
-  text(r,226,251,"CLASSIC",gold,1);
+  text(r,74,251,tr(a,"difficulty"),muted,1);
+  text(r,226,251,difficultyName(a.aiDifficulty),gold,1);
   text(r,74,276,tr(a,"language"),muted,1); text(r,226,276,a.language==Language::Polish?"POLSKI":"ENGLISH",gold,1);
   text(r,25,332,custom?tr(a,"deck_slot")+" "+std::to_string(a.deckSlot)+"  B: EDIT  P: PREMADE":tr(a,"instructions"),paper,1);
   text(r,119,370,tr(a,"confirm"),gold,1);
@@ -937,7 +960,12 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
     if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x||key==SDLK_SPACE)a.screen=Screen::DeckSelect;
   } else if(a.screen==Screen::DeckSelect) {
     if(key==SDLK_ESCAPE) { a.screen=Screen::Title; return; }
-    if(key==SDLK_z) { a.language=a.language==Language::Polish?Language::English:Language::Polish; return; }
+    if(key==SDLK_UP||key==SDLK_DOWN) {
+      const int direction=key==SDLK_DOWN?1:2;
+      a.aiDifficulty=static_cast<gwent::AiDifficulty>((static_cast<int>(a.aiDifficulty)+direction)%3);
+      saveSettings(a);return;
+    }
+    if(key==SDLK_z) { a.language=a.language==Language::Polish?Language::English:Language::Polish;saveSettings(a);return; }
     if(key==SDLK_r) { loadSavedMatch(a);return; }
     if(key==SDLK_b) { openDeckEditor(a);return; }
     if(key==SDLK_p) { a.userDeckSelected=false;return; }
@@ -948,7 +976,7 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
     }
     if(key==SDLK_LEFT||key==SDLK_a)a.deckIndex=(a.deckIndex+recipes().size()-1)%recipes().size();
     else if(key==SDLK_RIGHT||key==SDLK_d)a.deckIndex=(a.deckIndex+1)%recipes().size();
-    else if(key==SDLK_l)a.language=a.language==Language::Polish?Language::English:Language::Polish;
+    else if(key==SDLK_l) { a.language=a.language==Language::Polish?Language::English:Language::Polish;saveSettings(a); }
     else if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x)startMatch(a);
   } else if(a.screen==Screen::DeckBuilder) {
     if(key==SDLK_ESCAPE||key==SDLK_z) { a.screen=Screen::DeckSelect;return; }
@@ -1049,6 +1077,7 @@ int main(int argc,char** argv) {
   app.audio.play("menu_opening");
   if(char* directory=SDL_GetPrefPath("GwentClassic","MiyooMiniPlus")) {
     app.dataDirectory=directory;app.savePath=app.dataDirectory+"match-v1.gws";
+    loadSettings(app);
     if(gwent::loadUserDeck(userDeckPath(app,app.deckSlot),app.editDeck))app.userDeckSelected=true;
     else if(!recipes().empty()) { const auto& recipe=recipes().front();app.editDeck={"Deck 1",recipe.faction,recipe.leaderReferenceIndex,recipe.cardCounts};app.userDeckSelected=true; }
     SDL_free(directory);
@@ -1092,6 +1121,30 @@ int main(int argc,char** argv) {
       app.cardFlight.startedAt=SDL_GetTicks()>250?SDL_GetTicks()-250:0;
       clearFrame();drawMatchOnScreen(renderer,app);SDL_RenderPresent(renderer);
       if(!saveFrame(argv[5])) { app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 4; }
+    }
+    if(argc>6) {
+      app.screen=Screen::DeckSelect;
+      app.aiDifficulty=gwent::AiDifficulty::Normal;
+      bool smokeRunning=true;
+      handleKey(app,SDLK_DOWN,smokeRunning);
+      App settingsProbe;settingsProbe.dataDirectory=app.dataDirectory;loadSettings(settingsProbe);
+      if(app.aiDifficulty!=gwent::AiDifficulty::Hard ||
+         (!app.dataDirectory.empty() && settingsProbe.aiDifficulty!=app.aiDifficulty)) {
+        app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 6;
+      }
+      clearFrame();drawDeckSelect(renderer,app);SDL_RenderPresent(renderer);
+      if(!saveFrame(argv[6])) { app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 4; }
+    }
+    if(argc>7) {
+      app.screen=Screen::Title;
+      bool smokeRunning=true;
+      handleKey(app,SDLK_RETURN,smokeRunning);
+      if(app.screen!=Screen::DeckSelect) {
+        app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 7;
+      }
+      app.screen=Screen::Title;
+      clearFrame();drawTitle(renderer,app);SDL_RenderPresent(renderer);
+      if(!saveFrame(argv[7])) { app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 4; }
     }
     SDL_RenderPresent(renderer);
     for(auto& image:app.textures)if(image.second)SDL_DestroyTexture(image.second);

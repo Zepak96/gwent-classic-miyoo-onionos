@@ -29,7 +29,7 @@ jobs:
       - name: Decode reference SFX
         run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./build-sdl/gwent --audio-test
       - name: Frontend smoke test
-        run: SDL_VIDEODRIVER=dummy ./build-sdl/gwent --smoke-test frontend-smoke.bmp deck-builder-smoke.bmp card-details-smoke.bmp card-flight-smoke.bmp
+        run: SDL_VIDEODRIVER=dummy ./build-sdl/gwent --smoke-test frontend-smoke.bmp deck-builder-smoke.bmp card-details-smoke.bmp card-flight-smoke.bmp deck-select-smoke.bmp title-smoke.bmp
       - name: Upload frontend smoke frames
         uses: actions/upload-artifact@v4
         with:
@@ -39,5 +39,7 @@ jobs:
             deck-builder-smoke.bmp
             card-details-smoke.bmp
             card-flight-smoke.bmp
+            deck-select-smoke.bmp
+            title-smoke.bmp
           if-no-files-found: error
           retention-days: 7

@@ -12,7 +12,7 @@
 
 namespace gwent {
 namespace {
-struct WeightedAction { AiAction action; double weight{0.0}; };
+struct WeightedAction { AiAction action; double weight{0.0}; bool legal{false}; };
 struct BoardData {
   std::vector<const Card*> spies, medics, scorches;
   std::array<std::vector<const Card*>,2> graveSpies, graveMedics, graveScorches;
@@ -391,7 +391,7 @@ AiAction chooseLeaderAction(const Game& game,int who,const BoardData& data) {
 }
 }
 
-AiAction chooseAiAction(Game& game,int who) {
+AiAction chooseAiAction(Game& game,int who,AiDifficulty difficulty) {
   if(who<0||who>1||who!=game.currentPlayer||
      (game.phase!=Phase::PlayerTurn&&game.phase!=Phase::OpponentTurn))return {true,{},{},{}};
   const auto& player=game.players[who];
@@ -405,20 +405,18 @@ AiAction chooseAiAction(Game& game,int who) {
   for(const auto& card:player.hand) {
     const auto choice=cardAction(game,who,card,data);
     int weight=std::max(0,weightCard(game,who,card,data));
-    if(weight>0) {
-      Game preview=game;
-      if(!playCard(preview,who,choice.cardId,choice.target,choice.selectedCardId))weight=0;
-    }
-    actions.push_back({choice,static_cast<double>(weight)});
+    Game preview=game;
+    const bool legal=playCard(preview,who,choice.cardId,choice.target,choice.selectedCardId);
+    if(!legal)weight=0;
+    actions.push_back({choice,static_cast<double>(weight),legal});
   }
   if(player.leaderAbilityAvailable && !player.leader.abilities.empty()) {
     const auto choice=chooseLeaderAction(game,who,data);
     int weight=std::max(0,weightLeader(game,who,data,player.leader.abilities.front()));
-    if(weight>0) {
-      Game preview=game;
-      if(!activateLeader(preview,who,choice.target,choice.leaderSelection))weight=0;
-    }
-    actions.push_back({choice,static_cast<double>(weight)});
+    Game preview=game;
+    const bool legal=activateLeader(preview,who,choice.target,choice.leaderSelection);
+    if(!legal)weight=0;
+    actions.push_back({choice,static_cast<double>(weight),legal});
   }
   double passWeight=0.0;
   if(2-player.roundLosses>1) {
@@ -427,7 +425,28 @@ AiAction chooseAiAction(Game& game,int who) {
     else if(difference < -30 && static_cast<int>(opponent.hand.size())-static_cast<int>(player.hand.size())>2)passWeight=100;
     else passWeight=std::abs(difference);
   }
-  actions.push_back({AiAction{true,{},{},{}},passWeight});
+  actions.push_back({AiAction{true,{},{},{}},passWeight,true});
+
+  if(difficulty==AiDifficulty::Easy) {
+    const bool alreadyAhead=player.score>opponent.score ||
+      (player.score==opponent.score && player.faction==Faction::Nilfgaard);
+    if(opponent.passed && alreadyAhead)return actions.back().action;
+    std::vector<const AiAction*> playable;
+    for(const auto& action:actions)if(action.legal&&!action.action.pass)playable.push_back(&action.action);
+    if(playable.empty())return actions.back().action;
+    // Easy makes occasional low-risk strategic mistakes but still submits
+    // only actions that the engine has verified as legal.
+    if(!opponent.passed && roll(game)%6==0)return actions.back().action;
+    return *playable[roll(game)%playable.size()];
+  }
+  if(difficulty==AiDifficulty::Hard) {
+    const WeightedAction* best=nullptr;
+    for(const auto& action:actions) {
+      if(!action.legal)continue;
+      if(!best || action.weight>best->weight)best=&action;
+    }
+    if(best && (best->weight>0 || best->action.pass))return best->action;
+  }
   double total=0;
   for(const auto& action:actions)total+=action.weight;
   if(total<=0) {
