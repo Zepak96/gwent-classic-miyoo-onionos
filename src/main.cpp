@@ -2,10 +2,12 @@
 #include "gwent/ai.hpp"
 #include "gwent/catalog.hpp"
 #include "gwent/game.hpp"
+#include "gwent/save.hpp"
 #include <algorithm>
 #include <array>
 #include <cctype>
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -85,6 +87,7 @@ struct App {
   bool targetMode{false};
   std::vector<std::string> selectedTargets;
   std::vector<std::string> mulligan;
+  std::string savePath;
   std::string status{"PRESS ENTER"};
   Uint32 aiAt{0};
 };
@@ -117,7 +120,25 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="defeat")return pl?"PRZEGRANA":"DEFEAT";
   if(key=="victory")return pl?"ZWYCIESTWO":"VICTORY";
   if(key=="target")return pl?"WYBIERZ CEL ENTEREM, ESC ANULUJE":"CHOOSE TARGET WITH ENTER, ESC CANCELS";
+  if(key=="resume")return pl?"R - WCZYTAJ ZAPIS   ESC - WSTECZ":"R - RESUME SAVE   ESC - BACK";
+  if(key=="save_controls")return pl?"SELECT/S - ZAPISZ   START/O - WCZYTAJ":"SELECT/S - SAVE   START/O - LOAD";
+  if(key=="saved")return pl?"ZAPISANO":"GAME SAVED";
+  if(key=="loaded")return pl?"WCZYTANO ZAPIS":"SAVE LOADED";
+  if(key=="no_save")return pl?"BRAK POPRAWNEGO ZAPISU":"NO VALID SAVE FOUND";
   return key;
+}
+bool loadSavedMatch(App& a) {
+  gwent::Game restored;std::string error;
+  if(a.savePath.empty()||!gwent::loadGame(a.savePath,restored,&error)) { a.status=tr(a,"no_save");return false; }
+  a.game=std::move(restored);a.screen=Screen::Match;a.handIndex=0;a.rowIndex=0;a.targetIndex=0;
+  a.targetMode=false;a.selectedTargets.clear();a.mulligan.clear();a.status=tr(a,"loaded");
+  if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+400;
+  return true;
+}
+void saveCurrentMatch(App& a) {
+  std::string error;
+  if(a.screen!=Screen::Match||a.savePath.empty()||!gwent::saveGame(a.savePath,a.game,&error))a.status="SAVE ERROR";
+  else a.status=tr(a,"saved");
 }
 std::string factionName(gwent::Faction faction,bool pl) {
   switch(faction) {
@@ -257,7 +278,7 @@ void drawDeckSelect(SDL_Renderer* r,const App& a) {
   text(r,74,276,tr(a,"language"),muted,1); text(r,226,276,a.language==Language::Polish?"POLSKI":"ENGLISH",gold,1);
   text(r,25,332,tr(a,"instructions"),paper,1);
   text(r,119,370,tr(a,"confirm"),gold,1);
-  text(r,170,414,"ESC - BACK",muted,1);
+  text(r,170,414,tr(a,"resume"),muted,1);
 }
 void drawMatch(SDL_Renderer* r,const App& a) {
   box(r,0,0,W,H,ink);
@@ -336,9 +357,12 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     }
   } else {
     text(r,18,372,tr(a,"controls"),paper,1); text(r,18,391,tr(a,"pass"),muted,1);
-  static const char* rows[]={"MELEE","RANGED","SIEGE"};
-  text(r,18,415,"ROW: "+std::string(rows[a.rowIndex]),gold,1);
   }
+  if(a.game.phase!=gwent::Phase::RoundSetup) {
+    static const char* rows[]={"MELEE","RANGED","SIEGE"};
+    text(r,18,415,"ROW: "+std::string(rows[a.rowIndex]),gold,1);
+  }
+  text(r,18,433,tr(a,"save_controls"),muted,1);
   if(a.game.phase==gwent::Phase::RoundResult || a.game.phase==gwent::Phase::MatchResult) {
     box(r,115,153,410,110,ink); frame(r,115,153,410,110,gold);
     const bool done=a.game.phase==gwent::Phase::MatchResult;
@@ -350,6 +374,8 @@ void drawMatch(SDL_Renderer* r,const App& a) {
 }
 void handleMatchKey(App& a,SDL_Keycode key) {
   if(key==SDLK_ESCAPE) { a.screen=Screen::DeckSelect; a.targetMode=false; return; }
+  if(key==SDLK_s||key==SDLK_F5) { saveCurrentMatch(a);return; }
+  if(key==SDLK_o||key==SDLK_F9) { loadSavedMatch(a);return; }
   if(a.game.phase==gwent::Phase::MatchResult) {
     if(key==SDLK_RETURN||key==SDLK_x||key==SDLK_SPACE) { a.screen=Screen::DeckSelect; return; }
     return;
@@ -438,6 +464,7 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
   } else if(a.screen==Screen::DeckSelect) {
     if(key==SDLK_ESCAPE) { a.screen=Screen::Title; return; }
     if(key==SDLK_z) { a.language=a.language==Language::Polish?Language::English:Language::Polish; return; }
+    if(key==SDLK_r) { loadSavedMatch(a);return; }
     if(key==SDLK_LEFT||key==SDLK_a)a.deckIndex=(a.deckIndex+recipes().size()-1)%recipes().size();
     else if(key==SDLK_RIGHT||key==SDLK_d)a.deckIndex=(a.deckIndex+1)%recipes().size();
     else if(key==SDLK_l)a.language=a.language==Language::Polish?Language::English:Language::Polish;
@@ -447,7 +474,9 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
 }
 
 int main(int argc,char** argv) {
-  if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_EVENTS|SDL_INIT_TIMER)!=0)return 1;
+  if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_EVENTS|SDL_INIT_TIMER|SDL_INIT_GAMECONTROLLER)!=0)return 1;
+  SDL_GameControllerEventState(SDL_ENABLE);
+  for(int index=0;index<SDL_NumJoysticks();++index)if(SDL_IsGameController(index))SDL_GameControllerOpen(index);
   SDL_Window* window=SDL_CreateWindow("Gwent Classic - Witcher 3",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,W,H,SDL_WINDOW_SHOWN);
   if(!window){SDL_Quit();return 2;}
   SDL_Renderer* renderer=SDL_CreateRenderer(window,-1,SDL_RENDERER_ACCELERATED|SDL_RENDERER_PRESENTVSYNC);
@@ -455,6 +484,7 @@ int main(int argc,char** argv) {
   if(!renderer){SDL_DestroyWindow(window);SDL_Quit();return 3;}
   SDL_RenderSetLogicalSize(renderer,W,H);
   App app; bool running=true;
+  if(char* directory=SDL_GetPrefPath("GwentClassic","MiyooMiniPlus")) { app.savePath=std::string(directory)+"match-v1.gws";SDL_free(directory); }
   if(argc>1 && std::string(argv[1])=="--smoke-test") {
     drawTitle(renderer,app); SDL_RenderPresent(renderer);
     app.screen=Screen::DeckSelect; drawDeckSelect(renderer,app); SDL_RenderPresent(renderer);
@@ -477,6 +507,13 @@ int main(int argc,char** argv) {
     while(SDL_PollEvent(&event)) {
       if(event.type==SDL_QUIT)running=false;
       else if(event.type==SDL_KEYDOWN&&!event.key.repeat)handleKey(app,event.key.keysym.sym,running);
+      else if(event.type==SDL_CONTROLLERBUTTONDOWN) {
+        if(event.cbutton.button==SDL_CONTROLLER_BUTTON_BACK&&app.screen==Screen::Match)saveCurrentMatch(app);
+        else if(event.cbutton.button==SDL_CONTROLLER_BUTTON_START) {
+          if(app.screen==Screen::Match)loadSavedMatch(app);
+          else handleKey(app,SDLK_RETURN,running);
+        }
+      }
     }
     if(app.screen==Screen::Match && app.game.phase==gwent::Phase::OpponentTurn && SDL_GetTicks()>=app.aiAt)performAi(app);
     if(app.screen==Screen::Title)drawTitle(renderer,app);

@@ -1,8 +1,11 @@
 #include "gwent/game.hpp"
 #include "gwent/catalog.hpp"
 #include "gwent/ai.hpp"
+#include "gwent/save.hpp"
 #include <algorithm>
 #include <cassert>
+#include <filesystem>
+#include <fstream>
 #include <utility>
 
 using namespace gwent;
@@ -135,6 +138,43 @@ static void factionStartAndSkelligeRoundThree() {
   int aiRetained=0;
   for(const auto& row:aiSkellige.players[1].board)aiRetained+=static_cast<int>(row.size());
   assert(aiRetained==2);
+}
+static void saveRoundTripAndCorruptionHandling() {
+  Game original;
+  original.phase=Phase::RoundSetup; original.currentPlayer=1; original.firstPlayer=1; original.round=3;
+  original.weather={true,false,true}; original.horn[1]={false,true,false};
+  original.randomRespawn=true; original.scoiataelChoicePending=false;
+  original.skelligeRevivesRemaining=1; original.skelligeRevivePlayer=0; original.factionAbilitiesInitialized=true;
+  original.rngState=0x12345678; original.lastError="persisted diagnostic";
+  auto card=unit("save-card",9,Row::None); card.agile=true; card.spy=true; card.group="save-group";
+  card.abilities={"spy","agile","morale"}; card.referenceIndex=42; card.deckCopies=3;
+  original.players[0].hand={card}; original.players[0].deck={unit("save-deck",4)};
+  original.players[0].graveyard={unit("save-grave",7)}; original.players[0].board[1]={unit("save-board",6,Row::Ranged)};
+  original.players[0].leader.id="save-leader"; original.players[0].leader.kind=Kind::Leader;
+  original.players[0].faction=Faction::Skellige;
+  original.players[0].leaderAbilityAvailable=true; original.players[0].roundWins=1; original.players[0].roundLosses=1;
+  Card weather; weather.id="save-weather"; weather.name="Skellige Storm"; weather.kind=Kind::Weather; weather.abilities={"storm","rain","fog"};
+  original.weatherCards={{weather,1}}; original.revealedCards[0]={card};
+  const auto path=(std::filesystem::temp_directory_path()/"gwent-classic-save-test.gws").string();
+  std::error_code ignored;std::filesystem::remove(path,ignored);std::filesystem::remove(path+".tmp",ignored);
+  std::string error;
+  assert(saveGame(path,original,&error));
+  Game restored;
+  assert(loadGame(path,restored,&error));
+  assert(restored.phase==original.phase && restored.currentPlayer==1 && restored.firstPlayer==1 && restored.round==3);
+  assert(restored.players[0].hand.size()==1 && restored.players[0].hand[0].id=="save-card");
+  assert(restored.players[0].hand[0].abilities==card.abilities && restored.players[0].hand[0].referenceIndex==42);
+  assert(restored.players[0].board[1][0].id=="save-board" && restored.players[0].leader.id=="save-leader");
+  assert(restored.weather==original.weather && restored.horn==original.horn && restored.weatherCards[0].card.name=="Skellige Storm");
+  assert(restored.skelligeRevivesRemaining==1 && restored.skelligeRevivePlayer==0 && restored.rngState==original.rngState);
+  {
+    std::fstream file(path,std::ios::binary|std::ios::in|std::ios::out);
+    file.seekg(-1,std::ios::end);char byte=0;file.read(&byte,1);byte=static_cast<char>(byte^0x5a);file.seekp(-1,std::ios::end);file.write(&byte,1);
+  }
+  Game preserved;preserved.round=2;preserved.lastError="must remain intact";
+  assert(!loadGame(path,preserved,&error));
+  assert(preserved.round==2 && preserved.lastError=="must remain intact");
+  std::filesystem::remove(path,ignored);std::filesystem::remove(path+".tmp",ignored);
 }
 static void abilitiesAndValidation() {
   Game spy; auto s=unit("spy",3); s.spy=true; spy.players[0].hand.push_back(s);
@@ -394,4 +434,4 @@ static void leaderAbilities() {
   assert(crach.players[0].deck.size()==1 && crach.players[1].deck.size()==1);
   assert(crach.players[0].graveyard.empty() && crach.players[1].graveyard.empty());
 }
-int main() { scoreRules(); turnsAndRounds(); factionStartAndSkelligeRoundThree(); abilitiesAndValidation(); openingHandAndMulligan(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); avengerCards(); leaderAbilities(); }
+int main() { scoreRules(); turnsAndRounds(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); abilitiesAndValidation(); openingHandAndMulligan(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); avengerCards(); leaderAbilities(); }
