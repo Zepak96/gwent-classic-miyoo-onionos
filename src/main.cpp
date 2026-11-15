@@ -945,7 +945,7 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     }
   } else if(a.game.phase==gwent::Phase::RoundSetup) {
     std::vector<const gwent::Card*> candidates;
-    for(const auto& card:me.graveyard)if(card.kind==gwent::Kind::Unit&&!card.hero&&(card.row!=gwent::Row::None||card.agile))candidates.push_back(&card);
+    for(const auto& card:me.graveyard)if(std::find(a.game.skelligeAgileReviveIds.begin(),a.game.skelligeAgileReviveIds.end(),card.id)!=a.game.skelligeAgileReviveIds.end())candidates.push_back(&card);
     box(r,0,0,W,STAGE_H,Color{0,0,0,195});frame(r,0,0,W,STAGE_H,Color{20,20,20});
     text(r,170,26,tr(a,"skellige_revival"),gold,1);
     if(!candidates.empty()) {
@@ -1150,7 +1150,7 @@ void handleMatchKey(App& a,SDL_Keycode key) {
   }
   if(a.game.phase==gwent::Phase::RoundSetup) {
     std::vector<const gwent::Card*> candidates;
-    for(const auto& card:a.game.players[0].graveyard)if(card.kind==gwent::Kind::Unit&&!card.hero&&(card.row!=gwent::Row::None||card.agile))candidates.push_back(&card);
+    for(const auto& card:a.game.players[0].graveyard)if(std::find(a.game.skelligeAgileReviveIds.begin(),a.game.skelligeAgileReviveIds.end(),card.id)!=a.game.skelligeAgileReviveIds.end())candidates.push_back(&card);
     if(candidates.empty())return;
     a.targetIndex=std::clamp(a.targetIndex,0,static_cast<int>(candidates.size())-1);
     if(key==SDLK_LEFT||key==SDLK_a)a.targetIndex=(a.targetIndex+static_cast<int>(candidates.size())-1)%static_cast<int>(candidates.size());

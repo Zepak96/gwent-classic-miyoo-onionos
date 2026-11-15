@@ -146,19 +146,22 @@ static void factionStartAndSkelligeRoundThree() {
   Game skellige;
   skellige.phase=Phase::RoundResult; skellige.round=2; skellige.firstPlayer=0;
   skellige.players[0].faction=Faction::Skellige;
-  skellige.players[0].graveyard.push_back(unit("skellige-normal",5,Row::Siege));
   auto agile=unit("skellige-agile",7,Row::None); agile.agile=true;
-  skellige.players[0].graveyard.push_back(agile);
+  auto agile2=unit("skellige-agile-2",4,Row::None); agile2.agile=true;
+  skellige.players[0].graveyard={agile,agile2};
   assert(startNextRound(skellige));
   assert(skellige.round==3 && skellige.phase==Phase::RoundSetup && skellige.skelligeRevivesRemaining==2);
   skellige.players[0].hand.push_back(unit("blocked-during-setup",1));
   assert(!playCard(skellige,0,"blocked-during-setup") && !pass(skellige,0));
   assert(!chooseSkelligeRevive(skellige,0,"skellige-agile",Row::None));
-  assert(chooseSkelligeRevive(skellige,0,"skellige-agile",Row::Ranged));
+  const auto chosenAgile=skellige.skelligeAgileReviveIds.front();
+  assert(!chooseSkelligeRevive(skellige,0,"not-a-selected-card",Row::Ranged));
+  assert(chooseSkelligeRevive(skellige,0,chosenAgile,Row::Ranged));
   assert(skellige.skelligeRevivesRemaining==1 && skellige.players[0].board[1].size()==1);
-  assert(chooseSkelligeRevive(skellige,0,"skellige-normal"));
+  const auto secondAgile=skellige.skelligeAgileReviveIds.front();
+  assert(chooseSkelligeRevive(skellige,0,secondAgile,Row::Melee));
   assert(skellige.skelligeRevivesRemaining==0 && skellige.phase==Phase::PlayerTurn);
-  assert(skellige.players[0].board[2].size()==1 && skellige.players[0].graveyard.empty());
+  assert(skellige.players[0].board[0].size()==1 && skellige.players[0].graveyard.empty());
 
   Game aiSkellige;
   aiSkellige.phase=Phase::RoundResult; aiSkellige.round=2; aiSkellige.players[1].faction=Faction::Skellige;
@@ -174,12 +177,12 @@ static void saveRoundTripAndCorruptionHandling() {
   original.phase=Phase::RoundSetup; original.currentPlayer=1; original.firstPlayer=1; original.round=3;
   original.weather={true,false,true}; original.horn[1]={false,true,false};
   original.randomRespawn=true; original.scoiataelChoicePending=false;
-  original.skelligeRevivesRemaining=1; original.skelligeRevivePlayer=0; original.factionAbilitiesInitialized=true;
+  original.skelligeRevivesRemaining=1; original.skelligeRevivePlayer=0; original.skelligeAgileReviveIds={"save-agile"}; original.factionAbilitiesInitialized=true;
   original.rngState=0x12345678; original.lastError="persisted diagnostic";
   auto card=unit("save-card",9,Row::None); card.agile=true; card.spy=true; card.group="save-group";
   card.abilities={"spy","agile","morale"}; card.referenceIndex=42; card.deckCopies=3;
   original.players[0].hand={card}; original.players[0].deck={unit("save-deck",4)};
-  original.players[0].graveyard={unit("save-grave",7)}; original.players[0].board[1]={unit("save-board",6,Row::Ranged)};
+  original.players[0].graveyard={unit("save-grave",7)};auto saveAgile=unit("save-agile",5,Row::None);saveAgile.agile=true;original.players[0].graveyard.push_back(saveAgile);original.players[0].board[1]={unit("save-board",6,Row::Ranged)};
   original.players[0].leader.id="save-leader"; original.players[0].leader.kind=Kind::Leader;
   original.players[0].faction=Faction::Skellige;
   original.players[0].leaderAbilityAvailable=true; original.players[0].roundWins=1; original.players[0].roundLosses=1;
@@ -196,7 +199,7 @@ static void saveRoundTripAndCorruptionHandling() {
   assert(restored.players[0].hand[0].abilities==card.abilities && restored.players[0].hand[0].referenceIndex==42);
   assert(restored.players[0].board[1][0].id=="save-board" && restored.players[0].leader.id=="save-leader");
   assert(restored.weather==original.weather && restored.horn==original.horn && restored.weatherCards[0].card.name=="Skellige Storm");
-  assert(restored.skelligeRevivesRemaining==1 && restored.skelligeRevivePlayer==0 && restored.rngState==original.rngState);
+  assert(restored.skelligeRevivesRemaining==1 && restored.skelligeRevivePlayer==0 && restored.skelligeAgileReviveIds==original.skelligeAgileReviveIds && restored.rngState==original.rngState);
   {
     std::fstream file(path,std::ios::binary|std::ios::in|std::ios::out);
     file.seekg(-1,std::ios::end);char byte=0;file.read(&byte,1);byte=static_cast<char>(byte^0x5a);file.seekp(-1,std::ios::end);file.write(&byte,1);

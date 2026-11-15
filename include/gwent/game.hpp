@@ -62,6 +62,7 @@ struct Game {
   bool scoiataelChoicePending{false};
   int skelligeRevivesRemaining{0};
   int skelligeRevivePlayer{-1};
+  std::vector<std::string> skelligeAgileReviveIds;
   bool factionAbilitiesInitialized{false};
   std::array<std::vector<Card>, 2> revealedCards;
   std::uint64_t rngState{1};

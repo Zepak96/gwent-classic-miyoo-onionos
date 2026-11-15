@@ -581,25 +581,34 @@ bool startNextRound(Game& g) {
   }
   g.skelligeRevivesRemaining=0;
   g.skelligeRevivePlayer=-1;
+  g.skelligeAgileReviveIds.clear();
   if (g.round == 3) for (int owner=0;owner<2;++owner) {
     auto& player=g.players[owner];
     if(player.faction!=Faction::Skellige)continue;
     int available=static_cast<int>(std::count_if(player.graveyard.begin(),player.graveyard.end(),isCombatUnit));
     const int count=std::min(2,available);
-    if(owner==0 && count>0) {
-      g.skelligeRevivePlayer=owner;
-      g.skelligeRevivesRemaining=count;
-      continue;
-    }
+    std::vector<Card> selected;
     for(int revived=0;revived<count;++revived) {
       std::vector<int> units;
       for(int i=0;i<static_cast<int>(player.graveyard.size());++i)
         if(isCombatUnit(player.graveyard[i]))units.push_back(i);
       const int chosen=units[nextRandom(g)%units.size()];
       Card unit=player.graveyard[chosen]; player.graveyard.erase(player.graveyard.begin()+chosen);
-      const int row=unit.agile?agileTargetRow(g,owner,unit):rowIndex(unit.row);
-      player.board[row].push_back(unit);
+      selected.push_back(std::move(unit));
     }
+    for(auto& unit:selected) {
+      if(owner==0 && unit.agile) {
+        g.skelligeAgileReviveIds.push_back(unit.id);
+        player.graveyard.push_back(std::move(unit));
+      } else {
+        const int row=unit.agile?agileTargetRow(g,owner,unit):rowIndex(unit.row);
+        player.board[row].push_back(std::move(unit));
+      }
+    }
+  }
+  if(!g.skelligeAgileReviveIds.empty()) {
+    g.skelligeRevivesRemaining=static_cast<int>(g.skelligeAgileReviveIds.size());
+    g.skelligeRevivePlayer=0;
   }
   g.currentPlayer = g.firstPlayer;
   g.phase = g.skelligeRevivesRemaining>0 ? Phase::RoundSetup :
@@ -611,9 +620,10 @@ bool startNextRound(Game& g) {
 bool chooseSkelligeRevive(Game& g,int who,const std::string& cardId,Row target) {
   if(g.phase!=Phase::RoundSetup || who!=g.skelligeRevivePlayer || who<0 || who>1 ||
      g.skelligeRevivesRemaining<=0)return false;
+  if(std::find(g.skelligeAgileReviveIds.begin(),g.skelligeAgileReviveIds.end(),cardId)==g.skelligeAgileReviveIds.end())return false;
   auto& grave=g.players[who].graveyard;
   const auto found=findCard(grave,cardId);
-  if(found==grave.end() || !isCombatUnit(*found))return false;
+  if(found==grave.end() || !isCombatUnit(*found) || !found->agile)return false;
   int row=rowIndex(found->row);
   if(found->agile) {
     if(target!=Row::Melee && target!=Row::Ranged)return false;
@@ -622,9 +632,11 @@ bool chooseSkelligeRevive(Game& g,int who,const std::string& cardId,Row target) 
   const Card revived=*found;
   grave.erase(found);
   g.players[who].board[row].push_back(revived);
+  g.skelligeAgileReviveIds.erase(std::find(g.skelligeAgileReviveIds.begin(),g.skelligeAgileReviveIds.end(),cardId));
   --g.skelligeRevivesRemaining;
   if(g.skelligeRevivesRemaining==0) {
     g.skelligeRevivePlayer=-1;
+    g.skelligeAgileReviveIds.clear();
     g.phase=g.currentPlayer==0?Phase::PlayerTurn:Phase::OpponentTurn;
   }
   recompute(g);
