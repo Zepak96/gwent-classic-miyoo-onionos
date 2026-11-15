@@ -4,7 +4,7 @@ Data raportu: 2026-11-15.
 
 ## Wynik
 
-Testy automatyczne C++ obejmują punktowanie, pogodę, róg, Bohaterów, Morale, Więź (3 kopie), pasowanie, remis, Nilfgaard, Szpiega, Medyka, Manekina, Zbiórkę, rozdanie i wymianę kart, walidację talii oraz generowanie katalogu/talii. Commit `b474ce1` został zbudowany w GitHub Actions i zaliczył 2/2 testy (`engine_rules`, `card_catalog`). Bieżące lokalne zmiany dodają 10 receptur talii do wygenerowanego C++ i dodatkowe testy; czekają na kolejny wynik CI. Testy nadal nie pokrywają wszystkich kart i zasad.
+Testy automatyczne C++ obejmują punktowanie, pogodę, róg, Bohaterów, Morale, Więź (3 kopie), pasowanie, remis, Nilfgaard, Szpiega, Medyka, Manekina, Zbiórkę, Mardroeme/Berserker, Scorch, rozdanie i wymianę kart, walidację talii, katalog oraz 10 talii referencyjnych z liderami. Commit `7e41eff` został zbudowany w GitHub Actions i zaliczył 2/2 testy (`engine_rules`, `card_catalog`). Testy nadal nie pokrywają wszystkich kart, AI, UI ani wydania ARM.
 
 | Obszar | Status | Uwagi |
 |---|---|---|
