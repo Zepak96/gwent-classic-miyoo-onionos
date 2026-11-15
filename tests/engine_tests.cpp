@@ -249,6 +249,16 @@ static void abilitiesAndValidation() {
   assert(playCard(muster,0,"muster1"));
   assert(muster.players[0].deck.empty() && muster.players[0].board[0].size()==1 && muster.players[0].board[1].size()==1);
 
+  Game roachMuster;
+  Card geralt = referenceCard("Geralt of Rivia");
+  Card roach = referenceCard("Roach");
+  roachMuster.players[0].hand.push_back(geralt);
+  roachMuster.players[0].deck.push_back(roach);
+  assert(playCard(roachMuster,0,geralt.id));
+  assert(roachMuster.players[0].deck.empty());
+  assert(std::any_of(roachMuster.players[0].board[0].begin(),roachMuster.players[0].board[0].end(),
+                     [](const Card& card){return card.name=="Roach";}));
+
   Game weather; Card frost; frost.id="frost"; frost.kind=Kind::Weather; frost.abilities={"frost"};
   weather.players[0].hand.push_back(frost); weather.players[0].board[0].push_back(unit("cold",8));
   assert(playCard(weather,0,"frost"));
