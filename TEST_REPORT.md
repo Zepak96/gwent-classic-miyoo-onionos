@@ -2,6 +2,14 @@
 
 Data raportu: 2026-11-15.
 
+## Mulligan, muzyka tła i aktualizacja SD — 15.11.2026
+
+- Naprawiono obsługę Start podczas mulliganu: nie otwiera pauzy, tylko zatwierdza wybór lub pomija wymianę. A zaznacza kartę, Y zatwierdza/pomija, X otwiera inspektor. Ekran pokazuje liczbę pozostałych wymian oraz podpowiedzi przy dolnej krawędzi.
+- Dwa utwory dostarczone przez właścicielkę projektu są odtwarzane w pętli: `menu.mp3` na ekranach menu i talii, `match.mp3` podczas meczu. Przełączanie ścieżek i dekodowanie obu MP3 są częścią `--audio-test`; efekty dźwiękowe nadal przechodzą dekodowanie.
+- Weryfikacja lokalna: CTest 2/2, `--audio-test`, `--input-test`, smoke UI 640×480 (w tym ekran mulliganu). GitHub Actions dla commita `1df0c3740e85cca7a5e5aca826b54e7d2b9cdff8`: desktop #43753875815 i ARM package #43753875880 — sukces.
+- ARM hard-float ZIP SHA-256: `273c7c80e1ee44df75b1ada8adc1519758d50816f822c933a15f53afd20855e5`. Zainstalowano na karcie `E:` bez kasowania plików; wszystkie 602 pliki gry z ZIP-a zgodne SHA-256, 0 brakujących/rozbieżnych; skrót `GwentClassic.port` zachowany. Hash zainstalowanej gry: `dda094d69a0d2afea52f5bb19a8ba4e2159a917550b299ae4b19e057cdadce5f`.
+- Fizyczny start gry, przyciski Miyoo i odsłuch muzyki nadal wymagają potwierdzenia na konsoli.
+
 ## Regresja Więzi i aktualizacja karty — 15.11.2026
 
 - Naprawiono błędne liczenie Tight Bond: zgodnie z opisem w referencyjnym `abilities.js`, dwie lub więcej kart o identycznej nazwie podwajają siłę; trzecia i kolejna kopia nie zwiększa mnożnika. Poprzedni test oczekiwał niepoprawnego mnożenia x3 i został skorygowany.
