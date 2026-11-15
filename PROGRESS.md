@@ -24,7 +24,9 @@ Docelowa gra to wyłącznie Gwint jako minigra w Wiedźminie 3: Wild Hunt, z zaw
 - [~] Model danych kart i graczy; podstawowe punktowanie z pogodą, rogiem, Morale, Więzią i immunitetem Bohaterów.
 - [~] Szpieg, Medyk, Manekin, Zbiórka, Pożoga, pasowanie, remis, przejście rundy i wstępne zdolności frakcji.
 - [~] Rozdanie 10 kart z deterministycznie tasowanej talii oraz jednorazowa wymiana do 2 kart dla każdego gracza.
-- [~] Zaimportowany katalog 216 rekordów; natywny silnik nie odtwarza jeszcze wszystkich rekordów/zdolności.
+- [~] Zaimportowany katalog 216 rekordów; generator kompiluje go jako 258 instancji/rekordów do natywnego builda.
+- [~] Dodatkowe zdolności z danych: row-specific Scorch, Mardroeme/Berserker, Dandelion oraz obsługa leaderów w katalogu.
+- [ ] Wczytywanie kart z katalogu w menu, pełny zestaw zdolności i wszystkich liderów.
 - [~] Rozdanie 10 kart z deterministycznie tasowanej talii oraz jednorazowa wymiana do 2 kart dla każdego gracza.
 - [ ] Pełna weryfikacja obliczeń (w tym zachowania 3+ kart Więzi) względem Wiedźmina 3 na ustalonym buildzie.
 - [ ] Pełny katalog kart zweryfikowany z ustalonym profilem wersji.

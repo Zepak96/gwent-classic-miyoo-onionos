@@ -2,11 +2,12 @@
 #include <array>
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace gwent {
 enum class Row : std::uint8_t { Melee, Ranged, Siege, None };
-enum class Kind : std::uint8_t { Unit, Weather, ClearWeather, CommanderHorn, Scorch, Decoy };
+enum class Kind : std::uint8_t { Unit, Leader, Weather, ClearWeather, CommanderHorn, Scorch, Mardroeme, Decoy };
 enum class Faction : std::uint8_t { NorthernRealms, Nilfgaard, Scoiatael, Monsters, Skellige, Neutral };
 enum class Phase : std::uint8_t { Mulligan, PlayerTurn, OpponentTurn, RoundResult, MatchResult };
 
@@ -24,8 +25,13 @@ struct Card {
   bool morale{false};
   bool bond{false};
   bool muster{false};
+  bool berserker{false};
   std::string group;
+  std::vector<std::string> abilities;
+  int referenceIndex{-1};
+  int deckCopies{1};
 };
+struct ActiveWeather { Card card; int owner{0}; };
 struct Player {
   std::vector<Card> deck, hand, graveyard;
   std::array<std::vector<Card>, 3> board;
@@ -44,7 +50,8 @@ struct Game {
   int matchWinner{-1}; // -1 while active; 0/1 for winner; 2 for a drawn match.
   int round{1};
   std::array<bool, 3> weather{false, false, false};
-  std::array<bool, 3> horn{false, false, false};
+  std::array<std::array<bool, 3>, 2> horn{{{false, false, false}, {false, false, false}}};
+  std::vector<ActiveWeather> weatherCards;
   std::uint64_t rngState{1};
   std::string lastError;
 };
@@ -55,9 +62,12 @@ bool playCard(Game&, int playerIndex, const std::string& cardId, Row target = Ro
               const std::string& selectedCardId = {});
 void beginMatch(Game&, std::vector<Card> playerDeck, Faction playerFaction,
                 std::vector<Card> opponentDeck, Faction opponentFaction,
-                std::uint64_t seed, int firstPlayer = 0);
+                std::uint64_t seed, int firstPlayer = -1);
 bool replaceMulliganCards(Game&, int playerIndex, const std::vector<std::string>& cardIds);
 bool pass(Game&, int playerIndex);
 bool startNextRound(Game&);
 std::string validateDeck(const std::vector<Card>& deck, Faction faction);
+std::string validateDeck(const std::vector<Card>& deck, const Card& leader, Faction faction);
+const std::vector<Card>& referenceCardCatalog();
+std::vector<Card> makeReferenceDeck(const std::vector<std::pair<int, int>>& cardCounts);
 }

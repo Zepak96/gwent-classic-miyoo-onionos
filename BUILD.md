@@ -6,7 +6,7 @@ Projekt używa C++17 i CMake. Konfiguracja zakłada opcjonalny frontend SDL2 i n
 
 ## Desktop
 
-Wymagania: CMake 3.16+, kompilator C++17, SDL2. Z katalogu projektu:
+Wymagania: CMake 3.16+, kompilator C++17, Python 3, SDL2. Python generuje natywny katalog kart na etapie kompilacji. Z katalogu projektu:
 
 ```sh
 cmake -S . -B build -DGWENT_WITH_SDL=ON

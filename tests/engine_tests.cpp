@@ -1,4 +1,5 @@
 #include "gwent/game.hpp"
+#include "gwent/catalog.hpp"
 #include <algorithm>
 #include <cassert>
 #include <utility>
@@ -15,6 +16,11 @@ static void scoreRules() {
   assert(calculateScore(p, {true,false,false}, {false,false,false}) == 1);
   assert(calculateScore(p, {false,false,false}, {true,false,false}) == 16);
 
+  Player rowA, rowB;
+  rowA.board[0].push_back(unit("a-4",4)); rowB.board[0].push_back(unit("b-5",5));
+  assert(calculateScore(rowA,{false,false,false},{true,false,false})==8);
+  assert(calculateScore(rowB,{false,false,false},{false,false,false})==5); // a horn only affects its owner's side
+
   auto hero = unit("hero", 10); hero.hero = true;
   p.board[0].push_back(hero);
   assert(calculateScore(p, {true,false,false}, {true,false,false}) == 12); // weather and horn do not affect Heroes
@@ -23,6 +29,11 @@ static void scoreRules() {
   auto moraleUnit = unit("morale", 1); moraleUnit.morale = true;
   morale.board[0] = {moraleUnit, unit("ally", 4)};
   assert(calculateScore(morale, {false,false,false}, {false,false,false}) == 6); // morale boosts allies, not itself
+
+  Player dandelion;
+  auto hornUnit = unit("dandelion",2); hornUnit.abilities={"horn"};
+  dandelion.board[0]={hornUnit,unit("ally",4)};
+  assert(calculateScore(dandelion,{false,false,false},{false,false,false})==10);
 
   Player bond;
   auto a = unit("bond-a", 4); a.bond = true; a.group = "commando";
@@ -37,7 +48,7 @@ static void turnsAndRounds() {
   assert(pass(g,1)); assert(g.currentPlayer==0 && !g.players[0].passed);
   assert(pass(g,0)); assert(g.phase==Phase::RoundResult);
   assert(g.players[0].roundWins==1 && g.players[1].roundLosses==1);
-  assert(startNextRound(g)); assert(g.currentPlayer==1); // previous round's loser starts
+  assert(startNextRound(g)); assert(g.currentPlayer==0); // the previous round's winner starts
   assert(!startNextRound(g));
 
   Game tie; tie.players[0].hand.push_back(unit("ta", 2)); tie.players[1].hand.push_back(unit("tb", 2));
@@ -60,7 +71,8 @@ static void abilitiesAndValidation() {
   Game decoy; decoy.players[0].hand.push_back(Card{"decoy","Decoy",Kind::Decoy});
   decoy.players[0].board[0].push_back(unit("return",5));
   assert(playCard(decoy,0,"decoy",Row::None,"return"));
-  assert(decoy.players[0].board[0].empty() && decoy.players[0].hand.size()==1 && decoy.players[0].hand[0].id=="return");
+  assert(decoy.players[0].board[0].size()==1 && decoy.players[0].board[0][0].kind==Kind::Decoy);
+  assert(decoy.players[0].hand.size()==1 && decoy.players[0].hand[0].id=="return");
 
   Game medic; auto m=unit("medic",2); m.medic=true; medic.players[0].hand.push_back(m);
   medic.players[0].graveyard.push_back(unit("revive",6));
@@ -72,6 +84,28 @@ static void abilitiesAndValidation() {
   muster.players[0].hand.push_back(leader); muster.players[0].deck.push_back(copy);
   assert(playCard(muster,0,"muster1"));
   assert(muster.players[0].deck.empty() && muster.players[0].board[0].size()==1 && muster.players[0].board[1].size()==1);
+
+  Game weather; Card frost; frost.id="frost"; frost.kind=Kind::Weather; frost.abilities={"frost"};
+  weather.players[0].hand.push_back(frost); weather.players[0].board[0].push_back(unit("cold",8));
+  assert(playCard(weather,0,"frost"));
+  assert(weather.weather[0] && weather.weatherCards.size()==1 && weather.players[0].graveyard.empty());
+  Card clear; clear.id="clear"; clear.kind=Kind::ClearWeather; weather.players[1].hand.push_back(clear);
+  assert(playCard(weather,1,"clear"));
+  assert(!weather.weather[0] && weather.weatherCards.empty());
+  assert(weather.players[0].graveyard.size()==1 && weather.players[1].graveyard.size()==1);
+
+  Game horns; Card commanderHorn; commanderHorn.id="horn"; commanderHorn.kind=Kind::CommanderHorn;
+  horns.players[0].hand.push_back(commanderHorn);
+  horns.players[0].board[0].push_back(unit("friendly",4));
+  horns.players[1].board[0].push_back(unit("enemy",5));
+  assert(playCard(horns,0,"horn",Row::Melee));
+  assert(horns.players[0].score==8 && horns.players[1].score==5);
+
+  Game rowScorch; auto scorcher=unit("scorcher",4); scorcher.abilities={"scorch_c"}; rowScorch.players[0].hand.push_back(scorcher);
+  rowScorch.players[1].board[0]={unit("target-6",6),unit("target-4",4)};
+  assert(playCard(rowScorch,0,"scorcher"));
+  assert(rowScorch.players[1].board[0].size()==1 && rowScorch.players[1].board[0][0].id=="target-4");
+  assert(rowScorch.players[1].graveyard.size()==1);
 
   std::vector<Card> deck(22,unit("u",1));
   assert(validateDeck(deck,Faction::NorthernRealms).empty());
@@ -94,4 +128,29 @@ static void openingHandAndMulligan() {
   assert(replaceMulliganCards(g, 1, {}));
   assert(g.phase == Phase::OpponentTurn && g.currentPlayer == 1);
 }
-int main() { scoreRules(); turnsAndRounds(); abilitiesAndValidation(); openingHandAndMulligan(); }
+static void referenceCatalog() {
+  const auto& catalog = referenceCardCatalog();
+  assert(catalog.size() == 258);
+  assert(std::count_if(catalog.begin(), catalog.end(), [](const Card& c){return c.kind==Kind::Leader;}) >= 20);
+  auto geralt = std::find_if(catalog.begin(), catalog.end(), [](const Card& c){return c.name=="Geralt of Rivia";});
+  assert(geralt != catalog.end() && geralt->muster && geralt->group=="Roach");
+  auto roach = std::find_if(catalog.begin(), catalog.end(), [](const Card& c){return c.name=="Roach";});
+  assert(roach != catalog.end());
+  auto blueStripes = std::find_if(catalog.begin(), catalog.end(), [](const Card& c){return c.name=="Blue Stripes Commando";});
+  assert(blueStripes != catalog.end());
+  auto triple = makeReferenceDeck({{blueStripes->referenceIndex,3}});
+  assert(triple.size()==3 && triple[0].group=="Blue Stripes Commando");
+  auto leader = std::find_if(catalog.begin(), catalog.end(), [](const Card& c){return c.kind==Kind::Leader && c.faction==Faction::NorthernRealms;});
+  assert(leader != catalog.end());
+  std::vector<Card> deck(22, unit("plain",1));
+  assert(validateDeck(deck,*leader,Faction::NorthernRealms).empty());
+
+  Game mardroeme; Card potion; potion.id="potion"; potion.kind=Kind::Mardroeme;
+  mardroeme.players[0].hand.push_back(potion);
+  auto berserker=unit("bear-source",4); berserker.name="Berserker"; berserker.berserker=true;
+  mardroeme.players[0].board[0].push_back(berserker);
+  assert(playCard(mardroeme,0,"potion",Row::Melee));
+  assert(mardroeme.players[0].board[0][0].name=="Transformed Vildkaarl");
+  assert(mardroeme.players[0].board[0][0].power==14);
+}
+int main() { scoreRules(); turnsAndRounds(); abilitiesAndValidation(); openingHandAndMulligan(); referenceCatalog(); }
