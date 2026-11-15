@@ -29,7 +29,9 @@ jobs:
       - name: Decode reference SFX
         run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./build-sdl/gwent --audio-test
       - name: Frontend smoke test
-        run: SDL_VIDEODRIVER=dummy ./build-sdl/gwent --smoke-test frontend-smoke.bmp deck-builder-smoke.bmp card-details-smoke.bmp card-flight-smoke.bmp deck-select-smoke.bmp title-smoke.bmp
+        run: SDL_VIDEODRIVER=dummy ./build-sdl/gwent --smoke-test frontend-smoke.bmp deck-builder-smoke.bmp card-details-smoke.bmp card-flight-smoke.bmp deck-select-smoke.bmp title-smoke.bmp leader-choice-smoke.bmp leader-reveal-smoke.bmp
+      - name: Miyoo software-composition smoke test
+        run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy GWENT_SOFTWARE_COMPOSITE=1 ./build-sdl/gwent --smoke-test composite-frontend-smoke.bmp composite-deck-builder-smoke.bmp composite-card-details-smoke.bmp composite-card-flight-smoke.bmp composite-deck-select-smoke.bmp composite-title-smoke.bmp composite-leader-choice-smoke.bmp composite-leader-reveal-smoke.bmp
       - name: Upload frontend smoke frames
         uses: actions/upload-artifact@v4
         with:
@@ -41,5 +43,15 @@ jobs:
             card-flight-smoke.bmp
             deck-select-smoke.bmp
             title-smoke.bmp
+            leader-choice-smoke.bmp
+            leader-reveal-smoke.bmp
+            composite-frontend-smoke.bmp
+            composite-deck-builder-smoke.bmp
+            composite-card-details-smoke.bmp
+            composite-card-flight-smoke.bmp
+            composite-deck-select-smoke.bmp
+            composite-title-smoke.bmp
+            composite-leader-choice-smoke.bmp
+            composite-leader-reveal-smoke.bmp
           if-no-files-found: error
           retention-days: 7

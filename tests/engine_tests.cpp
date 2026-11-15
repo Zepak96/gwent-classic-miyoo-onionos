@@ -489,16 +489,47 @@ static void leaderAbilities() {
   Game draw;
   draw.players[0].leader=leader("emhyr_relentless"); draw.players[0].leaderAbilityAvailable=true;
   draw.players[1].graveyard.push_back(unit("stolen-unit",7));
+  assert(!activateLeader(draw,0));
+  assert(draw.players[0].hand.empty() && draw.players[1].graveyard.size()==1 && draw.players[0].leaderAbilityAvailable);
   assert(activateLeader(draw,0,Row::None,{"stolen-unit"}));
   assert(draw.players[0].hand.size()==1 && draw.players[1].graveyard.empty());
+
+  Game reveal;
+  reveal.players[0].leader=leader("emhyr_emperor"); reveal.players[0].leaderAbilityAvailable=true;
+  reveal.players[1].hand={unit("known-a",1),unit("known-b",2),unit("known-c",3),unit("known-d",4)};
+  assert(activateLeader(reveal,0));
+  assert(reveal.revealedCards[0].size()==3 && reveal.players[1].hand.size()==4);
+  std::vector<std::string> revealedIds;
+  for(const auto& card:reveal.revealedCards[0])revealedIds.push_back(card.id);
+  std::sort(revealedIds.begin(),revealedIds.end());
+  assert(std::adjacent_find(revealedIds.begin(),revealedIds.end())==revealedIds.end());
+
+  Game heroRestore;
+  heroRestore.players[0].leader=leader("emhyr_relentless"); heroRestore.players[0].leaderAbilityAvailable=true;
+  Card graveHero=unit("grave-hero",15);graveHero.hero=true;
+  heroRestore.players[1].graveyard.push_back(graveHero);
+  assert(activateLeader(heroRestore,0,Row::None,{"grave-hero"}));
+  assert(heroRestore.players[0].hand.size()==1 && heroRestore.players[0].hand[0].hero);
 
   Game discard;
   discard.players[0].leader=leader("eredin_destroyer"); discard.players[0].leaderAbilityAvailable=true;
   discard.players[0].hand={unit("discard-a",1),unit("discard-b",2)};
   discard.players[0].deck={unit("draw-a",3),unit("draw-b",4)};
+  assert(!activateLeader(discard,0));
+  assert(discard.players[0].hand.size()==2 && discard.players[0].deck.size()==2 && discard.players[0].leaderAbilityAvailable);
   assert(activateLeader(discard,0,Row::None,{"discard-a","discard-b","draw-a"}));
   assert(discard.players[0].hand.size()==1 && discard.players[0].hand[0].id=="draw-a");
   assert(discard.players[0].graveyard.size()==2 && discard.players[0].deck.size()==1);
+
+  Game kingWeather;
+  kingWeather.players[0].leader=leader("eredin_king"); kingWeather.players[0].leaderAbilityAvailable=true;
+  kingWeather.players[0].deck={referenceCard("Biting Frost"),referenceCard("Torrential Rain")};
+  assert(!activateLeader(kingWeather,0));
+  assert(kingWeather.players[0].deck.size()==2 && kingWeather.weatherCards.empty());
+  assert(!activateLeader(kingWeather,0,Row::None,{"not-in-deck"}));
+  assert(kingWeather.players[0].deck.size()==2 && kingWeather.weatherCards.empty());
+  assert(activateLeader(kingWeather,0,Row::None,{kingWeather.players[0].deck[1].id}));
+  assert(kingWeather.weather[2] && kingWeather.weatherCards.size()==1 && kingWeather.weatherCards[0].card.name=="Torrential Rain");
 
   Game crach;
   crach.players[0].leader=leader("crach_an_craite"); crach.players[0].leaderAbilityAvailable=true;

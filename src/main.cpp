@@ -137,6 +137,9 @@ struct App {
   bool userDeckSelected{false};
   bool editingLeader{false};
   bool cardDetailsOpen{false};
+  bool leaderSelectionMode{false};
+  bool leaderRevealOpen{false};
+  std::vector<std::string> leaderSelections;
   CardFlight cardFlight;
   Uint32 selectDownAt{0};
   bool selectLongPressed{false};
@@ -154,6 +157,7 @@ struct App {
   std::string dataDirectory;
   std::string assetDirectory;
   mutable std::unordered_map<std::string,SDL_Texture*> textures;
+  mutable std::vector<std::string> textureOrder;
   gwent_port::AudioSystem audio;
   std::string status{"PRESS ENTER"};
   Uint32 aiAt{0};
@@ -162,18 +166,46 @@ void animatePlayedCard(App& a,const gwent::Card& card,int player,int handIndex,i
 SDL_Texture* textureFor(SDL_Renderer* renderer,const App& app,const std::string& relative) {
   if(relative.empty()||app.assetDirectory.empty())return nullptr;
   const auto found=app.textures.find(relative);
-  if(found!=app.textures.end())return found->second;
+  if(found!=app.textures.end()) {
+    auto& order=app.textureOrder;
+    order.erase(std::remove(order.begin(),order.end(),relative),order.end());
+    order.push_back(relative);
+    return found->second;
+  }
   const auto path=std::filesystem::path(app.assetDirectory)/relative;
   int width=0,height=0,channels=0;
   unsigned char* pixels=stbi_load(path.string().c_str(),&width,&height,&channels,STBI_rgb_alpha);
   if(!pixels)return nullptr;
-  SDL_Texture* loaded=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA32,SDL_TEXTUREACCESS_STATIC,width,height);
-  if(loaded) {
-    SDL_UpdateTexture(loaded,nullptr,pixels,width*4);
-    SDL_SetTextureBlendMode(loaded,SDL_BLENDMODE_BLEND);
+  SDL_Texture* loaded=nullptr;
+  const int maxWidth=relative.rfind("img/lg/",0)==0?246:W;
+  if(width>maxWidth||height>H) {
+    const float scale=std::min({1.0f,static_cast<float>(maxWidth)/width,static_cast<float>(H)/height});
+    const int scaledWidth=std::max(1,static_cast<int>(std::lround(width*scale)));
+    const int scaledHeight=std::max(1,static_cast<int>(std::lround(height*scale)));
+    SDL_Surface* source=SDL_CreateRGBSurfaceWithFormatFrom(pixels,width,height,32,width*4,SDL_PIXELFORMAT_RGBA32);
+    SDL_Surface* scaled=SDL_CreateRGBSurfaceWithFormat(0,scaledWidth,scaledHeight,32,SDL_PIXELFORMAT_RGBA32);
+    if(source&&scaled&&SDL_BlitScaled(source,nullptr,scaled,nullptr)==0)loaded=SDL_CreateTextureFromSurface(renderer,scaled);
+    if(source)SDL_FreeSurface(source);
+    if(scaled)SDL_FreeSurface(scaled);
+  } else {
+    loaded=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA32,SDL_TEXTUREACCESS_STATIC,width,height);
+    if(loaded)SDL_UpdateTexture(loaded,nullptr,pixels,width*4);
   }
+  if(loaded)SDL_SetTextureBlendMode(loaded,SDL_BLENDMODE_BLEND);
   stbi_image_free(pixels);
   app.textures.emplace(relative,loaded);
+  app.textureOrder.push_back(relative);
+  constexpr std::size_t maxCachedTextures=48;
+  while(app.textureOrder.size()>maxCachedTextures) {
+    const std::string oldest=app.textureOrder.front();
+    app.textureOrder.erase(app.textureOrder.begin());
+    const auto stale=app.textures.find(oldest);
+    if(stale!=app.textures.end()) {
+      SDL_RenderFlush(renderer);
+      if(stale->second)SDL_DestroyTexture(stale->second);
+      app.textures.erase(stale);
+    }
+  }
   return loaded;
 }
 void drawImage(SDL_Renderer* renderer,const App& app,const std::string& relative,int x,int y,int w,int h) {
@@ -225,6 +257,16 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="deck_need_cards")return pl?"MIN. 22 JEDNOSTKI / MAX. 10 SPECJALNYCH":"MIN 22 UNITS / MAX 10 SPECIALS";
   if(key=="deck_custom")return pl?"WLASNA TALIA":"CUSTOM DECK";
   if(key=="card_details")return pl?"SZCZEGOLY KARTY":"CARD DETAILS";
+  if(key=="leader_reveal")return pl?"KARTY Z REKI PRZECIWNIKA":"OPPONENT'S REVEALED CARDS";
+  if(key=="leader_continue")return pl?"A / ENTER - KONTYNUUJ":"A / ENTER - CONTINUE";
+  if(key=="leader_choose_target")return pl?"WYBIERZ KARTE":"CHOOSE A CARD";
+  if(key=="leader_choose_discard")return pl?"WYBIERZ KARTE DO ODRZUCENIA":"CHOOSE A CARD TO DISCARD";
+  if(key=="leader_choose_draw")return pl?"WYBIERZ KARTE DO DOBRANIA":"CHOOSE A CARD TO DRAW";
+  if(key=="leader_choose_weather")return pl?"WYBIERZ KARTE POGODOWA":"CHOOSE A WEATHER CARD";
+  if(key=="leader_choose_grave")return pl?"WYBIERZ JEDNOSTKE Z CMENTARZA":"CHOOSE A UNIT FROM THE GRAVEYARD";
+  if(key=="leader_selected")return pl?"ODRZUCONE":"DISCARD SELECTION";
+  if(key=="leader_controls")return pl?"LEWO/PRAWO: KARTA  A: WYBIERZ  B: WROC":"LEFT/RIGHT: CARD  A: SELECT  B: BACK";
+  if(key=="leader_cancel")return pl?"B / ESC - ANULUJ":"B / ESC - CANCEL";
   if(key=="power")return pl?"SILA":"POWER";
   if(key=="row")return pl?"RZAD":"ROW";
   if(key=="special")return pl?"SPECJALNA":"SPECIAL";
@@ -367,6 +409,67 @@ std::vector<std::string> legalCardTargets(const App& a,const gwent::Card& card) 
     for(const auto& target:p.graveyard) if(target.kind==gwent::Kind::Unit && !target.hero) ids.push_back(target.id);
   }
   return ids;
+}
+std::string activeLeaderAbility(const gwent::Card& leader) {
+  const auto it=std::find_if(leader.abilities.begin(),leader.abilities.end(),[](const std::string& id){
+    return id.rfind("foltest_",0)==0||id.rfind("emhyr_",0)==0||id.rfind("eredin_",0)==0||
+           id.rfind("francesca_",0)==0||id=="crach_an_craite"||id=="king_bran";
+  });
+  return it==leader.abilities.end()?std::string{}:*it;
+}
+std::vector<gwent::Card> leaderChoiceCards(const App& a) {
+  const auto& player=a.game.players[0];
+  const std::string ability=activeLeaderAbility(player.leader);
+  std::vector<gwent::Card> cards;
+  if(ability=="emhyr_relentless"||ability=="eredin_bringer_of_death") {
+    const auto& grave=ability=="emhyr_relentless"?a.game.players[1].graveyard:player.graveyard;
+    for(const auto& card:grave)if(card.kind==gwent::Kind::Unit)cards.push_back(card);
+  } else if(ability=="eredin_destroyer"&&a.leaderSelections.size()<2) {
+    for(const auto& card:player.hand)
+      if(std::find(a.leaderSelections.begin(),a.leaderSelections.end(),card.id)==a.leaderSelections.end())cards.push_back(card);
+  } else if(ability=="eredin_destroyer") {
+    for(const auto& card:player.deck)cards.push_back(card);
+  } else if(ability=="eredin_king") {
+    for(const auto& card:player.deck)if(card.kind==gwent::Kind::Weather)cards.push_back(card);
+  }
+  return cards;
+}
+std::string leaderChoicePrompt(const App& a) {
+  const std::string ability=activeLeaderAbility(a.game.players[0].leader);
+  if(ability=="eredin_destroyer")return tr(a,a.leaderSelections.size()<2?"leader_choose_discard":"leader_choose_draw");
+  if(ability=="eredin_king")return tr(a,"leader_choose_weather");
+  return tr(a,"leader_choose_grave");
+}
+void finishLeaderChoice(App& a) {
+  const bool okay=gwent::activateLeader(a.game,0,gwent::Row::None,a.leaderSelections);
+  a.leaderSelectionMode=false;
+  a.targetIndex=0;
+  if(okay) {
+    a.status="LEADER ABILITY USED";
+    if(!a.game.revealedCards[0].empty())a.leaderRevealOpen=true;
+    if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+400;
+  } else a.status="LEADER CANNOT BE USED";
+  a.leaderSelections.clear();
+}
+void beginLeaderChoice(App& a) {
+  a.leaderSelections.clear();
+  const auto ability=activeLeaderAbility(a.game.players[0].leader);
+  const bool needsChoice=ability=="emhyr_relentless"||ability=="eredin_bringer_of_death"||
+                         ability=="eredin_destroyer"||ability=="eredin_king";
+  if(!needsChoice) {
+    if(gwent::activateLeader(a.game,0)) {
+      a.status="LEADER ABILITY USED";
+      if(!a.game.revealedCards[0].empty())a.leaderRevealOpen=true;
+      if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+400;
+    } else a.status="LEADER CANNOT BE USED";
+    return;
+  }
+  if((ability=="eredin_destroyer"&&(a.game.players[0].hand.size()<2||a.game.players[0].deck.empty()))||
+     leaderChoiceCards(a).empty()) { a.status="LEADER HAS NO VALID TARGET";return; }
+  a.leaderSelectionMode=true;
+  a.targetIndex=0;
+  a.audio.play("open");
+  a.status=leaderChoicePrompt(a);
 }
 gwent::Card findById(const std::vector<gwent::Card>& cards,const std::string& id) {
   const auto it=std::find_if(cards.begin(),cards.end(),[&](const gwent::Card& c){return c.id==id;});
@@ -859,6 +962,59 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     const int selected=std::clamp(a.handIndex,0,static_cast<int>(me.hand.size())-1);
     drawCardDetails(r,a,me.hand[static_cast<std::size_t>(selected)]);
   }
+  if(a.leaderSelectionMode) {
+    const auto cards=leaderChoiceCards(a);
+    if(!cards.empty()) {
+      box(r,0,0,W,STAGE_H,Color{0,0,0,238});
+      frame(r,14,12,W-28,STAGE_H-24,Color{143,108,54});
+      text(r,28,25,leaderChoicePrompt(a),gold,2);
+      if(activeLeaderAbility(me.leader)=="eredin_destroyer")
+        text(r,28,49,tr(a,"leader_selected")+" "+std::to_string(a.leaderSelections.size())+"/2",paper,1);
+      const int selected=std::clamp(a.targetIndex,0,static_cast<int>(cards.size())-1);
+      const int start=std::clamp(selected-3,0,std::max(0,static_cast<int>(cards.size())-8));
+      const int shown=std::min(8,static_cast<int>(cards.size())-start);
+      for(int i=0;i<shown;++i) {
+        const auto& card=cards[static_cast<std::size_t>(start+i)];
+        const int x=26+i*61;
+        drawImage(r,a,"img/lg/"+gwent::referenceCardImage(card.referenceIndex),x,92,47,77);
+        if(start+i==selected)frame(r,x-2,90,51,81,gold);
+      }
+      const auto& card=cards[static_cast<std::size_t>(selected)];
+      drawImage(r,a,"img/lg/"+gwent::referenceCardImage(card.referenceIndex),521,77,96,168);
+      frame(r,520,76,98,170,gold);
+      text(r,28,207,card.name+"  "+std::to_string(card.power),paper,1);
+      if(!a.leaderSelections.empty()) {
+        std::string chosen;
+        for(const auto& id:a.leaderSelections) {
+          const auto found=std::find_if(me.hand.begin(),me.hand.end(),[&](const gwent::Card& c){return c.id==id;});
+          if(found!=me.hand.end()) { if(!chosen.empty())chosen+=" / ";chosen+=found->name; }
+        }
+        text(r,28,229,shortName(chosen,69),Color{235,207,164},1);
+      }
+      text(r,28,286,tr(a,"leader_controls"),muted,1);
+      text(r,28,305,tr(a,"leader_cancel"),muted,1);
+    }
+  }
+  if(a.leaderRevealOpen) {
+    box(r,0,0,W,STAGE_H,Color{0,0,0,242});
+    frame(r,18,12,W-36,STAGE_H-24,Color{143,108,54});
+    centeredTextInBox(r,32,20,W-64,24,tr(a,"leader_reveal"),gold,2);
+    const auto& cards=a.game.revealedCards[0];
+    const int width=std::min(106,static_cast<int>((W-100)/std::max<std::size_t>(1,cards.size())));
+    const int gap=cards.size()>1?16:0;
+    const int total=static_cast<int>(cards.size())*width+(static_cast<int>(cards.size())-1)*gap;
+    const int firstX=(W-total)/2;
+    for(std::size_t i=0;i<cards.size();++i) {
+      const int x=firstX+static_cast<int>(i)*(width+gap);
+      const int height=static_cast<int>(width*1.72);
+      drawImage(r,a,"img/lg/"+gwent::referenceCardImage(cards[i].referenceIndex),x,58,width,height);
+      frame(r,x-1,57,width+2,height+2,gold);
+      const auto names=wrapDetailText(cards[i].name,16);
+      for(std::size_t line=0;line<names.size();++line)
+        centeredTextInBox(r,x-8,58+height+8+static_cast<int>(line)*8,width+16,8,names[line],paper,1);
+    }
+    centeredTextInBox(r,20,STAGE_H-35,W-40,16,tr(a,"leader_continue"),muted,1);
+  }
 }
 void drawMatchOnScreen(SDL_Renderer* r,const App& a) {
   // The reference match board is 16:9 (640x360); center it on Miyoo's 4:3
@@ -869,6 +1025,29 @@ void drawMatchOnScreen(SDL_Renderer* r,const App& a) {
   SDL_RenderSetViewport(r,nullptr);
 }
 void handleMatchKey(App& a,SDL_Keycode key) {
+  if(a.leaderRevealOpen) {
+    if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x||key==SDLK_SPACE||key==SDLK_ESCAPE||key==SDLK_z||key==SDLK_BACKSPACE) {
+      a.leaderRevealOpen=false;
+      if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+350;
+    }
+    return;
+  }
+  if(a.leaderSelectionMode) {
+    const auto cards=leaderChoiceCards(a);
+    if(cards.empty()) { a.leaderSelectionMode=false;a.leaderSelections.clear();a.status="LEADER HAS NO VALID TARGET";return; }
+    if(key==SDLK_ESCAPE||key==SDLK_z||key==SDLK_BACKSPACE) {
+      a.leaderSelectionMode=false;a.leaderSelections.clear();a.targetIndex=0;a.status=tr(a,"your_turn");return;
+    }
+    if(key==SDLK_LEFT||key==SDLK_a) { a.targetIndex=(a.targetIndex+static_cast<int>(cards.size())-1)%static_cast<int>(cards.size());a.audio.play("ui_card"); }
+    else if(key==SDLK_RIGHT||key==SDLK_d) { a.targetIndex=(a.targetIndex+1)%static_cast<int>(cards.size());a.audio.play("ui_card"); }
+    else if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x||key==SDLK_SPACE) {
+      a.leaderSelections.push_back(cards[static_cast<std::size_t>(a.targetIndex)].id);
+      if(activeLeaderAbility(a.game.players[0].leader)=="eredin_destroyer"&&a.leaderSelections.size()<3) {
+        a.targetIndex=0;a.status=leaderChoicePrompt(a);a.audio.play("ui_card");
+      } else finishLeaderChoice(a);
+    }
+    return;
+  }
   if(key==SDLK_ESCAPE) { a.screen=Screen::DeckSelect; a.targetMode=false; return; }
   if(key==SDLK_s||key==SDLK_F5) { saveCurrentMatch(a);return; }
   if(key==SDLK_o||key==SDLK_F9) { loadSavedMatch(a);return; }
@@ -950,8 +1129,7 @@ void handleMatchKey(App& a,SDL_Keycode key) {
   else if(key==SDLK_UP) a.rowIndex=(a.rowIndex+2)%3;
   else if(key==SDLK_DOWN) a.rowIndex=(a.rowIndex+1)%3;
   else if(key==SDLK_l) {
-    if(gwent::activateLeader(a.game,0)) { a.status="LEADER ABILITY USED"; if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+400; }
-    else a.status="LEADER CANNOT BE USED";
+    beginLeaderChoice(a);
   }
   else if(key==SDLK_BACKSPACE) {
     if(gwent::pass(a.game,0)) { a.audio.play("pass");a.status="YOU PASSED"; if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+400; }
@@ -959,6 +1137,7 @@ void handleMatchKey(App& a,SDL_Keycode key) {
   else if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x) doHumanPlay(a);
 }
 void handleKey(App& a,SDL_Keycode key,bool& running) {
+  if(a.screen==Screen::Match&&(a.leaderSelectionMode||a.leaderRevealOpen)) { handleMatchKey(a,key);return; }
   if(a.cardDetailsOpen) {
     if(key==SDLK_i||key==SDLK_ESCAPE||key==SDLK_BACKSPACE||key==SDLK_z)a.cardDetailsOpen=false;
     return;
@@ -1061,9 +1240,45 @@ int main(int argc,char** argv) {
   for(int index=0;index<SDL_NumJoysticks();++index)if(SDL_IsGameController(index))SDL_GameControllerOpen(index);
   SDL_Window* window=SDL_CreateWindow("Gwent Classic - Witcher 3",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,W,H,SDL_WINDOW_SHOWN);
   if(!window){SDL_Quit();return 2;}
-  SDL_Renderer* renderer=SDL_CreateRenderer(window,-1,SDL_RENDERER_ACCELERATED|SDL_RENDERER_PRESENTVSYNC);
-  if(!renderer)renderer=SDL_CreateRenderer(window,-1,SDL_RENDERER_SOFTWARE);
-  if(!renderer){SDL_DestroyWindow(window);SDL_Quit();return 3;}
+  SDL_Renderer* presentationRenderer=SDL_CreateRenderer(window,-1,SDL_RENDERER_ACCELERATED|SDL_RENDERER_PRESENTVSYNC);
+  if(!presentationRenderer)presentationRenderer=SDL_CreateRenderer(window,-1,SDL_RENDERER_SOFTWARE);
+  if(!presentationRenderer){std::cerr<<"Could not create SDL renderer: "<<SDL_GetError()<<"\n";SDL_DestroyWindow(window);SDL_Quit();return 3;}
+  SDL_Renderer* renderer=presentationRenderer;
+  SDL_Surface* softwareCanvas=nullptr;
+  SDL_Texture* softwareFrame=nullptr;
+  SDL_RendererInfo presentationInfo{};
+  SDL_GetRendererInfo(presentationRenderer,&presentationInfo);
+  const char* compositeSetting=SDL_getenv("GWENT_SOFTWARE_COMPOSITE");
+  const bool useSoftwareComposite=(presentationInfo.name&&std::string(presentationInfo.name)=="Miyoo Mini")||
+                                  (compositeSetting&&std::string(compositeSetting)=="1");
+  if(useSoftwareComposite) {
+    softwareCanvas=SDL_CreateRGBSurfaceWithFormat(0,W,H,32,SDL_PIXELFORMAT_ARGB8888);
+    if(softwareCanvas)renderer=SDL_CreateSoftwareRenderer(softwareCanvas);
+    if(renderer!=presentationRenderer)
+      softwareFrame=SDL_CreateTexture(presentationRenderer,SDL_PIXELFORMAT_ARGB8888,SDL_TEXTUREACCESS_STREAMING,W,H);
+    if(!softwareCanvas||!renderer||renderer==presentationRenderer||!softwareFrame) {
+      std::cerr<<"Could not initialize Miyoo-compatible software composition: "<<SDL_GetError()<<"\n";
+      if(softwareFrame)SDL_DestroyTexture(softwareFrame);
+      if(renderer!=presentationRenderer&&renderer)SDL_DestroyRenderer(renderer);
+      if(softwareCanvas)SDL_FreeSurface(softwareCanvas);
+      SDL_DestroyRenderer(presentationRenderer);SDL_DestroyWindow(window);SDL_Quit();return 3;
+    }
+    SDL_SetTextureBlendMode(softwareFrame,SDL_BLENDMODE_NONE);
+  }
+  SDL_Renderer* drawRenderer=renderer;
+  const auto destroyRenderers=[&]() {
+    if(softwareFrame)SDL_DestroyTexture(softwareFrame);
+    if(drawRenderer!=presentationRenderer)SDL_DestroyRenderer(drawRenderer);
+    if(softwareCanvas)SDL_FreeSurface(softwareCanvas);
+    SDL_DestroyRenderer(presentationRenderer);
+  };
+  const auto presentFrame=[&]() {
+    if(!softwareCanvas) { SDL_RenderPresent(presentationRenderer);return; }
+    SDL_RenderPresent(drawRenderer);
+    SDL_UpdateTexture(softwareFrame,nullptr,softwareCanvas->pixels,softwareCanvas->pitch);
+    SDL_RenderCopy(presentationRenderer,softwareFrame,nullptr,nullptr);
+    SDL_RenderPresent(presentationRenderer);
+  };
   SDL_RenderSetLogicalSize(renderer,W,H);
   SDL_SetRenderDrawBlendMode(renderer,SDL_BLENDMODE_BLEND);
   App app; bool running=true;
@@ -1082,7 +1297,7 @@ int main(int argc,char** argv) {
       for(const auto& failure:failures)std::cerr<<"Could not decode SFX: "<<failure<<"\n";
       if(!app.audio.available())std::cerr<<"Could not open SDL audio device: "<<SDL_GetError()<<"\n";
     } else std::cout<<"Decoded every reference SFX file.\n";
-    app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return okay?0:5;
+    app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return okay?0:5;
   }
   app.audio.play("menu_opening");
   if(char* directory=SDL_GetPrefPath("GwentClassic","MiyooMiniPlus")) {
@@ -1101,36 +1316,36 @@ int main(int argc,char** argv) {
       SDL_FreeSurface(surface);return okay;
     };
     clearFrame();
-    app.screen=Screen::DeckBuilder;drawDeckBuilder(renderer,app);SDL_RenderPresent(renderer);
-    if(argc>3&&!saveFrame(argv[3])) { app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 4; }
+    app.screen=Screen::DeckBuilder;drawDeckBuilder(renderer,app);presentFrame();
+    if(argc>3&&!saveFrame(argv[3])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
     if(argc>4) {
       clearFrame();
       const auto& catalog=gwent::referenceCardCatalog();
       const auto ciri=std::find_if(catalog.begin(),catalog.end(),[](const gwent::Card& card){return card.name=="Cirilla Fiona Elen Riannon";});
       if(ciri!=catalog.end())drawCardDetails(renderer,app,*ciri);
       else { app.cardDetailsOpen=true;drawDeckBuilder(renderer,app);app.cardDetailsOpen=false; }
-      SDL_RenderPresent(renderer);
-      if(!saveFrame(argv[4])) { app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 4; }
+      presentFrame();
+      if(!saveFrame(argv[4])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
     }
     startMatch(app);
     gwent::replaceMulliganCards(app.game,0,{}); gwent::replaceMulliganCards(app.game,1,gwent::chooseAiMulligan(app.game,1));
     app.game.phase=gwent::Phase::PlayerTurn;app.game.currentPlayer=0;
     clearFrame();
     drawMatchOnScreen(renderer,app);
-    if(argc>2&&!saveFrame(argv[2])) { app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 4; }
+    if(argc>2&&!saveFrame(argv[2])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
     if(argc>5) {
       app.game.phase=gwent::Phase::PlayerTurn;app.game.currentPlayer=0;
       const auto& hand=app.game.players[0].hand;
       const auto it=std::find_if(hand.begin(),hand.end(),[](const gwent::Card& card){return card.kind==gwent::Kind::Unit&&!card.medic&&!card.spy&&(card.row!=gwent::Row::None||card.agile);});
-      if(it==hand.end()) { app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 5; }
+      if(it==hand.end()) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 5; }
       const int index=static_cast<int>(it-hand.begin()),before=static_cast<int>(hand.size());
       const gwent::Card card=*it;
       const gwent::Row row=card.agile?gwent::Row::Melee:card.row;
-      if(!gwent::playCard(app.game,0,card.id,row)) { app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 5; }
+      if(!gwent::playCard(app.game,0,card.id,row)) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 5; }
       animatePlayedCard(app,card,0,index,before);
       app.cardFlight.startedAt=SDL_GetTicks()>250?SDL_GetTicks()-250:0;
-      clearFrame();drawMatchOnScreen(renderer,app);SDL_RenderPresent(renderer);
-      if(!saveFrame(argv[5])) { app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 4; }
+      clearFrame();drawMatchOnScreen(renderer,app);presentFrame();
+      if(!saveFrame(argv[5])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
     }
     if(argc>6) {
       app.screen=Screen::DeckSelect;
@@ -1140,26 +1355,63 @@ int main(int argc,char** argv) {
       App settingsProbe;settingsProbe.dataDirectory=app.dataDirectory;loadSettings(settingsProbe);
       if(app.aiDifficulty!=gwent::AiDifficulty::Hard ||
          (!app.dataDirectory.empty() && settingsProbe.aiDifficulty!=app.aiDifficulty)) {
-        app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 6;
+        app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 6;
       }
       app.status.clear();
-      clearFrame();drawDeckSelect(renderer,app);SDL_RenderPresent(renderer);
-      if(!saveFrame(argv[6])) { app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 4; }
+      clearFrame();drawDeckSelect(renderer,app);presentFrame();
+      if(!saveFrame(argv[6])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
     }
     if(argc>7) {
       app.screen=Screen::Title;
       bool smokeRunning=true;
       handleKey(app,SDLK_RETURN,smokeRunning);
       if(app.screen!=Screen::DeckSelect) {
-        app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 7;
+        app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 7;
       }
       app.screen=Screen::Title;
-      clearFrame();drawTitle(renderer,app);SDL_RenderPresent(renderer);
-      if(!saveFrame(argv[7])) { app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 4; }
+      clearFrame();drawTitle(renderer,app);presentFrame();
+      if(!saveFrame(argv[7])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
     }
-    SDL_RenderPresent(renderer);
+    const auto& catalog=gwent::referenceCardCatalog();
+    const auto leaderFor=[&](const std::string& ability) {
+      const auto it=std::find_if(catalog.begin(),catalog.end(),[&](const gwent::Card& card){
+        return card.kind==gwent::Kind::Leader&&std::find(card.abilities.begin(),card.abilities.end(),ability)!=card.abilities.end();
+      });
+      return it==catalog.end()?gwent::Card{}:*it;
+    };
+    if(argc>8) {
+      app.game=gwent::Game{};app.game.players[0].leader=leaderFor("eredin_king");
+      app.game.players[0].leaderAbilityAvailable=true;
+      for(const auto& card:catalog)if(card.kind==gwent::Kind::Weather)app.game.players[0].deck.push_back(card);
+      app.leaderSelections.clear();app.leaderSelectionMode=false;app.leaderRevealOpen=false;app.cardDetailsOpen=false;
+      beginLeaderChoice(app);
+      if(!app.leaderSelectionMode||leaderChoiceCards(app).empty()) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 8; }
+      clearFrame();drawMatchOnScreen(renderer,app);presentFrame();
+      if(!saveFrame(argv[8])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
+      handleMatchKey(app,SDLK_RIGHT);handleMatchKey(app,SDLK_x);
+      if(app.leaderSelectionMode||app.game.weatherCards.size()!=1||
+         app.game.weatherCards[0].card.kind!=gwent::Kind::Weather||app.game.players[0].leaderAbilityAvailable) {
+        app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 8;
+      }
+    }
+    if(argc>9) {
+      app.game=gwent::Game{};app.game.players[0].leader=leaderFor("emhyr_emperor");
+      app.game.players[0].leaderAbilityAvailable=true;
+      for(const auto& card:catalog)if(card.kind==gwent::Kind::Unit&&app.game.players[1].hand.size()<4) {
+        auto copy=card;copy.id+="-reveal-smoke-"+std::to_string(app.game.players[1].hand.size());
+        app.game.players[1].hand.push_back(std::move(copy));
+      }
+      app.leaderSelections.clear();app.leaderSelectionMode=false;app.leaderRevealOpen=false;app.cardDetailsOpen=false;
+      beginLeaderChoice(app);
+      if(!app.leaderRevealOpen||app.game.revealedCards[0].size()!=3) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 9; }
+      clearFrame();drawMatchOnScreen(renderer,app);presentFrame();
+      if(!saveFrame(argv[9])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
+      handleMatchKey(app,SDLK_x);
+      if(app.leaderRevealOpen) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 9; }
+    }
+    presentFrame();
     for(auto& image:app.textures)if(image.second)SDL_DestroyTexture(image.second);
-    app.audio.shutdown();SDL_DestroyRenderer(renderer); SDL_DestroyWindow(window); SDL_Quit(); return 0;
+    app.audio.shutdown();destroyRenderers(); SDL_DestroyWindow(window); SDL_Quit(); return 0;
   }
   auto observedPhase=app.game.phase;
   while(running) {
@@ -1187,7 +1439,8 @@ int main(int argc,char** argv) {
       app.cardDetailsOpen=true;app.selectLongPressed=true;app.audio.play("open");
     }
     if(app.cardFlight.active&&SDL_TICKS_PASSED(SDL_GetTicks(),app.cardFlight.startedAt+500))app.cardFlight.active=false;
-    if(app.screen==Screen::Match && app.game.phase==gwent::Phase::OpponentTurn && SDL_GetTicks()>=app.aiAt)performAi(app);
+    if(app.screen==Screen::Match && !app.leaderSelectionMode && !app.leaderRevealOpen &&
+       app.game.phase==gwent::Phase::OpponentTurn && SDL_GetTicks()>=app.aiAt)performAi(app);
     if(app.screen==Screen::Match&&app.game.phase!=observedPhase) {
       if(app.game.phase==gwent::Phase::Mulligan)app.audio.play("redraw");
       else if(app.game.phase==gwent::Phase::PlayerTurn)app.audio.play("turn_me");
@@ -1201,8 +1454,8 @@ int main(int argc,char** argv) {
     else if(app.screen==Screen::DeckSelect)drawDeckSelect(renderer,app);
     else if(app.screen==Screen::DeckBuilder)drawDeckBuilder(renderer,app);
     else drawMatchOnScreen(renderer,app);
-    SDL_RenderPresent(renderer); SDL_Delay(8);
+    presentFrame(); SDL_Delay(8);
   }
   for(auto& image:app.textures)if(image.second)SDL_DestroyTexture(image.second);
-  app.audio.shutdown();SDL_DestroyRenderer(renderer); SDL_DestroyWindow(window); SDL_Quit(); return 0;
+  app.audio.shutdown();destroyRenderers(); SDL_DestroyWindow(window); SDL_Quit(); return 0;
 }

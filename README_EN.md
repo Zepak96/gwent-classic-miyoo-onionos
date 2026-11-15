@@ -6,7 +6,7 @@ A native 1:1 port of the Gwent minigame from **The Witcher 3: Wild Hunt** to Miy
 
 See [PROGRESS.md](PROGRESS.md) and [docs/REFERENCE_UI_PORT.md](docs/REFERENCE_UI_PORT.md) for the reference audit and remaining work. An OnionOS ARM build and SD package have been produced and tested against the card contents, but the current code is still incomplete and has not been launched on the physical console.
 
-Current 640×480 smoke frames: [title screen](docs/screenshots/current-title-smoke.png), [deck and AI level selection](docs/screenshots/current-deck-select-smoke.png), [match](docs/screenshots/current-match-smoke.png), [card inspector](docs/screenshots/current-card-details-smoke.png), [deck builder](docs/screenshots/current-deck-smoke.png), and [card-play animation](docs/screenshots/current-card-flight-smoke.png). These are desktop smoke-test renders, not captures from a physical Miyoo.
+Current 640×480 smoke frames: [title screen](docs/screenshots/current-title-smoke.png), [deck and AI level selection](docs/screenshots/current-deck-select-smoke.png), [match](docs/screenshots/current-match-smoke.png), [leader card selection](docs/screenshots/current-leader-choice-smoke.png), [Emhyr's revealed cards](docs/screenshots/current-leader-reveal-smoke.png), [card inspector](docs/screenshots/current-card-details-smoke.png), [deck builder](docs/screenshots/current-deck-smoke.png), and [card-play animation](docs/screenshots/current-card-flight-smoke.png). These are desktop smoke-test renders, not captures from a physical Miyoo.
 
 ## Build
 

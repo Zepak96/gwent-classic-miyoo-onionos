@@ -440,7 +440,7 @@ bool activateLeader(Game& g, int who, Row target, const std::vector<std::string>
   auto playWeatherFromDeck=[&](const std::string& weatherName, bool anyWeather) {
     auto found=player.deck.end();
     if (!selected.empty()) found=findCard(player.deck,selected);
-    if (found==player.deck.end()) found=std::find_if(player.deck.begin(),player.deck.end(),[&](const Card& c){
+    else found=std::find_if(player.deck.begin(),player.deck.end(),[&](const Card& c){
       const bool weather=c.kind==Kind::Weather;
       return weather && (anyWeather || c.name==weatherName);
     });
@@ -465,44 +465,45 @@ bool activateLeader(Game& g, int who, Row target, const std::vector<std::string>
   }
   else if (id=="emhyr_relentless") {
     auto& grave=g.players[1-who].graveyard;
-    auto found=selected.empty()?std::find_if(grave.begin(),grave.end(),[](const Card& c){return c.kind==Kind::Unit && !c.hero;}):findCard(grave,selected);
-    if(found==grave.end() || found->kind!=Kind::Unit || found->hero) canActivate=false;
+    auto found=selected.empty()?grave.end():findCard(grave,selected);
+    if(found==grave.end() || found->kind!=Kind::Unit) canActivate=false;
     else { player.hand.push_back(*found); grave.erase(found); }
   }
   else if (id=="emhyr_whiteflame" || id=="emhyr_invader" || id=="eredin_treacherous" || id=="francesca_daisy" || id=="king_bran") canActivate=false;
   else if (id=="eredin_commander") { if(g.horn[who][0]) canActivate=false; else g.horn[who][0]=true; }
   else if (id=="eredin_bringer_of_death") {
     auto& grave=player.graveyard;
-    auto found=selected.empty()?std::find_if(grave.begin(),grave.end(),[](const Card& c){return c.kind==Kind::Unit && !c.hero;}):findCard(grave,selected);
-    if(found==grave.end() || found->kind!=Kind::Unit || found->hero) canActivate=false;
+    auto found=selected.empty()?grave.end():findCard(grave,selected);
+    if(found==grave.end() || found->kind!=Kind::Unit) canActivate=false;
     else { player.hand.push_back(*found); grave.erase(found); }
   }
   else if (id=="eredin_destroyer") {
     if(player.hand.size()<2 || player.deck.empty()) canActivate=false;
     else {
       std::vector<std::string> discardIds;
-      if(selectedIds.size()>=2) discardIds={selectedIds[0],selectedIds[1]};
-      else {
-        std::vector<Card> ordered=player.hand;
-        std::sort(ordered.begin(),ordered.end(),[](const Card& a,const Card& b){return a.power<b.power;});
-        discardIds={ordered[0].id,ordered[1].id};
-      }
-      auto first=findCard(player.hand,discardIds[0]); auto second=findCard(player.hand,discardIds[1]);
-      if(first==player.hand.end() || second==player.hand.end() || first==second) canActivate=false;
-      else {
-        std::string drawId=selectedIds.size()>=3?selectedIds[2]:player.deck.back().id;
-        auto draw=findCard(player.deck,drawId);
-        if(draw==player.deck.end()) canActivate=false;
+      if(selectedIds.size()>=3) discardIds={selectedIds[0],selectedIds[1]};
+      else canActivate=false;
+      if(canActivate) {
+        auto first=findCard(player.hand,discardIds[0]); auto second=findCard(player.hand,discardIds[1]);
+        if(first==player.hand.end() || second==player.hand.end() || first==second) canActivate=false;
         else {
-          Card a=*first, b=*second;
-          player.hand.erase(std::remove_if(player.hand.begin(),player.hand.end(),[&](const Card& c){return c.id==a.id||c.id==b.id;}),player.hand.end());
-          player.graveyard.push_back(a); player.graveyard.push_back(b);
-          player.hand.push_back(*draw); player.deck.erase(draw);
+          auto draw=findCard(player.deck,selectedIds[2]);
+          if(draw==player.deck.end()) canActivate=false;
+          else {
+            Card a=*first, b=*second;
+            Card drawn=*draw;
+            player.hand.erase(std::remove_if(player.hand.begin(),player.hand.end(),[&](const Card& c){return c.id==a.id||c.id==b.id;}),player.hand.end());
+            player.graveyard.push_back(a); player.graveyard.push_back(b);
+            player.hand.push_back(std::move(drawn)); player.deck.erase(draw);
+          }
         }
       }
     }
   }
-  else if (id=="eredin_king") playWeatherFromDeck("",true);
+  else if (id=="eredin_king") {
+    if(selected.empty())canActivate=false;
+    else canActivate=playWeatherFromDeck("",true);
+  }
   else if (id=="eredin_treacherous") canActivate=false;
   else if (id=="francesca_queen") scorchEnemyRow(g,who,0);
   else if (id=="francesca_beautiful") { if(g.horn[who][1]) canActivate=false; else g.horn[who][1]=true; }

@@ -162,9 +162,10 @@ int weightBerserker(const Game& game,int who,int row,const Card& card,int score)
   score=8*((count+1)*(count+1)-count*count)+count*score;
   return std::max(1,score);
 }
-int weightMedic(const Game& game,int who,const BoardData& data,int score,int graveOwner) {
+int weightMedic(const Game& game,int who,const BoardData& data,int score,int graveOwner,bool includeHeroes=false) {
   bool hasEligible=false;
-  for(const auto& card:game.players[graveOwner].graveyard)if(isUnit(card)){hasEligible=true;break;}
+  for(const auto& card:game.players[graveOwner].graveyard)
+    if(card.kind==Kind::Unit&&(includeHeroes||!card.hero)){hasEligible=true;break;}
   if(!hasEligible)return std::min(1,score);
   int bonus=0;
   const int ownerOpponent=1-graveOwner;
@@ -219,9 +220,9 @@ std::vector<Card> discardOrder(const Player& player) {
   cards.insert(cards.end(),normal.begin(),normal.end());
   return cards;
 }
-const Card* chooseMedicTarget(const std::vector<Card>& grave) {
+const Card* chooseMedicTarget(const std::vector<Card>& grave,bool includeHeroes=false) {
   std::vector<const Card*> units;
-  for(const auto& card:grave)if(isUnit(card))units.push_back(&card);
+  for(const auto& card:grave)if(card.kind==Kind::Unit&&(includeHeroes||!card.hero))units.push_back(&card);
   if(units.empty())return nullptr;
   auto minSpy=std::min_element(units.begin(),units.end(),[](const Card* a,const Card* b){
     const int ap=a->spy?a->power:std::numeric_limits<int>::max();
@@ -291,9 +292,9 @@ int weightLeader(const Game& game,int who,const BoardData& data,const std::strin
     const auto count=game.players[1-who].hand.size();
     return count==0?0:std::max(10,10*(8-static_cast<int>(count)));
   }
-  if(id=="emhyr_relentless")return weightMedic(game,who,data,0,1-who);
+  if(id=="emhyr_relentless")return weightMedic(game,who,data,0,1-who,true);
   if(id=="eredin_commander")return weightHornRow(game,who,0);
-  if(id=="eredin_bringer_of_death")return weightMedic(game,who,data,0,who);
+  if(id=="eredin_bringer_of_death")return weightMedic(game,who,data,0,who,true);
   if(id=="eredin_destroyer") {
     auto discard=discardOrder(game.players[who]);
     if(discard.size()<2)return 0;
@@ -330,17 +331,18 @@ int weightLeader(const Game& game,int who,const BoardData& data,const std::strin
 std::vector<std::string> leaderSelection(const Game& game,int who,const std::string& id,const BoardData& data) {
   const auto& player=game.players[who];
   if(id=="emhyr_relentless") {
-    const auto* target=chooseMedicTarget(game.players[1-who].graveyard);
+    const auto* target=chooseMedicTarget(game.players[1-who].graveyard,true);
     return target?std::vector<std::string>{target->id}:std::vector<std::string>{};
   }
   if(id=="eredin_bringer_of_death") {
-    const auto* target=chooseMedicTarget(player.graveyard);
+    const auto* target=chooseMedicTarget(player.graveyard,true);
     return target?std::vector<std::string>{target->id}:std::vector<std::string>{};
   }
   if(id=="eredin_destroyer") {
     auto discard=discardOrder(player);
     std::vector<std::string> chosen;
     for(const auto& card:discard)if(card.power<7 && chosen.size()<2)chosen.push_back(card.id);
+    if(chosen.size()==2&&!player.deck.empty())chosen.push_back(player.deck.back().id);
     return chosen;
   }
   if(id=="eredin_king") {
