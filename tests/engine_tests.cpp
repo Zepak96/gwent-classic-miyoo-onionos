@@ -138,7 +138,7 @@ static void referenceCatalog() {
   assert(roach != catalog.end());
   auto blueStripes = std::find_if(catalog.begin(), catalog.end(), [](const Card& c){return c.name=="Blue Stripes Commando";});
   assert(blueStripes != catalog.end());
-  auto triple = makeReferenceDeck({{blueStripes->referenceIndex,3}});
+  auto triple = makeReferenceDeck(std::vector<std::pair<int,int>>{{blueStripes->referenceIndex,3}});
   assert(triple.size()==3 && triple[0].group=="Blue Stripes Commando");
   auto leader = std::find_if(catalog.begin(), catalog.end(), [](const Card& c){return c.kind==Kind::Leader && c.faction==Faction::NorthernRealms;});
   assert(leader != catalog.end());
