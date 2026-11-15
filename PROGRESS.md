@@ -22,7 +22,7 @@ Docelowa gra to wyłącznie Gwint jako minigra w Wiedźminie 3: Wild Hunt, z zaw
 ### Etap 2 — silnik
 
 - [~] Model danych kart i graczy; podstawowe punktowanie z pogodą, rogiem, Morale, Więzią i immunitetem Bohaterów.
-- [~] Szpieg, Medyk, Manekin, Zbiórka, Pożoga, pasowanie, remis i przejście rundy. Podstawowe zdolności frakcji są przeniesione z `factions.js`: dobór Królestw Północy, wygrana Nilfgaardu przy remisie, losowy oddział Potworów pozostający po rundzie, wybór pierwszego gracza przez ludzkiego Scoia'tael oraz wskrzeszenie dwóch jednostek Skellige na początku trzeciej rundy (wybór gracza zwinnej jednostki, AI losowo wybiera i ustawia ją na lepszym rzędzie). Weryfikacja szczegółowych interakcji nadal trwa.
+- [~] Szpieg, Medyk, Manekin, Zbiórka, Pożoga, pasowanie, remis i przejście rundy. Podstawowe zdolności frakcji są przeniesione z `factions.js`: dobór Królestw Północy, wygrana Nilfgaardu przy remisie, losowy oddział Potworów pozostający po rundzie, wybór pierwszego gracza przez ludzkiego Scoia'tael oraz losowy wybór do dwóch jednostek z cmentarza Skellige na początku trzeciej rundy; gracz wybiera rząd tylko wtedy, gdy wskrzeszona karta jest Zwinna. Ostatni przypadek poprawiono w commicie `95fd156`; dalsza weryfikacja interakcji nadal trwa.
 - [~] Rozdanie 10 kart z deterministycznie tasowanej talii oraz jednorazowa wymiana do 2 kart dla każdego gracza.
 - [~] Zaimportowany katalog 216 rekordów; generator kompiluje go jako 258 instancji/rekordów do natywnego builda.
 - [~] Zaimportowano 10 referencyjnych talii przeciwników wraz z liderami i listami kart; budowanie talii z tych przepisów jest spięte z katalogiem.
@@ -48,7 +48,7 @@ Docelowa gra to wyłącznie Gwint jako minigra w Wiedźminie 3: Wild Hunt, z zaw
 - [~] Dodano tryb inspekcji zaznaczonej karty (`I`/przytrzymanie SELECT przez 500 ms) z powiększoną oryginalną grafiką i większym opisem. To ułatwienie odczytu dla 640×480; nie zastępuje pełnej korekty typografii, wyrównania liczb, geometrii wszystkich okien ani animacji źródłowych.
 - [~] Poprawiono czytelność inspektora: smoke pokazuje pełnowymiarową Cirillę z widocznym cytatem na karcie oraz pełnym opisem Muster obok. W zwykłym podglądzie meczu zasady są teraz większe (2×); długie opisy pokazują cztery wiersze i wskazówkę otwarcia pełnego tekstu klawiszem `I`. Lokalny build SDL2, CTest 2/2 i smoke działają; test fizyczny oraz dalsze porównanie wszystkich napisów i medalionów nadal otwarte.
 - [~] Przeniesiono podstawowy lot zagrywanej karty z ręki do rzędu/pogody w 500 ms dla gracza i AI. Audyt CSS/JS wskazał też kaskadowe przesunięcia karuzeli i przejścia/fade; te animacje oraz zmiany układu są nadal niezaimplementowane.
-- [~] Przypięte grafiki kart, plansza, ikony SVG i SFX z repo są w `assets/gwent-classic/`; sześć SVG ma rastrowe odpowiedniki PNG dla SDL. Dodano dekodowanie/odtwarzanie wszystkich 35 referencyjnych MP3 przez SDL Audio i `dr_mp3`, z odgłosami menu, nawigacji, kart, rund i pasowania; CI dekoduje cały zestaw. Muzyki w repo wzorcowym nie ma; jej odtworzenie i test audio na Miyoo są otwarte.
+- [~] Przypięte grafiki kart, plansza, ikony SVG i SFX z repo są w `assets/gwent-classic/`; sześć SVG ma rastrowe odpowiedniki PNG dla SDL. Dodano dekodowanie 35 efektów MP3 oraz zapętlane tło menu i meczu z dwóch ścieżek dostarczonych przez właścicielkę projektu. Lokalny smoke dekoduje efekty i muzykę oraz przełącza odtwarzanie; fizyczny test audio na Miyoo pozostaje otwarty.
 - [x] Zgodność pogody: ponowne zagranie już aktywnej karty pogodowej odrzuca duplikat na cmentarz właściciela bez ponownego aktywowania efektu. Dodano regresję dla duplikatu Biting Frost i późniejszego Czystego Nieba; lokalne CTest 2/2 oraz dekodowanie 35 MP3 przechodzą.
 - [~] Zbudowano frontend armhf oficjalnym toolchainem Miyoo GCC 8.2.1 i przypiętym SDL2; po poprawce czytelności ZIP OnionOS z commita `d4f4e6c` (workflow ARM #43740551240) skopiowano na kartę SD OnionOS v4.3.1-1. Audyt plików: 598/598 plików gry i skrót `.notfound` zgodne SHA-256; binarka na karcie ma hash `d57e6584fe75ed2c8abb7a01240b832324ee86e8eb9ba05f147519bc698b5844`. Skrót wymaga uruchomienia `~Import ports.miyoocmd`; start gry, wejście, audio i wydajność czekają na fizyczny test.
 - [~] Desktop/ARM build i smoke; regresja silnika istnieje dla wybranych reguł. Pełne pokrycie, pomiar zasobów i test uruchomienia na sprzęcie nadal otwarte.
@@ -61,6 +61,7 @@ Użytkownik chce później rozbudować grę o lekką warstwę fabularną. Ten za
 - [ ] Rosnąca trudność przeciwników i talii między pojedynkami.
 - [ ] Finałowy przeciwnik/boss oraz zakończenie małej kampanii.
 - [ ] Menu kampanii i osobny zapis jej postępu.
+- [ ] Po wydaniu bieżącej wersji odświeżyć menu główne w kierunku atmosfery z referencyjnego zrzutu ekranu dostarczonego przez użytkowniczkę.
 - [ ] Kilka wariantów plansz/stolików z legalną, oryginalną oprawą graficzną.
 - [ ] Opracować krótkie wprowadzenie fabularne oraz teksty PL/EN, bez naruszania licencji tekstów i assetów gry.
 
@@ -84,7 +85,7 @@ Funkcja pozostaje nieukończona, dopóki nie ma implementacji i testu. Kompatybi
 - `SDL_event_mini.c` odpytuje `/dev/input/event0` i mapuje linuksowe klawisze na SDL keyboard events. Wdrożono translację A=Left Ctrl, B=Left Alt, X=Left Shift, Y=Space, Start=Return, Select=Escape, L=Tab, R=Backspace, L2/R2=PageDown/PageUp. Dodano `patches/miyoo-sdl-keyhome.patch`, zbudowano przypięty SDL Mini z mapowaniem MENU=`KEY_HOME`→`SDLK_HOME` i dołączono patch do paczki.
 - Dodano ekran pauzy z kontynuacją, ręcznym save/load, poziomem AI, wyborem PL/EN, przełącznikiem SFX i powrotem do menu talii. Select wymaga potwierdzenia przed pasowaniem; przytrzymanie Select otwiera inspektor. Zdarzenie Home zapisuje mecz i kończy proces. Sterowanie fizyczne nadal wymaga testu na konsoli.
 - Lokalny build SDL2 i CTest (2/2) przeszły; smoke dekoduje 35/35 SFX, sprawdza translację fizycznych klawiszy, tryb pauzy, potwierdzanie pasowania i ochronę aktywnego wyboru celu. Wygenerowano oraz obejrzano klatki w trybie compositingu 640×480. Pełny cross-build i paczka ARM przechodzą w tym przebiegu; nową paczkę należy jeszcze skopiować i porównać z kartą.
-- Weryfikacja na urządzeniu nadal otwarta: fizyczne przyciski, start, dźwięk, RAM, stabilność i prawdziwa wydajność nie są potwierdzone. Referencyjny frontend 1:1, tutorial, pełne PL/EN, muzyka i kompletna zgodność reguł również pozostają do wdrożenia.
+- Weryfikacja na urządzeniu nadal otwarta: fizyczne przyciski, start, dźwięk, RAM, stabilność i prawdziwa wydajność nie są potwierdzone. Referencyjny frontend 1:1, tutorial, pełne PL/EN i kompletna zgodność reguł również pozostają do wdrożenia. Rozbudowane menu i kampania arcade są zaplanowane po wydaniu tej wersji.
 
 ## Regresja punktowania Więzi — 15.11.2026
 

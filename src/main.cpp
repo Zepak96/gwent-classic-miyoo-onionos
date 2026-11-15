@@ -230,7 +230,8 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="instructions")return pl?"LEWO/PRAWO - TALIA":"LEFT/RIGHT - DECK";
   if(key=="confirm")return pl?"ENTER - GRA   Z - JEZYK":"ENTER - PLAY   Z - LANGUAGE";
   if(key=="mulligan")return pl?"WYBIERZ DO 2 KART DO WYMIANY":"CHOOSE UP TO 2 CARDS TO MULLIGAN";
-  if(key=="confirm_mulligan")return pl?"SPACJA - ZAZNACZ   ENTER - ZATWIERDZ":"SPACE - MARK   ENTER - CONFIRM";
+  if(key=="mulligan_controls")return pl?"A: WYBIERZ   START: ZATWIERDZ / POMIN":"A: MARK CARD   START: CONFIRM / SKIP";
+  if(key=="mulligan_details")return pl?"X: POWIEKSZ KARTE   LEWO/PRAWO: WYBOR":"X: ENLARGE CARD   LEFT/RIGHT: SELECT";
   if(key=="choose_first")return pl?"SCOIA'TAEL WYBIERA KOLEJKE: LEWO/PRAWO, ENTER":"SCOIA'TAEL CHOOSES FIRST: LEFT/RIGHT, ENTER";
   if(key=="human_first")return pl?"ZACZYNASZ TY":"YOU START";
   if(key=="ai_first")return pl?"ZACZYNA PRZECIWNIK":"OPPONENT STARTS";
@@ -942,6 +943,9 @@ void drawMatch(SDL_Renderer* r,const App& a) {
       text(r,214,161,tr(a,"choose_first"),paper,1);
     } else {
       text(r,214,161,tr(a,"mulligan"),paper,1);
+      const int remaining=std::max(0,2-static_cast<int>(a.mulligan.size()));
+      const std::string counter=(a.language==Language::Polish?"WYMIANY: ":"REDRAWS: ")+std::to_string(remaining)+"/2";
+      text(r,214,185,counter,gold,1);
     }
   } else if(a.game.phase==gwent::Phase::RoundSetup) {
     std::vector<const gwent::Card*> candidates;
@@ -980,6 +984,11 @@ void drawMatch(SDL_Renderer* r,const App& a) {
   if(a.cardDetailsOpen&&!me.hand.empty()&&showHand) {
     const int selected=std::clamp(a.handIndex,0,static_cast<int>(me.hand.size())-1);
     drawCardDetails(r,a,me.hand[static_cast<std::size_t>(selected)]);
+  }
+  if(a.game.phase==gwent::Phase::Mulligan&&!a.game.scoiataelChoicePending) {
+    box(r,8,328,410,43,Color{7,6,5,238});frame(r,8,328,410,43,Color{143,108,54});
+    centeredTextInBox(r,16,333,394,13,tr(a,"mulligan_controls"),paper,1);
+    centeredTextInBox(r,16,351,394,13,tr(a,"mulligan_details"),Color{214,190,150},1);
   }
   if(a.leaderSelectionMode) {
     const auto cards=leaderChoiceCards(a);
@@ -1099,7 +1108,10 @@ void handleMatchKey(App& a,SDL_Keycode key) {
     }
     return;
   }
-  if(key==SDLK_p) { a.pauseOpen=true;a.pauseIndex=0;return; }
+  if(key==SDLK_p) {
+    if(a.game.phase==gwent::Phase::Mulligan) { handleMatchKey(a,SDLK_RETURN);return; }
+    a.pauseOpen=true;a.pauseIndex=0;return;
+  }
   if(key==SDLK_BACKQUOTE) {
     if(a.game.phase==gwent::Phase::PlayerTurn&&!a.leaderSelectionMode&&!a.leaderRevealOpen&&!a.targetMode)a.passConfirmationOpen=true;
     else if(a.game.phase==gwent::Phase::Mulligan)handleMatchKey(a,SDLK_RETURN);
@@ -1167,6 +1179,7 @@ void handleMatchKey(App& a,SDL_Keycode key) {
     return;
   }
   if(a.game.phase==gwent::Phase::Mulligan) {
+    if(key==SDLK_l) { handleMatchKey(a,SDLK_RETURN);return; }
     if(a.game.scoiataelChoicePending) {
       if(key==SDLK_LEFT||key==SDLK_a||key==SDLK_RIGHT||key==SDLK_d)a.game.firstPlayer=1-a.game.firstPlayer;
       else if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x)gwent::chooseScoiataelFirstPlayer(a.game,a.game.firstPlayer);
@@ -1410,12 +1423,16 @@ int main(int argc,char** argv) {
   }
   app.audio.initialize(app.assetDirectory);
   if(argc>1&&std::string(argv[1])=="--audio-test") {
-    std::vector<std::string> failures;
-    const bool okay=app.audio.available()&&app.audio.validateAllSfx(failures);
+    std::vector<std::string> failures,musicFailures;
+    const bool okay=app.audio.available()&&app.audio.validateAllSfx(failures)&&app.audio.validateBackgroundMusic(musicFailures);
     if(!okay) {
       for(const auto& failure:failures)std::cerr<<"Could not decode SFX: "<<failure<<"\n";
+      for(const auto& failure:musicFailures)std::cerr<<"Could not decode background music: "<<failure<<"\n";
       if(!app.audio.available())std::cerr<<"Could not open SDL audio device: "<<SDL_GetError()<<"\n";
-    } else std::cout<<"Decoded every reference SFX file.\n";
+    } else {
+      app.audio.playMusic("menu");SDL_Delay(80);app.audio.playMusic("match");SDL_Delay(80);
+      std::cout<<"Decoded all reference SFX and both background music tracks; playback switched successfully.\n";
+    }
     app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return okay?0:5;
   }
   if(argc>1&&std::string(argv[1])=="--input-test") {
@@ -1443,11 +1460,24 @@ int main(int argc,char** argv) {
     handleMatchKey(app,SDLK_x);
     okay=okay&&app.aiDifficulty==gwent::AiDifficulty::Hard;
     app.pauseOpen=false;
+    app.game=gwent::Game{};app.screen=Screen::Match;app.miyooControls=true;
+    app.game.phase=gwent::Phase::Mulligan;
+    gwent::Card mulliganCard;mulliganCard.id="mulligan-test";mulliganCard.kind=gwent::Kind::Unit;
+    gwent::Card replacement;replacement.id="replacement-test";replacement.kind=gwent::Kind::Unit;
+    app.game.players[0].hand={mulliganCard};app.game.players[0].deck={replacement};
+    app.mulligan.clear();
+    handleMatchKey(app,normalizeMiyooKey(app,SDLK_LCTRL));
+    okay=okay&&app.mulligan.size()==1;
+    handleMatchKey(app,normalizeMiyooKey(app,SDLK_SPACE));
+    okay=okay&&app.game.phase==gwent::Phase::PlayerTurn&&app.game.players[0].mulliganDone&&app.mulligan.empty();
+    app.game=gwent::Game{};app.game.phase=gwent::Phase::Mulligan;app.mulligan.clear();
+    handleMatchKey(app,normalizeMiyooKey(app,SDLK_RETURN));
+    okay=okay&&app.game.phase==gwent::Phase::PlayerTurn&&app.game.players[0].mulliganDone&&app.mulligan.empty();
     handleMatchKey(app,SDLK_BACKQUOTE);
     okay=okay&&app.passConfirmationOpen&&!app.game.players[0].passed;
     handleMatchKey(app,SDLK_x);
     okay=okay&&!app.passConfirmationOpen&&app.game.players[0].passed;
-    if(okay)std::cout<<"Miyoo keyboard mapping and guarded pass passed.\n";
+    if(okay)std::cout<<"Miyoo controls, mulligan selection/skip and guarded pass passed.\n";
     else std::cerr<<"Miyoo keyboard mapping or guarded pass failed.\n";
     app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return okay?0:10;
   }
@@ -1481,6 +1511,13 @@ int main(int argc,char** argv) {
       if(!saveFrame(argv[4])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
     }
     startMatch(app);
+    if(argc>11) {
+      app.game.phase=gwent::Phase::Mulligan;
+      app.mulligan.clear();
+      if(!app.game.players[0].hand.empty())app.mulligan.push_back(app.game.players[0].hand.front().id);
+      clearFrame();drawMatchOnScreen(renderer,app);presentFrame();
+      if(!saveFrame(argv[11])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
+    }
     gwent::replaceMulliganCards(app.game,0,{}); gwent::replaceMulliganCards(app.game,1,gwent::chooseAiMulligan(app.game,1));
     app.game.phase=gwent::Phase::PlayerTurn;app.game.currentPlayer=0;
     clearFrame();
@@ -1618,6 +1655,7 @@ int main(int argc,char** argv) {
       else if(app.game.phase==gwent::Phase::MatchResult)app.audio.play(app.game.matchWinner==0?"game_win":"game_lose");
       observedPhase=app.game.phase;
     }
+    app.audio.playMusic(app.screen==Screen::Match?"match":"menu");
     SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);
     if(app.screen==Screen::Title)drawTitle(renderer,app);
     else if(app.screen==Screen::DeckSelect)drawDeckSelect(renderer,app);

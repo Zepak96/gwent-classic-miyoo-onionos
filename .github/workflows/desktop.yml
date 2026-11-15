@@ -26,14 +26,14 @@ jobs:
         run: cmake --build build-sdl --parallel
       - name: Test
         run: ctest --test-dir build-sdl --output-on-failure
-      - name: Decode reference SFX
+      - name: Decode effects and background music
         run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./build-sdl/gwent --audio-test
       - name: Frontend smoke test
-        run: SDL_VIDEODRIVER=dummy ./build-sdl/gwent --smoke-test frontend-smoke.bmp deck-builder-smoke.bmp card-details-smoke.bmp card-flight-smoke.bmp deck-select-smoke.bmp title-smoke.bmp leader-choice-smoke.bmp leader-reveal-smoke.bmp pause-smoke.bmp
+        run: SDL_VIDEODRIVER=dummy ./build-sdl/gwent --smoke-test frontend-smoke.bmp deck-builder-smoke.bmp card-details-smoke.bmp card-flight-smoke.bmp deck-select-smoke.bmp title-smoke.bmp leader-choice-smoke.bmp leader-reveal-smoke.bmp pause-smoke.bmp mulligan-smoke.bmp
       - name: Miyoo physical-key mapping
         run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./build-sdl/gwent --input-test
       - name: Miyoo software-composition smoke test
-        run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy GWENT_SOFTWARE_COMPOSITE=1 ./build-sdl/gwent --smoke-test composite-frontend-smoke.bmp composite-deck-builder-smoke.bmp composite-card-details-smoke.bmp composite-card-flight-smoke.bmp composite-deck-select-smoke.bmp composite-title-smoke.bmp composite-leader-choice-smoke.bmp composite-leader-reveal-smoke.bmp composite-pause-smoke.bmp
+        run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy GWENT_SOFTWARE_COMPOSITE=1 ./build-sdl/gwent --smoke-test composite-frontend-smoke.bmp composite-deck-builder-smoke.bmp composite-card-details-smoke.bmp composite-card-flight-smoke.bmp composite-deck-select-smoke.bmp composite-title-smoke.bmp composite-leader-choice-smoke.bmp composite-leader-reveal-smoke.bmp composite-pause-smoke.bmp composite-mulligan-smoke.bmp
       - name: Upload frontend smoke frames
         uses: actions/upload-artifact@v4
         with:
@@ -48,6 +48,7 @@ jobs:
             leader-choice-smoke.bmp
             leader-reveal-smoke.bmp
             pause-smoke.bmp
+            mulligan-smoke.bmp
             composite-frontend-smoke.bmp
             composite-deck-builder-smoke.bmp
             composite-card-details-smoke.bmp
@@ -57,5 +58,6 @@ jobs:
             composite-leader-choice-smoke.bmp
             composite-leader-reveal-smoke.bmp
             composite-pause-smoke.bmp
+            composite-mulligan-smoke.bmp
           if-no-files-found: error
           retention-days: 7

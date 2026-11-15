@@ -29,9 +29,9 @@ GNU GCC runtime libraries
   LICENSE.GCC-runtime-exception-3.1.txt.
 
 The package includes the pinned reference artwork, SVG icons, and SFX under
-assets/gwent-classic/. Asset origins, CDPR authorization as reported by the
+assets/gwent-classic/. It also includes two MP3 background tracks supplied by
+the project owner. Asset origins, CDPR authorization as reported by the
 project owner, and the upstream RandomPianist SFX credit are documented in
-assets/gwent-classic/ASSET_ORIGIN.md. Music tracks are absent from the pinned
-reference repository. The card catalog and deck data are covered by the
-notices in the source repository's LICENSES.md and
+assets/gwent-classic/ASSET_ORIGIN.md. The card catalog and deck data are
+covered by the notices in the source repository's LICENSES.md and
 third_party/gwent-classic/NOTICE.md.

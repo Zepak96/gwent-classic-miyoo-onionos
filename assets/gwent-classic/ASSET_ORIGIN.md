@@ -6,6 +6,9 @@ These files are copied from `asundr/gwent-classic` at commit
 - `img/`: 531 files — the Gwent board, 216 small card images, 221 large card
   images, faction backs, interface icons, overlays, and notifications.
 - `sfx/`: 35 MP3 sound effects included in the reference repository.
+- `music/`: two MP3 background tracks supplied by the project owner: the Blood
+  and Wine main-menu theme (`menu.mp3`) and the Gwent match theme
+  (`match.mp3`). These are not part of the pinned reference repository.
 - `svg/`: 6 interface icons.
 - `img/icons/ui_*.png`: 6 transparent 256x256 PNG renderings of the six SVG
   icons, generated with CairoSVG 2.9.1. The source SVG files remain included;
@@ -15,8 +18,8 @@ These files are copied from `asundr/gwent-classic` at commit
 
 The reference README credits RandomPianist for many of its edited sound
 effects. This attribution is preserved here. Its music is streamed from
-YouTube by the reference browser game; there are no music tracks in this
-repository to port.
+YouTube by the reference browser game; the project owner supplied separate
+Witcher 3 music tracks for this port.
 
 The project owner reports that a CD PROJEKT RED representative authorized
 using CDPR game assets in this non-commercial Miyoo Mini Plus mod. The private

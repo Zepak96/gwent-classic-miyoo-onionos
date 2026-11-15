@@ -29,7 +29,7 @@ mkdir -p "$game_dir/assets/gwent-classic"
 install -m 755 "$build_dir/gwent" "$game_dir/gwent"
 install -m 755 "$(dirname "$0")/../packaging/onion/launch.sh" "$game_dir/launch.sh"
 install -m 755 "$(dirname "$0")/../packaging/onion/GwentClassic.notfound" "$shortcut_dir/GwentClassic.notfound"
-cp -a assets/gwent-classic/img assets/gwent-classic/sfx assets/gwent-classic/svg "$game_dir/assets/gwent-classic/"
+cp -a assets/gwent-classic/img assets/gwent-classic/sfx assets/gwent-classic/svg assets/gwent-classic/music "$game_dir/assets/gwent-classic/"
 
 copy_shared() {
   local source="$1" name="$2"
