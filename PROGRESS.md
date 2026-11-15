@@ -143,6 +143,12 @@ Funkcja pozostaje nieukończona, dopóki nie ma implementacji i testu. Kompatybi
 - Porównanie `Card.animate()` z `.card > div:nth-child(4)` wykazało, że SDL zmieniał rozmiar grafiki skokowo. Dodano źródłową krzywą CSS `ease` i przejścia tła 250 ms: 40→100%, 100→80% i 80→40%, przy zachowaniu fade-in/out oraz hold.
 - `--input-test` sprawdza granice faz i wartości skali; smoke generuje klatkę Morale w trakcie pierwszego przejścia. Desktop build, CTest (2/2), `--input-test`, pełny smoke, ARM GCC 8.2 hard-float i ZIP OnionOS przeszły. ZIP SHA-256: `e9b8fbebbc730a58fa94e87e41caebdb6bc7bdedb235db9af6d9dfd78cca1046`. Nie skopiowano go na SD ani nie testowano na urządzeniu.
 
+## Układ rzędów i animacja odstępów — 15.11.2026
+
+- Wyrównano pozycje kart w rzędzie do `row-cards` w źródłowym CSS: karty są centrowane, a odstępy/optyczne nakładanie wynikają ze źródłowej szerokości kart i `resizeCardContainer(10, .075, .00325)`.
+- Po zmianie liczby kart pozycje i odstępy interpolują przez 250 ms krzywą CSS `ease` odpowiadającą przejściu marginesów w źródle. Lot karty i nakładki zdolności korzystają z nowych docelowych pozycji rzędów.
+- Test wejścia sprawdza pozycję dla 1/9 kart, zagęszczanie przy 10/20 oraz interpolację 250 ms; smoke renderuje 10 kart w połowie przejścia. Desktop build, CTest (2/2), `--input-test` i pełny smoke przeszły. Cross-build GCC 8.2 zweryfikował ELF32 ARM hard-float; ZIP OnionOS przeszedł `unzip -t`, SHA-256 `3dc8fc01a09a3c6d418f57fbac3862d595392ede2d57574040c15a2f6b646f44`; hash binarki w ZIP zgadza się z ARM buildem (`a0d2d056205cb0ba380365317f5400656797b347606c0254f2a7f7ca1196f8d3`). Nie wgrywano na SD.
+
 ## Animacje z repozytorium źródłowego — 15.11.2026
 
 Przeniesiono do SDL wybrane istniejące animacje źródłowe: lot karty trwa 499 ms, oryginalne grafiki `anim_*.png` są używane dla efektów kart, a nakładka pogody pojawia się i znika w 500 ms. Szczegóły timingów i lista efektów nadal wymagających portu są w `docs/REFERENCE_ANIMATIONS.md`. To jest częściowy postęp, nie ukończony port animacji 1:1. Desktop build, CTest 2/2 i test wejścia SDL przeszły; ta zmiana nie była cross-buildowana dla Miyoo, kopiowana na kartę SD ani sprawdzana na konsoli.

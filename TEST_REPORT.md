@@ -172,3 +172,8 @@ Ported the reference `Player.canPlay()`, `Player.endTurn()`, and `Game.startRoun
 
 - Compared `Card.animate()` and the source CSS background-size transition. Replaced instantaneous overlay size jumps with the source 250 ms CSS `ease` curve across the 40→100%, 100→80% and 80→40% stages.
 - Added boundary checks to `--input-test` and an SDL smoke frame with the Morale overlay midway through its first scale transition. Desktop build, CTest (2/2), `--input-test`, and full SDL dummy smoke passed. ARM GCC 8.2 build produced a 32-bit ARM hard-float ELF; the OnionOS ZIP passed `unzip -t`, SHA-256 `e9b8fbebbc730a58fa94e87e41caebdb6bc7bdedb235db9af6d9dfd78cca1046`. No SD copy or physical Miyoo test was performed.
+
+## Source row centering and spacing transition — 15.11.2026
+
+- Ported `Row.resize()` card spacing and `.card`'s 250 ms margin transition, including centered rows and source overlap for larger unit counts. Card flight/effect target coordinates now use that row layout.
+- Added test coverage for row geometry at 1/9/10/20 cards and mid-transition interpolation; added a 10-card half-transition SDL smoke frame. Desktop build, CTest 2/2, `--input-test`, and full SDL smoke passed; the 640×480 frame was visually inspected. ARM GCC 8.2 produced a 32-bit ARM hard-float ELF, and the OnionOS ZIP passed `unzip -t` with SHA-256 `3dc8fc01a09a3c6d418f57fbac3862d595392ede2d57574040c15a2f6b646f44`; packaged binary hash matches ARM build `a0d2d056205cb0ba380365317f5400656797b347606c0254f2a7f7ca1196f8d3`. No SD install or physical Miyoo test was performed.

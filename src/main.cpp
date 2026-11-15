@@ -165,6 +165,12 @@ struct App {
     Uint32 startedAt{0};
     Uint32 duration{1650};
   };
+  struct RowLayout {
+    bool initialized{false};
+    std::size_t cardCount{0};
+    double fromX{0},fromPitch{0},toX{0},toPitch{0};
+    Uint32 startedAt{0};
+  };
   Screen screen{Screen::DeckBuilder};
   Language language{Language::Polish};
   std::size_t deckIndex{0};
@@ -192,6 +198,7 @@ struct App {
   std::array<std::array<Uint32,3>,2> weatherChangedAt{};
   std::array<std::array<bool,3>,2> weatherTransition{};
   std::array<std::array<std::string,3>,2> weatherOverlay{};
+  std::array<std::array<RowLayout,3>,2> rowLayouts{};
   bool weatherInitialized{false};
   Uint32 selectDownAt{0};
   bool selectLongPressed{false};
@@ -228,6 +235,41 @@ double sourceEase(double progress) {
   }
   const double inverse=1.0-t;
   return 3.0*inverse*inverse*t*0.1+3.0*inverse*t*t+t*t*t;
+}
+struct SourceRowGeometry { double firstX{0},pitch{0}; };
+SourceRowGeometry sourceRowGeometry(std::size_t cardCount) {
+  constexpr double rowLeft=170.0,rowWidth=336.0,rowCardsLeft=0.20,rowCardsWidth=0.797;
+  constexpr double cardWidth=4.45*W/100.0,smallMargin=0.075*W/100.0,overlapCoefficient=0.00325*W/100.0;
+  const double areaX=rowLeft+rowWidth*rowCardsLeft;
+  const double areaWidth=rowWidth*rowCardsWidth;
+  if(cardCount==0)return {areaX+areaWidth/2.0,cardWidth+2*smallMargin};
+  const double n=static_cast<double>(cardCount);
+  const double sideMargin=cardCount<10?smallMargin:(areaWidth-cardWidth*n)/(2*n)-overlapCoefficient*n;
+  const double pitch=cardWidth+2*sideMargin;
+  const double total=n*pitch;
+  return {areaX+(areaWidth-total)/2.0+sideMargin,pitch};
+}
+SourceRowGeometry currentRowGeometry(const App::RowLayout& layout,std::size_t cardCount,Uint32 now) {
+  if(!layout.initialized)return sourceRowGeometry(cardCount);
+  const Uint32 elapsed=std::min<Uint32>(now-layout.startedAt,250);
+  const double progress=sourceEase(static_cast<double>(elapsed)/250.0);
+  return {layout.fromX+(layout.toX-layout.fromX)*progress,
+          layout.fromPitch+(layout.toPitch-layout.fromPitch)*progress};
+}
+void updateRowLayouts(App& a,Uint32 now) {
+  for(int owner=0;owner<2;++owner)for(int row=0;row<3;++row) {
+    auto& layout=a.rowLayouts[owner][row];
+    const std::size_t count=a.game.players[owner].board[row].size();
+    if(!layout.initialized) {
+      const auto geometry=sourceRowGeometry(count);
+      layout={true,count,geometry.firstX,geometry.pitch,geometry.firstX,geometry.pitch,now};
+    } else if(layout.cardCount!=count) {
+      const auto current=currentRowGeometry(layout,layout.cardCount,now);
+      const auto target=sourceRowGeometry(count);
+      layout.cardCount=count;layout.fromX=current.firstX;layout.fromPitch=current.pitch;
+      layout.toX=target.firstX;layout.toPitch=target.pitch;layout.startedAt=now;
+    }
+  }
 }
 int sourceAbilityScalePercent(Uint32 elapsed) {
   const auto interpolate=[&](int from,int to,Uint32 time) {
@@ -797,7 +839,8 @@ void animatePlayedCard(App& a,const gwent::Card& card,int player,int handIndex,i
     const auto it=std::find_if(cards.begin(),cards.end(),[&](const gwent::Card& item){return item.id==card.id;});
     if(it==cards.end())continue;
     const int index=static_cast<int>(it-cards.begin());
-    flight.owner=owner;flight.row=row;flight.toX=237+index*29;
+    const auto geometry=sourceRowGeometry(cards.size());
+    flight.owner=owner;flight.row=row;flight.toX=static_cast<int>(std::lround(geometry.firstX+index*geometry.pitch));
     flight.toY=owner==0?143+row*45:5+(2-row)*45;found=true;
   }
   if(!found) {
@@ -837,8 +880,10 @@ void queueTargetEffect(App& a,const std::string& icon,int x,int y,Uint32 delay=0
   a.cardEffects.push_back(std::move(visual));
 }
 void queueTriggeredEffects(App& a,const gwent::Game& before,const gwent::Card& played,int player) {
-  const auto boardPosition=[](int owner,int row,int index) {
-    return std::pair<int,int>{237+index*29,owner==0?143+row*45:5+(2-row)*45};
+  const auto boardPosition=[](int owner,int row,int index,std::size_t cardCount) {
+    const auto geometry=sourceRowGeometry(cardCount);
+    return std::pair<int,int>{static_cast<int>(std::lround(geometry.firstX+index*geometry.pitch)),
+                              owner==0?143+row*45:5+(2-row)*45};
   };
   const auto containsId=[](const std::vector<gwent::Card>& cards,const std::string& id) {
     return std::any_of(cards.begin(),cards.end(),[&](const gwent::Card& c){return c.id==id;});
@@ -854,7 +899,7 @@ void queueTriggeredEffects(App& a,const gwent::Game& before,const gwent::Card& p
       for(int index=0;index<static_cast<int>(oldRow.size());++index) {
         const auto& target=oldRow[index];
         if(containsId(a.game.players[owner].graveyard,target.id)) {
-          const auto [x,y]=boardPosition(owner,row,index);queueTargetEffect(a,"scorch",x,y);
+          const auto [x,y]=boardPosition(owner,row,index,oldRow.size());queueTargetEffect(a,"scorch",x,y);
         }
       }
     }
@@ -866,7 +911,7 @@ void queueTriggeredEffects(App& a,const gwent::Game& before,const gwent::Card& p
       const auto& target=current[index];
       const bool existed=std::any_of(before.players[0].board.begin(),before.players[0].board.end(),[&](const auto& r){return containsId(r,target.id);})||
                          std::any_of(before.players[1].board.begin(),before.players[1].board.end(),[&](const auto& r){return containsId(r,target.id);});
-      const auto [x,y]=boardPosition(owner,row,index);
+      const auto [x,y]=boardPosition(owner,row,index,current.size());
       if(played.medic&&!existed&&containsId(before.players[player].graveyard,target.id))
         queueTargetEffect(a,"medic",x,y,499);
       else if(played.muster&&!existed&&target.id!=played.id)
@@ -1007,13 +1052,12 @@ void drawRow(SDL_Renderer* r,const App& a,int owner,int row,int y) {
   rowScoreText(r,left,y,std::to_string(total));
   if(a.game.horn[owner][row])drawImage(r,a,"img/icons/power_horn.png",left+20,y+8,27,28);
   const auto& cards=a.game.players[owner].board[row];
-  const int start=left+67,shown=std::min(9,static_cast<int>(cards.size()));
-  for(int i=0;i<shown;++i) {
-    const auto& card=cards[static_cast<std::size_t>(i)];
+  const auto geometry=currentRowGeometry(a.rowLayouts[owner][row],cards.size(),SDL_GetTicks());
+  for(std::size_t i=0;i<cards.size();++i) {
+    const auto& card=cards[i];
     if(a.cardFlight.active&&a.cardFlight.owner==owner&&a.cardFlight.row==row&&a.cardFlight.card.id==card.id)continue;
-    drawSourceCard(r,a,start+i*29,y,card);
+    drawSourceCard(r,a,static_cast<int>(std::lround(geometry.firstX+i*geometry.pitch)),y,card);
   }
-  if(cards.size()>static_cast<std::size_t>(shown))text(r,left+width-15,y+15,"+",paper,1);
   if(a.weatherTransition[owner][row]||a.game.weather[row]) {
     const std::string& overlay=a.weatherOverlay[owner][row].empty()?std::string("frost"):a.weatherOverlay[owner][row];
     Uint8 alpha=255;
@@ -1782,6 +1826,18 @@ int main(int argc,char** argv) {
          sourceAbilityScalePercent(300)==100&&sourceAbilityScalePercent(350)==100&&
          sourceAbilityScalePercent(600)==80&&sourceAbilityScalePercent(1350)==80&&
          sourceAbilityScalePercent(1600)==40&&sourceAbilityScalePercent(1650)==40;
+    const auto oneCardRow=sourceRowGeometry(1),nineCardRow=sourceRowGeometry(9),tenCardRow=sourceRowGeometry(10),
+               twentyCardRow=sourceRowGeometry(20);
+    okay=okay&&oneCardRow.firstX>356&&oneCardRow.firstX<358&&nineCardRow.firstX>238&&nineCardRow.firstX<240&&
+         nineCardRow.pitch>29&&nineCardRow.pitch<30&&tenCardRow.pitch>26&&tenCardRow.pitch<27&&
+         twentyCardRow.pitch>12&&twentyCardRow.pitch<13;
+    App rowLayoutProbe;rowLayoutProbe.game.players[0].board[0].resize(9);
+    updateRowLayouts(rowLayoutProbe,100);
+    rowLayoutProbe.game.players[0].board[0].resize(10);updateRowLayouts(rowLayoutProbe,200);
+    const auto rowMidpoint=currentRowGeometry(rowLayoutProbe.rowLayouts[0][0],10,325);
+    const auto rowFinished=currentRowGeometry(rowLayoutProbe.rowLayouts[0][0],10,450);
+    okay=okay&&rowMidpoint.pitch< nineCardRow.pitch&&rowMidpoint.pitch>tenCardRow.pitch&&
+         std::abs(rowFinished.pitch-tenCardRow.pitch)<0.001;
     notificationProbe.notificationsEnabled=false;
     queueNotification(notificationProbe,"op-turn");
     okay=okay&&notificationProbe.activeNotification=="me-turn"&&notificationProbe.notificationQueue.empty();
@@ -2006,6 +2062,20 @@ int main(int argc,char** argv) {
       clearFrame();drawMatchOnScreen(renderer,app);presentFrame();
       if(!saveFrame(argv[14])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
     }
+    if(argc>15) {
+      app.screen=Screen::Match;app.game=gwent::Game{};app.game.phase=gwent::Phase::PlayerTurn;
+      const auto& catalogCards=gwent::referenceCardCatalog();
+      const auto sourceUnit=std::find_if(catalogCards.begin(),catalogCards.end(),
+        [](const gwent::Card& card){return card.kind==gwent::Kind::Unit&&!card.hero;});
+      if(sourceUnit==catalogCards.end()) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 5; }
+      for(int i=0;i<10;++i) { auto card=*sourceUnit;card.id+="-row-layout-"+std::to_string(i);app.game.players[0].board[0].push_back(std::move(card)); }
+      const auto from=sourceRowGeometry(9),to=sourceRowGeometry(10);auto& layout=app.rowLayouts[0][0];
+      layout={true,10,from.firstX,from.pitch,to.firstX,to.pitch,SDL_GetTicks()-125};
+      app.cardFlight.active=false;app.cardEffects.clear();app.activeNotification.clear();
+      app.pauseOpen=false;app.cardDetailsOpen=false;
+      clearFrame();drawMatchOnScreen(renderer,app);presentFrame();
+      if(!saveFrame(argv[15])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
+    }
     presentFrame();
     for(auto& image:app.textures)if(image.second)SDL_DestroyTexture(image.second);
     app.audio.shutdown();destroyRenderers(); SDL_DestroyWindow(window); SDL_Quit(); return 0;
@@ -2054,6 +2124,7 @@ int main(int argc,char** argv) {
       return SDL_TICKS_PASSED(now,effect.startedAt+effect.duration);
     }),app.cardEffects.end());
     updateWeatherTransitions(app);
+    updateRowLayouts(app,now);
     const auto previousPhase=observedPhase;
     if(app.screen==Screen::Match&&app.game.phase!=observedPhase) {
       if(app.game.phase==gwent::Phase::RoundResult||app.game.phase==gwent::Phase::MatchResult)
