@@ -99,7 +99,14 @@ items above:
   the source `Player.endTurn()` and `Game.startRound()` checks.
 - An AI action rejected by the port is reported; it is not converted into a
   voluntary pass.
+- Source `Carousel` choices now use the five-card source geometry, source card
+  images, localized descriptions, clamped left/right selection and a matching
+  eased movement stagger (200/300/450 ms) with a 100 ms center highlight.
+  Medic/Decoy targets, leader choices and Skellige revival use this shared
+  view. Broader screen and animation parity remains open.
 
 Verification for the current source tree: SDL2 desktop build, CTest 2/2, and
-`gwent --input-test` with dummy SDL video/audio. No current ARM package or
-physical-device result is claimed.
+`gwent --input-test` with dummy SDL video/audio; target-carousel smoke image
+visually reviewed at `artifacts/qa/target-carousel-choice.png`. ARM build and
+hard-float ABI are checked separately; package installation and physical-device
+input/audio/gameplay still need confirmation.

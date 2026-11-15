@@ -210,6 +210,8 @@ struct App {
   int rowIndex{0};
   int reviveRowIndex{0};
   int targetIndex{0};
+  Uint32 carouselMotionStartedAt{0};
+  int carouselMotionDirection{0};
   bool targetMode{false};
   std::vector<std::string> selectedTargets;
   std::vector<std::string> mulligan;
@@ -235,6 +237,17 @@ double sourceEase(double progress) {
   }
   const double inverse=1.0-t;
   return 3.0*inverse*inverse*t*0.1+3.0*inverse*t*t+t*t*t;
+}
+double sourceEaseIn(double progress) {
+  progress=std::clamp(progress,0.0,1.0);
+  double low=0.0,high=1.0,t=progress;
+  for(int i=0;i<12;++i) {
+    t=(low+high)*0.5;
+    const double inverse=1.0-t;
+    const double x=3.0*inverse*inverse*t*0.42+3.0*inverse*t*t+t*t*t;
+    if(x<progress)low=t;else high=t;
+  }
+  return t*t*t;
 }
 struct SourceRowGeometry { double firstX{0},pitch{0}; };
 SourceRowGeometry sourceRowGeometry(std::size_t cardCount) {
@@ -383,7 +396,7 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="continue")return pl?"ENTER - DALEJ":"ENTER - CONTINUE";
   if(key=="defeat")return pl?"PRZEGRANA":"DEFEAT";
   if(key=="victory")return pl?"ZWYCIESTWO":"VICTORY";
-  if(key=="target")return pl?"WYBIERZ CEL ENTEREM, ESC ANULUJE":"CHOOSE TARGET WITH ENTER, ESC CANCELS";
+  if(key=="target")return pl?"WYBIERZ KARTĘ":"CHOOSE A CARD";
   if(key=="resume")return pl?"R - WCZYTAJ ZAPIS   ESC - WSTECZ":"R - RESUME SAVE   ESC - BACK";
   if(key=="save_controls")return pl?"SELECT/S - ZAPISZ   START/O - WCZYTAJ":"SELECT/S - SAVE   START/O - LOAD";
   if(key=="deck_builder")return pl?"BUDOWNICZY Talii":"DECK BUILDER";
@@ -654,6 +667,22 @@ std::vector<std::string> legalCardTargets(const App& a,const gwent::Card& card) 
       if(target.kind==gwent::Kind::Unit && !target.hero) ids.push_back(target.id);
   } else if(card.kind==gwent::Kind::Unit && card.medic) {
     for(const auto& target:p.graveyard) if(target.kind==gwent::Kind::Unit && !target.hero) ids.push_back(target.id);
+    const auto graveCard=[&](const std::string& id)->const gwent::Card* {
+      const auto it=std::find_if(p.graveyard.begin(),p.graveyard.end(),[&](const gwent::Card& item){return item.id==id;});
+      return it==p.graveyard.end()?nullptr:&*it;
+    };
+    const auto sourceBasePower=[](const gwent::Card& card) {
+      const auto& catalog=gwent::referenceCardCatalog();
+      const auto original=std::find_if(catalog.begin(),catalog.end(),[&](const gwent::Card& item){return item.referenceIndex==card.referenceIndex;});
+      return original==catalog.end()?card.power:original->power;
+    };
+    std::stable_sort(ids.begin(),ids.end(),[&](const std::string& left,const std::string& right) {
+      const auto* aCard=graveCard(left);const auto* bCard=graveCard(right);
+      if(!aCard||!bCard)return left<right;
+      const int aBasePower=sourceBasePower(*aCard),bBasePower=sourceBasePower(*bCard);
+      if(aBasePower!=bBasePower)return aBasePower<bBasePower;
+      return aCard->name<bCard->name;
+    });
   }
   return ids;
 }
@@ -722,10 +751,13 @@ gwent::Card findById(const std::vector<gwent::Card>& cards,const std::string& id
   const auto it=std::find_if(cards.begin(),cards.end(),[&](const gwent::Card& c){return c.id==id;});
   return it==cards.end()?gwent::Card{}:*it;
 }
-std::string targetName(const gwent::Game& game,const std::string& id) {
-  for(const auto& row:game.players[0].board) for(const auto& card:row) if(card.id==id)return card.name;
-  for(const auto& card:game.players[0].graveyard) if(card.id==id)return card.name;
-  return "?";
+const gwent::Card* findTargetCard(const gwent::Game& game,const std::string& id) {
+  for(const auto& player:game.players) {
+    for(const auto& row:player.board)for(const auto& card:row)if(card.id==id)return &card;
+    for(const auto& card:player.graveyard)if(card.id==id)return &card;
+    for(const auto& card:player.hand)if(card.id==id)return &card;
+  }
+  return nullptr;
 }
 void doHumanPlay(App& a) {
   auto& hand=a.game.players[0].hand;
@@ -924,7 +956,7 @@ void queueTriggeredEffects(App& a,const gwent::Game& before,const gwent::Card& p
 void drawCardFlight(SDL_Renderer* r,const App& a) {
   const auto& flight=a.cardFlight;if(!flight.active)return;
   const float t=std::clamp(static_cast<float>(SDL_GetTicks()-flight.startedAt)/499.0f,0.0f,1.0f);
-  const float eased=t*t*(3.0f-2.0f*t);
+  const float eased=static_cast<float>(sourceEase(t));
   const int x=static_cast<int>(std::lround(flight.fromX+(flight.toX-flight.fromX)*eased));
   const int y=static_cast<int>(std::lround(flight.fromY+(flight.toY-flight.fromY)*eased));
   drawSourceCard(r,a,x,y,flight.card,true);
@@ -1040,6 +1072,71 @@ void drawCardDetails(SDL_Renderer* r,const App& a,const gwent::Card& card) {
     text(r,280,y,line,Color{242,234,218},2);y+=18;
   }
   text(r,280,433,tr(a,"close_card"),Color{185,185,185},1);
+}
+void drawChoiceCarousel(SDL_Renderer* r,const App& a,const std::vector<const gwent::Card*>& cards,
+                        int selected,const std::string& title,const std::string& controls) {
+  if(cards.empty())return;
+  const int index=std::clamp(selected,0,static_cast<int>(cards.size())-1);
+  centeredTextInBox(r,20,34,W-40,18,title,gold,1);
+  constexpr std::array<int,5> xs{{90,171,269,381,478}};
+  constexpr std::array<int,5> widths{{72,88,103,88,72}};
+  constexpr std::array<int,5> heights{{136,166,195,166,136}};
+  constexpr int top=73;
+  for(int slot=0;slot<5;++slot) {
+    const int cardIndex=index+slot-2;
+    if(cardIndex<0||cardIndex>=static_cast<int>(cards.size()))continue;
+    const auto& card=*cards[static_cast<std::size_t>(cardIndex)];
+    int x=xs[static_cast<std::size_t>(slot)];
+    const int width=widths[static_cast<std::size_t>(slot)],
+              height=heights[static_cast<std::size_t>(slot)];
+    // Port the source carousel's eased nudge and per-position transition
+    // staggering (outer 450 ms, adjacent 300 ms, center 200 ms).
+    const Uint32 elapsed=SDL_GetTicks()-a.carouselMotionStartedAt;
+    const Uint32 duration=slot==2?200u:((slot==1||slot==3)?300u:450u);
+    if(a.carouselMotionStartedAt&&elapsed<duration) {
+      const double t=static_cast<double>(elapsed)/duration;
+      const double eased=sourceEaseIn(t); // CSS cubic-bezier(.42, 0, 1, 1)
+      const double offset=static_cast<double>(a.carouselMotionDirection)*-0.6*6.4*(1.0-eased);
+      x+=static_cast<int>(std::lround(offset));
+    }
+    drawImage(r,a,"img/lg/"+gwent::referenceCardImage(card.referenceIndex),x,top,width,height);
+    if(slot==2) {
+      const Uint32 elapsed=SDL_GetTicks()-a.carouselMotionStartedAt;
+      const int pulse=a.carouselMotionStartedAt&&elapsed<100?static_cast<int>((100-elapsed)*0.30):0;
+      box(r,x-4,top-4,width+8,height+8,Color{218,168,71,static_cast<Uint8>(44+pulse)});
+      frame(r,x-2,top-2,width+4,height+4,gold);
+      frame(r,x-1,top-1,width+2,height+2,Color{245,215,139,220});
+    }
+    const auto nameLines=wrapDetailText(displayCardName(a,card),std::max<std::size_t>(7,static_cast<std::size_t>(width/6)));
+    const int nameHeight=std::min(18,static_cast<int>(nameLines.size())*8+2);
+    box(r,x,top,width,nameHeight,Color{8,8,8,232});
+    for(std::size_t line=0;line<nameLines.size()&&line<2;++line)
+      centeredTextInBox(r,x+1,top+static_cast<int>(line)*8,width-2,8,nameLines[line],paper,1);
+  }
+  const auto& selectedCard=*cards[static_cast<std::size_t>(index)];
+  box(r,226,277,188,51,Color{20,20,20,242});
+  box(r,226,277,188,1,Color{255,255,255,110});
+  box(r,226,327,188,1,Color{255,255,255,87});
+  std::string ability;
+  if(!selectedCard.abilities.empty()) {
+    ability=selectedCard.abilities.back();
+    if(ability=="cerys")ability="muster";
+    if(ability.rfind("avenger",0)==0)ability="avenger";
+    if(ability.rfind("scorch",0)==0)ability="scorch";
+  } else if(selectedCard.agile)ability="agile";
+  if(!ability.empty())drawImage(r,a,"img/icons/card_ability_"+ability+".png",231,281,13,13);
+  const auto& abilityTitle=gwent::referenceCardAbilityTitle(selectedCard.referenceIndex,a.language==Language::Polish);
+  const auto& description=gwent::referenceCardDescription(selectedCard.referenceIndex,a.language==Language::Polish);
+  if(!abilityTitle.empty())text(r,248,282,shortName(abilityTitle,27),Color{255,220,153,255},1);
+  else text(r,248,282,tr(a,"power")+" "+std::to_string(selectedCard.power),Color{255,220,153,255},1);
+  const auto descriptionLines=wrapDetailText(description.empty()?tr(a,"no_ability"):description,30);
+  for(std::size_t line=0;line<descriptionLines.size()&&line<3;++line)
+    text(r,231,296+static_cast<int>(line)*8,descriptionLines[line],Color{242,234,218,255},1);
+  centeredTextInBox(r,10,STAGE_H-20,W-20,13,controls,muted,1);
+}
+void noteCarouselMove(App& a,int direction) {
+  a.carouselMotionStartedAt=SDL_GetTicks();
+  a.carouselMotionDirection=direction;
 }
 void drawRow(SDL_Renderer* r,const App& a,int owner,int row,int y) {
   constexpr int left=170,width=336,rowHeight=44;
@@ -1295,20 +1392,13 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     std::vector<const gwent::Card*> candidates;
     for(const auto& card:me.graveyard)if(std::find(a.game.skelligeAgileReviveIds.begin(),a.game.skelligeAgileReviveIds.end(),card.id)!=a.game.skelligeAgileReviveIds.end())candidates.push_back(&card);
     box(r,0,0,W,STAGE_H,Color{0,0,0,195});frame(r,0,0,W,STAGE_H,Color{20,20,20});
-    text(r,170,26,tr(a,"skellige_revival"),gold,1);
-    if(!candidates.empty()) {
-      const int selected=std::clamp(a.targetIndex,0,static_cast<int>(candidates.size())-1);
-      const int start=std::clamp(selected-4,0,std::max(0,static_cast<int>(candidates.size())-9));
-      for(int i=start;i<std::min(static_cast<int>(candidates.size()),start+9);++i) {
-        const int x=100+(i-start)*31;
-        const auto* card=candidates[static_cast<std::size_t>(i)];
-        drawSourceCard(r,a,x,115,*card,i==selected);
-      }
-      const auto* selectedCard=candidates[static_cast<std::size_t>(selected)];
-      drawImage(r,a,"img/lg/"+gwent::referenceCardImage(selectedCard->referenceIndex),300,56,103,195);
-      text(r,170,247,selectedCard->name+"  "+std::to_string(selectedCard->power),paper,1);
-      text(r,170,270,selectedCard->agile?tr(a,"skellige_agile")+" "+tr(a,a.rowIndex==0?"melee":"ranged"):"ENTER - RETURN",muted,1);
-    }
+    const int selected=std::clamp(a.targetIndex,0,std::max(0,static_cast<int>(candidates.size())-1));
+    const bool agile=!candidates.empty()&&candidates[static_cast<std::size_t>(selected)]->agile;
+    const std::string controls=a.language==Language::Polish?
+      (agile?"LEWO/PRAWO: KARTA   GORA/DOL: RZAD   A: WYBIERZ":"LEWO/PRAWO: KARTA   A: WYBIERZ"):
+      (agile?"LEFT/RIGHT: CARD   UP/DOWN: ROW   A: SELECT":"LEFT/RIGHT: CARD   A: SELECT");
+    drawChoiceCarousel(r,a,candidates,a.targetIndex,tr(a,"skellige_revival"),controls);
+    if(agile)centeredTextInBox(r,180,252,280,15,tr(a,a.rowIndex==0?"melee":"ranged"),gold,1);
   }
   if(a.game.phase==gwent::Phase::RoundResult || a.game.phase==gwent::Phase::MatchResult) {
     const Uint8 alpha=endScreenAlpha(SDL_GetTicks()-a.endScreenStartedAt);
@@ -1350,33 +1440,24 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     if(!cards.empty()) {
       box(r,0,0,W,STAGE_H,Color{0,0,0,238});
       frame(r,14,12,W-28,STAGE_H-24,Color{143,108,54});
-      text(r,28,25,leaderChoicePrompt(a),gold,2);
+      std::vector<const gwent::Card*> choices;
+      for(const auto& card:cards)choices.push_back(&card);
+      std::string title=leaderChoicePrompt(a);
       if(activeLeaderAbility(me.leader)=="eredin_destroyer")
-        text(r,28,49,tr(a,"leader_selected")+" "+std::to_string(a.leaderSelections.size())+"/2",paper,1);
-      const int selected=std::clamp(a.targetIndex,0,static_cast<int>(cards.size())-1);
-      const int start=std::clamp(selected-3,0,std::max(0,static_cast<int>(cards.size())-8));
-      const int shown=std::min(8,static_cast<int>(cards.size())-start);
-      for(int i=0;i<shown;++i) {
-        const auto& card=cards[static_cast<std::size_t>(start+i)];
-        const int x=26+i*61;
-        drawImage(r,a,"img/lg/"+gwent::referenceCardImage(card.referenceIndex),x,92,47,77);
-        if(start+i==selected)frame(r,x-2,90,51,81,gold);
-      }
-      const auto& card=cards[static_cast<std::size_t>(selected)];
-      drawImage(r,a,"img/lg/"+gwent::referenceCardImage(card.referenceIndex),521,77,96,168);
-      frame(r,520,76,98,170,gold);
-      text(r,28,207,displayCardName(a,card)+"  "+std::to_string(card.power),paper,1);
-      if(!a.leaderSelections.empty()) {
-        std::string chosen;
-        for(const auto& id:a.leaderSelections) {
-          const auto found=std::find_if(me.hand.begin(),me.hand.end(),[&](const gwent::Card& c){return c.id==id;});
-          if(found!=me.hand.end()) { if(!chosen.empty())chosen+=" / ";chosen+=found->name; }
-        }
-        text(r,28,229,shortName(chosen,69),Color{235,207,164},1);
-      }
-      text(r,28,286,tr(a,"leader_controls"),muted,1);
-      text(r,28,305,tr(a,"leader_cancel"),muted,1);
+        title+="  "+tr(a,"leader_selected")+" "+std::to_string(a.leaderSelections.size())+"/2";
+      std::string controls=tr(a,"leader_controls");
+      if(activeLeaderAbility(me.leader)!="eredin_destroyer"&&a.leaderSelections.empty())
+        controls+="   "+tr(a,"leader_cancel");
+      drawChoiceCarousel(r,a,choices,a.targetIndex,title,controls);
     }
+  }
+  if(a.targetMode) {
+    std::vector<const gwent::Card*> choices;
+    for(const auto& id:a.selectedTargets)if(const auto* card=findTargetCard(a.game,id))choices.push_back(card);
+    std::string controls=a.language==Language::Polish?
+      "LEWO/PRAWO: KARTA   A: WYBIERZ   B: ANULUJ":
+      "LEFT/RIGHT: CARD   A: SELECT   B: CANCEL";
+    drawChoiceCarousel(r,a,choices,a.targetIndex,tr(a,"target"),controls);
   }
   if(a.leaderRevealOpen) {
     box(r,0,0,W,STAGE_H,Color{0,0,0,242});
@@ -1489,12 +1570,12 @@ void handleMatchKey(App& a,SDL_Keycode key) {
     if(key==SDLK_ESCAPE||key==SDLK_z||key==SDLK_BACKSPACE) {
       a.leaderSelectionMode=false;a.leaderSelections.clear();a.targetIndex=0;a.status=tr(a,"your_turn");return;
     }
-    if(key==SDLK_LEFT||key==SDLK_a) { a.targetIndex=(a.targetIndex+static_cast<int>(cards.size())-1)%static_cast<int>(cards.size());a.audio.play("ui_card"); }
-    else if(key==SDLK_RIGHT||key==SDLK_d) { a.targetIndex=(a.targetIndex+1)%static_cast<int>(cards.size());a.audio.play("ui_card"); }
+    if(key==SDLK_LEFT||key==SDLK_a) { const int old=a.targetIndex;a.targetIndex=std::max(0,a.targetIndex-1);a.audio.play("ui_card");if(old!=a.targetIndex)noteCarouselMove(a,-1); }
+    else if(key==SDLK_RIGHT||key==SDLK_d) { const int old=a.targetIndex;a.targetIndex=std::min(static_cast<int>(cards.size())-1,a.targetIndex+1);a.audio.play("ui_card");if(old!=a.targetIndex)noteCarouselMove(a,1); }
     else if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x||key==SDLK_SPACE) {
       a.leaderSelections.push_back(cards[static_cast<std::size_t>(a.targetIndex)].id);
       if(activeLeaderAbility(a.game.players[0].leader)=="eredin_destroyer"&&a.leaderSelections.size()<3) {
-        a.targetIndex=0;a.status=leaderChoicePrompt(a);a.audio.play("ui_card");
+        a.targetIndex=0;a.status=leaderChoicePrompt(a);a.audio.play("ui_card");noteCarouselMove(a,1);
       } else finishLeaderChoice(a);
     }
     return;
@@ -1512,6 +1593,7 @@ void handleMatchKey(App& a,SDL_Keycode key) {
   if(a.game.phase==gwent::Phase::RoundResult) {
     if(key==SDLK_RETURN||key==SDLK_x||key==SDLK_SPACE) {
       gwent::startNextRound(a.game); a.handIndex=0; a.rowIndex=0; a.targetIndex=0; a.status=tr(a,"your_turn");
+      if(a.game.phase==gwent::Phase::RoundSetup)a.audio.play("open");
       if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+400;
     }
     return;
@@ -1521,8 +1603,8 @@ void handleMatchKey(App& a,SDL_Keycode key) {
     for(const auto& card:a.game.players[0].graveyard)if(std::find(a.game.skelligeAgileReviveIds.begin(),a.game.skelligeAgileReviveIds.end(),card.id)!=a.game.skelligeAgileReviveIds.end())candidates.push_back(&card);
     if(candidates.empty())return;
     a.targetIndex=std::clamp(a.targetIndex,0,static_cast<int>(candidates.size())-1);
-    if(key==SDLK_LEFT||key==SDLK_a)a.targetIndex=(a.targetIndex+static_cast<int>(candidates.size())-1)%static_cast<int>(candidates.size());
-    else if(key==SDLK_RIGHT||key==SDLK_d)a.targetIndex=(a.targetIndex+1)%static_cast<int>(candidates.size());
+    if(key==SDLK_LEFT||key==SDLK_a) { const int old=a.targetIndex;a.targetIndex=std::max(0,a.targetIndex-1);a.audio.play("ui_card");if(old!=a.targetIndex)noteCarouselMove(a,-1); }
+    else if(key==SDLK_RIGHT||key==SDLK_d) { const int old=a.targetIndex;a.targetIndex=std::min(static_cast<int>(candidates.size())-1,a.targetIndex+1);a.audio.play("ui_card");if(old!=a.targetIndex)noteCarouselMove(a,1); }
     else if((key==SDLK_UP||key==SDLK_DOWN)&&candidates[static_cast<std::size_t>(a.targetIndex)]->agile)a.rowIndex=1-a.rowIndex;
     else if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x) {
       const auto* card=candidates[static_cast<std::size_t>(a.targetIndex)];
@@ -1570,8 +1652,8 @@ void handleMatchKey(App& a,SDL_Keycode key) {
       const bool chooseReviveRow=hand[static_cast<std::size_t>(a.handIndex)].medic&&
                                   revived!=a.game.players[0].graveyard.end()&&revived->agile;
       if(chooseReviveRow&&(key==SDLK_UP||key==SDLK_DOWN))a.reviveRowIndex=1-a.reviveRowIndex;
-      else if(key==SDLK_UP||key==SDLK_LEFT)a.targetIndex=(a.targetIndex+static_cast<int>(a.selectedTargets.size())-1)%static_cast<int>(a.selectedTargets.size());
-      else if(key==SDLK_DOWN||key==SDLK_RIGHT)a.targetIndex=(a.targetIndex+1)%static_cast<int>(a.selectedTargets.size());
+      else if(key==SDLK_UP||key==SDLK_LEFT) { const int old=a.targetIndex;a.targetIndex=std::max(0,a.targetIndex-1);a.audio.play("ui_card");if(old!=a.targetIndex)noteCarouselMove(a,-1); }
+      else if(key==SDLK_DOWN||key==SDLK_RIGHT) { const int old=a.targetIndex;a.targetIndex=std::min(static_cast<int>(a.selectedTargets.size())-1,a.targetIndex+1);a.audio.play("ui_card");if(old!=a.targetIndex)noteCarouselMove(a,1); }
     }
     else if(key==SDLK_RETURN||key==SDLK_x) {
       if(!a.selectedTargets.empty()&&a.handIndex>=0&&a.handIndex<static_cast<int>(hand.size())) {
@@ -1811,7 +1893,23 @@ int main(int argc,char** argv) {
               normalizeMiyooKey(app,SDLK_TAB)==SDLK_UP&&
               normalizeMiyooKey(app,SDLK_BACKSPACE)==SDLK_DOWN&&
               normalizeMiyooKey(app,SDLK_RETURN)==SDLK_p&&
-              normalizeMiyooKey(app,SDLK_ESCAPE)==SDLK_BACKQUOTE;
+              normalizeMiyooKey(app,SDLK_ESCAPE)==SDLK_BACKQUOTE&&
+              sourceEaseIn(0.0)<0.001&&sourceEaseIn(1.0)>0.999&&
+              sourceEase(0.0)<0.001&&sourceEase(0.5)>0.75&&sourceEase(0.5)<0.85&&sourceEase(1.0)>0.999;
+    const gwent::Card* lowBase=nullptr;const gwent::Card* highBase=nullptr;
+    for(const auto& card:gwent::referenceCardCatalog())if(card.kind==gwent::Kind::Unit&&!card.hero) {
+      if(!lowBase||card.power<lowBase->power)lowBase=&card;
+      if(!highBase||card.power>highBase->power)highBase=&card;
+    }
+    if(lowBase&&highBase&&lowBase->referenceIndex!=highBase->referenceIndex) {
+      App medicOrder;auto low=*lowBase,high=*highBase;
+      low.id="low-base-medic-sort";high.id="high-base-medic-sort";
+      low.power=highBase->power+50;high.power=0;
+      medicOrder.game.players[0].graveyard={high,low};
+      gwent::Card sourceMedic;sourceMedic.kind=gwent::Kind::Unit;sourceMedic.medic=true;
+      const auto sortedTargets=legalCardTargets(medicOrder,sourceMedic);
+      okay=okay&&sortedTargets.size()==2&&sortedTargets[0]==low.id&&sortedTargets[1]==high.id;
+    } else okay=false;
     App notificationProbe;
     queueNotification(notificationProbe,"round-start");
     queueNotification(notificationProbe,"me-turn");
@@ -1864,6 +1962,15 @@ int main(int argc,char** argv) {
     app.cardDetailsOpen=true;
     okay=okay&&normalizeMiyooKey(app,SDLK_ESCAPE)==SDLK_ESCAPE;
     app.cardDetailsOpen=false;
+    app.game=gwent::Game{};app.game.phase=gwent::Phase::PlayerTurn;
+    gwent::Card carouselInput;carouselInput.id="carousel-input";carouselInput.kind=gwent::Kind::Unit;
+    app.game.players[0].hand={carouselInput};app.handIndex=0;
+    app.targetMode=true;app.selectedTargets={"first-target","second-target"};app.targetIndex=0;
+    handleMatchKey(app,SDLK_RIGHT);
+    okay=okay&&app.targetIndex==1&&app.carouselMotionDirection==1;
+    handleMatchKey(app,SDLK_RIGHT);
+    okay=okay&&app.targetIndex==1;
+    app.targetMode=false;app.selectedTargets.clear();
     app.pauseOpen=true;app.pauseIndex=3;app.language=Language::Polish;
     handleMatchKey(app,SDLK_x);
     okay=okay&&app.language==Language::English;
@@ -2075,6 +2182,22 @@ int main(int argc,char** argv) {
       app.pauseOpen=false;app.cardDetailsOpen=false;
       clearFrame();drawMatchOnScreen(renderer,app);presentFrame();
       if(!saveFrame(argv[15])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
+    }
+    if(argc>16) {
+      app.screen=Screen::Match;app.game=gwent::Game{};app.game.phase=gwent::Phase::PlayerTurn;
+      app.language=Language::Polish;app.targetMode=true;app.targetIndex=2;app.handIndex=-1;
+      app.selectedTargets.clear();
+      for(const auto& source:gwent::referenceCardCatalog()) {
+        if(source.kind!=gwent::Kind::Unit||source.hero)continue;
+        auto card=source;card.id+="-carousel-smoke-"+std::to_string(app.selectedTargets.size());
+        app.selectedTargets.push_back(card.id);app.game.players[1].board[0].push_back(std::move(card));
+        if(app.selectedTargets.size()==5)break;
+      }
+      if(app.selectedTargets.size()!=5) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 5; }
+      app.cardFlight.active=false;app.cardEffects.clear();app.activeNotification.clear();
+      app.pauseOpen=false;app.cardDetailsOpen=false;app.carouselMotionStartedAt=SDL_GetTicks()-75;app.carouselMotionDirection=1;
+      clearFrame();drawMatchOnScreen(renderer,app);presentFrame();
+      if(!saveFrame(argv[16])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
     }
     presentFrame();
     for(auto& image:app.textures)if(image.second)SDL_DestroyTexture(image.second);
