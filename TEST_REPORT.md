@@ -12,6 +12,8 @@ Po dodaniu zapisu i wczytania workflow [desktop-build #43716080347](https://gith
 
 Po dodaniu API talii użytkownika pierwsze uruchomienie CI ujawniło błąd dekodowania pary identyfikatora/liczby kopii. Poprawka została zbudowana i zweryfikowana przez [desktop-build #43716630159](https://github.com/Zepak96/gwent-classic-miyoo-onionos/actions/runs/43716630159): oba zadania (silnik i frontend) zakończyły się powodzeniem, testy CTest przeszły, a frontendowy smoke test SDL zakończył się poprawnie. Test obejmuje poprawny zapis/odczyt talii, materializację jej kart z katalogu oraz odrzucenie uszkodzonego pliku bez nadpisania przepisu w pamięci. Nie obejmuje jeszcze edytora talii w UI ani uruchomienia gry na Miyoo.
 
+Po podłączeniu edytora do menu workflow [desktop-build #43717386389](https://github.com/Zepak96/gwent-classic-miyoo-onionos/actions/runs/43717386389) przeszedł dla silnika i frontendu. CTest zakończył się powodzeniem, smoke test SDL wyrenderował mecz i ekran edycji talii, a workflow zapisał oba obrazy jako artefakt `frontend-smoke-frames`. Ten test sprawdza renderowanie, nie automatyzuje sekwencji przycisków w edytorze ani nie zastępuje testu na fizycznym Miyoo.
+
 | Obszar | Status | Uwagi |
 |---|---|---|
 | Budowanie desktop | Zaliczone w CI | Ubuntu, CMake, SDL2; budowany frontend oraz silnik/testy |
