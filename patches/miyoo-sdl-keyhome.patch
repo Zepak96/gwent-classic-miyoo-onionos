@@ -1,0 +1,10 @@
+diff --git a/sdl2/src/video/mini/SDL_event_mini.c b/sdl2/src/video/mini/SDL_event_mini.c
+--- a/sdl2/src/video/mini/SDL_event_mini.c
++++ b/sdl2/src/video/mini/SDL_event_mini.c
+@@ -108,5 +108,6 @@ void Mini_EventInit(void)
+      mymap[KEY_ESC] = SDLK_ESCAPE;
++     mymap[KEY_HOME] = SDLK_HOME;
+      mymap[KEY_SPACE] = SDLK_SPACE;
+      mymap[KEY_CAPSLOCK] = SDLK_CAPSLOCK;
+      mymap[KEY_BACKSPACE] = SDLK_BACKSPACE;
+      mymap[KEY_TAB] = SDLK_TAB;

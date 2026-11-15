@@ -14,6 +14,7 @@ on:
       - 'third_party/**'
       - 'tools/build_onion.sh'
       - 'tools/package_onion.sh'
+      - 'patches/**'
 
 jobs:
   miyoo-armhf:
@@ -32,7 +33,7 @@ jobs:
           fetch-depth: 1
 
       - name: Install build tools
-        run: sudo apt-get update && sudo apt-get install -y cmake python3 zip unzip binutils
+        run: sudo apt-get update && sudo apt-get install -y autoconf automake binutils cmake make python3 zip unzip
 
       - name: Download and verify Miyoo toolchain
         shell: bash

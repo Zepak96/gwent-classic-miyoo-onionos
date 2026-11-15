@@ -43,7 +43,7 @@ copy_text() {
   chmod 644 "$game_dir/$name"
 }
 
-copy_shared "$sdl_source/prebuilt/640x480/libSDL2-2.0.so.0" libSDL2-2.0.so.0
+copy_shared "$sdl_source/sdl2/build/.libs/libSDL2-2.0.so.0" libSDL2-2.0.so.0
 copy_shared "$sdl_source/prebuilt/640x480/libEGL.so" libEGL.so
 copy_shared "$sdl_source/prebuilt/640x480/libGLESv2.so" libGLESv2.so
 copy_shared "$(find "$json_lib_dir" -name 'libjson-c.so.5*' -type f -print -quit)" libjson-c.so.5
@@ -57,10 +57,11 @@ copy_text third_party/gcc-runtime/COPYING.RUNTIME LICENSE.GCC-runtime-exception-
 copy_text "$sdl_source/LICENSE" LICENSE.SDL2-port.txt
 copy_text "$sdl_source/sdl2/LICENSE.txt" LICENSE.SDL2-core.txt
 copy_text "$sdl_source/swiftshader/LICENSE.txt" LICENSE.SwiftShader.txt
+install -m 644 "$(dirname "$0")/../patches/miyoo-sdl-keyhome.patch" "$game_dir/SDL-MIYOO-KEYHOME.patch"
 install -m 644 "$sdl_source/sdl2/dependency/json-c-0.15.tar.gz" "$game_dir/json-c-0.15-source.tar.gz"
 copy_text packaging/onion/THIRD_PARTY.txt THIRD_PARTY.txt
 copy_text assets/gwent-classic/ASSET_ORIGIN.md assets/gwent-classic/ASSET_ORIGIN.md
-printf 'steward-fu/sdl2 commit %s\n' "$actual_sdl_commit" > "$game_dir/BUILD-SDL.txt"
+printf 'steward-fu/sdl2 commit %s\nMiyoo key mapping patch: SDL-MIYOO-KEYHOME.patch\n' "$actual_sdl_commit" > "$game_dir/BUILD-SDL.txt"
 {
   printf 'SDL2 source: steward-fu/sdl2 %s\n' "$actual_sdl_commit"
   printf 'Miyoo toolchain: steward-fu mini_toolchain-v1.0\n'

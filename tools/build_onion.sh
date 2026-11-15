@@ -47,6 +47,28 @@ ln -sf "$prebuilt/arm-linux-gnueabihf/bin/ld.bfd" "$links/arm-linux-gnueabihf-ld
 ln -sf "$prebuilt/arm-linux-gnueabihf/bin/ld.bfd" "$links/arm-linux-gnueabihf-ld.bfd"
 export PATH="$links:$prebuilt/arm-linux-gnueabihf/bin:$prebuilt/bin:$mini/bin:$PATH"
 
+# The pinned Mini backend omitted KEY_HOME even though the Miyoo MENU key
+# reports that Linux keycode. Keep the change as a small auditable patch and
+# compile the library that will actually ship in the port.
+sdl_event_source="$sdl_source/sdl2/src/video/mini/SDL_event_mini.c"
+if ! grep -Fq 'mymap[KEY_HOME] = SDLK_HOME;' "$sdl_event_source"; then
+  git -C "$sdl_source" apply --check "$repo_root/patches/miyoo-sdl-keyhome.patch"
+  git -C "$sdl_source" apply "$repo_root/patches/miyoo-sdl-keyhome.patch"
+fi
+
+# Normalize text scripts/configuration when the checkout was created on
+# Windows; preserve binary SDK/SDL files and their contents.
+find "$sdl_source/sdl2" -type f \( -name '*.sh' -o -name '*.ac' -o -name '*.m4' -o -name '*.in' \
+  -o -name config.sub -o -name config.guess \) -exec sed -i 's/\r$//' {} +
+find "$sdl_source/sdl2/build-scripts" -type f -exec sed -i 's/\r$//' {} +
+
+ln -sfn "$sdl_source/prebuilt/640x480/libEGL.so" "$sdl_source/sdl2/libEGL.so"
+ln -sfn "$sdl_source/prebuilt/640x480/libGLESv2.so" "$sdl_source/sdl2/libGLESv2.so"
+make -C "$sdl_source" cfg
+make -C "$sdl_source" sdl2
+sdl_library="$sdl_source/sdl2/build/.libs/libSDL2-2.0.so.0"
+[[ -f "$sdl_library" ]] || { echo "Miyoo SDL build did not produce $sdl_library" >&2; exit 1; }
+
 build_dir="$output_dir/build"
 if [[ -L "$build_dir" ]]; then
   echo "refusing to use a symlink as the generated build directory: $build_dir" >&2
@@ -71,7 +93,7 @@ cmake -S "$repo_root" -B "$build_dir" \
   -DGWENT_WITH_SDL=ON \
   -DGWENT_BUILD_TESTS=OFF \
   -DGWENT_SDL2_INCLUDE_DIR="$sysroot/usr/include/SDL2" \
-  -DGWENT_SDL2_LIBRARY="$sdl_source/prebuilt/640x480/libSDL2-2.0.so.0"
+  -DGWENT_SDL2_LIBRARY="$sdl_library"
 cmake --build "$build_dir" --parallel "${JOBS:-2}"
 
 json_lib_dir="$sysroot/usr/lib"

@@ -7,7 +7,8 @@ Data raportu: 2026-11-15.
 - Naprawiono błędne liczenie Tight Bond: zgodnie z opisem w referencyjnym `abilities.js`, dwie lub więcej kart o identycznej nazwie podwajają siłę; trzecia i kolejna kopia nie zwiększa mnożnika. Poprzedni test oczekiwał niepoprawnego mnożenia x3 i został skorygowany.
 - Nowe przypadki sprawdzają trzy prawdziwe kopie „Blue Stripes Commando” z katalogu (wynik 24), brak Więzi pomiędzy różnymi nazwami mającymi tę samą metadaną grupy oraz działanie identycznej nazwy przy różnych grupach metadanych.
 - Weryfikacja: desktop CMake build; CTest 2/2; `--audio-test` dekoduje 35 efektów; `--input-test` sprawdza mapę klawiszy i potwierdzone pasowanie; build ARM hard-float zakończony poprawnie.
-- Paczka OnionOS SHA-256 `8cef487eba7ae0f632476c216afdbb06e179d86db17b8ecf1d8d6c867e7de4e`, binarka ARM SHA-256 `f37d866471e5f8d66ba2724dd290bea24fca48fe479eae1d7e5b990365afb5fb`. Zainstalowano na `E:`; 598 plików porównano SHA-256, 0 różnic, skrót `.port` zachowany. Fizyczny start na Miyoo nie został wykonany.
+- Przypięty SDL Mini zbudowano po zastosowaniu `patches/miyoo-sdl-keyhome.patch`; skompilowany ARM32 hard-float `libSDL2-2.0.so.0` w paczce jest identyczny z wynikiem builda. Aplikacja obsługuje `SDLK_HOME` przez zapis i wyjście.
+- Paczka OnionOS SHA-256 `08c7643b372f57e46e389712ed0677888aa3734c5408605777c24cbf57a5bce4`, binarka gry SHA-256 `f37d866471e5f8d66ba2724dd290bea24fca48fe479eae1d7e5b990365afb5fb`, SDL SHA-256 `8eebe8969a25997265b35175c132fc72e66b16615a096af1cf71ec8d91db2053`. Zainstalowano na `E:`; 599 plików porównano SHA-256, 0 różnic, skrót `.port` zachowany. Fizyczny start i MENU na Miyoo nie zostały jeszcze przetestowane.
 
 ## Wynik
 

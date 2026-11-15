@@ -29,7 +29,7 @@ nie zastępuje odczytu `event0` na konkretnej wersji firmware.
 | L2 / R2 | PageDown / PageUp | Przewijanie stron/ręki |
 | Start | Enter | Pauza/ustawienia podczas meczu; zatwierdzenie w menu |
 | Select | Escape | Pasowanie po dodatkowym potwierdzeniu; zapis talii w edytorze |
-| MENU | brak mapowania `KEY_HOME` w przypiętym `SDL_event_mini.c` | Nieobsługiwane przez obecną konfigurację SDL; wymaga poprawki backendu i testu urządzenia |
+| MENU | `KEY_HOME` → `SDLK_HOME` przez lokalną poprawkę SDL | Zapisuje mecz i zamyka grę, aby OnionOS odzyskał kontrolę |
 
 Klawisz Select nie pasuje automatycznie: najpierw otwiera pytanie, A zatwierdza,
 a B anuluje. Przytrzymanie Select przez 500 ms nadal otwiera inspektor karty w
@@ -38,8 +38,8 @@ Mini SDL, pauzę, bezpieczne potwierdzanie pasowania oraz ochronę wyboru celu.
 
 ## Status weryfikacji
 
-Mapowanie A/B/X/Y i klawiszy systemowych wynika z publicznego pomiaru; fizyczne
-naciśnięcia na Miyoo trzeba nadal potwierdzić na urządzeniu. Aplikacja zapisuje
-mecz i kończy działanie po zdarzeniu `SDLK_HOME`, ale przypięty sterownik Mini
-nie mapuje `KEY_HOME`, więc nie ma dowodu, że przycisk MENU może obecnie wysłać
-to zdarzenie. To pozostaje konkretnym zadaniem portu.
+Przypięty sterownik nie mapował `KEY_HOME`; projekt dodaje patch
+[`patches/miyoo-sdl-keyhome.patch`](../patches/miyoo-sdl-keyhome.patch), buduje z
+nim bibliotekę SDL i dołącza patch do paczki. ELF SDL jest ARM32 hard-float, a
+aplikacja zapisuje mecz i kończy działanie po `SDLK_HOME`. Fizycznego naciśnięcia
+MENU oraz zachowania OnionOS nadal trzeba potwierdzić na konsoli.
