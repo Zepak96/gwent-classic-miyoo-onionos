@@ -12,6 +12,7 @@ Oryginalny kod tego projektu jest objęty dołączoną licencją MIT. Nie obejmu
 - `OnionUI/Ports-Collection`, audytowany HEAD `685c7e6e9065232d6350765022baa4723a641f13` — wzorzec integracji systemowej. Launcher i materiały muszą zachować licencje upstream przy użyciu.
 - `nothings/stb`, commit `9600522de53973336fa033a289858a4354cbb04c` — `stb_image.h` v2.32, deklarowana licencja public domain; używany do dekodowania JPEG-ów kart i planszy.
 - `mackron/dr_libs`, commit `f12e197fd462e4c22873fbd70d11b1d2f2c1dc3c` — `dr_mp3.h`, używany do dekodowania efektów MP3. Projekt wybiera dołączoną opcję Unlicense/public domain; szczegóły w `third_party/DR_MP3_NOTICE.md`.
+- Oficjalny `steward-fu/mini_toolchain-v1.0`, SHA-256 `8addff71be4b015a4e1aef51e43635e50978d558a1675f5b1664124e8437d071` — źródło dynamicznych bibliotek `libstdc++.so.6` i `libgcc_s.so.1` w paczce ARM. Odpowiadające im teksty GPLv3 i GCC Runtime Library Exception 3.1 pobrano verbatim z `gcc-mirror/gcc` tag `releases/gcc-8.2.0`; znajdują się w `third_party/gcc-runtime/` oraz w paczce OnionOS. Źródło projektu GCC 8.2.x: https://github.com/gcc-mirror/gcc/tree/releases/gcc-8.2.0.
 
 ## Zaimportowane dane
 

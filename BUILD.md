@@ -2,7 +2,7 @@
 
 ## Status
 
-Projekt używa C++17 i CMake. Konfiguracja zakłada opcjonalny frontend SDL2 i niezależną bibliotekę silnika. Na środowisku, w którym utworzono ten plik, nie ma wykrytego CMake ani kompilatora C++, więc kompilacja nie została tu wykonana.
+Projekt używa C++17 i CMake. Konfiguracja zakłada opcjonalny frontend SDL2 i niezależną bibliotekę silnika. Desktop oraz ARM hard-float dla Miyoo Mini Plus mają osobne konfiguracje.
 
 ## Desktop
 
@@ -38,10 +38,18 @@ The SDL app writes a versioned, checksummed match save in `SDL_GetPrefPath("Gwen
 
 ## Miyoo Mini Plus / OnionOS
 
-Wymagany jest 32-bitowy ARM hard-float (arm-linux-gnueabihf) oraz wersje bibliotek zgodne z docelowym OnionOS. Referencyjny SDL z `steward-fu/sdl2` deklaruje wsparcie dla Miyoo Mini/Plus i OnionOS v4.3.1-1; trzeba potwierdzić docelową wersję systemu i biblioteki na urządzeniu. Ta konfiguracja nie produkuje jeszcze binarki ARM.
+Wymagany jest 32-bitowy ARM hard-float (arm-linux-gnueabihf) oraz wersje bibliotek zgodne z docelowym OnionOS. Referencyjny SDL z `steward-fu/sdl2` deklaruje wsparcie dla Miyoo Mini/Plus i OnionOS v4.3.1-1. Repozytorium SDL jest przypięte do `0631abc8e8916db6f9bc7e2afd0c22913d092a29`, a oficjalny toolchain `mini_toolchain-v1.0` do SHA-256 `8addff71be4b015a4e1aef51e43635e50978d558a1675f5b1664124e8437d071`. Toolchain wymaga ścieżek `/opt/mini` i `/opt/prebuilt`.
 
-Wydanie powinno korzystać z oficjalnego standalone launcher template OnionOS, `Roms/PORTS/Games/<nazwa>/`, `Shortcuts/<kategoria>/<nazwa>.notfound` i oficjalnego kroku `~Import ports`. Nie należy kopiować przykładowego launchera bez sprawdzenia jego argumentów i wymaganych bibliotek.
+Po pobraniu i sprawdzeniu toolchaina oraz checkoutcie powyższej rewizji SDL, w środowisku Linux z CMake, Python 3, zip, binutils i git uruchom:
+
+```sh
+bash tools/build_onion.sh /opt /path/to/steward-fu-sdl2 out/miyoo /path/to/mini_toolchain-v1.0.tar.gz
+```
+
+Skrypt kompiluje frontend z biblioteką SDL Miyoo, wymusza zgodność rewizji i sumy SDK, weryfikuje ELF32 ARM hard-float, pakuje foldery `Roms/PORTS` i tworzy SHA-256 ZIP-a. Workflow `Miyoo OnionOS package` wykonuje te kroki i publikuje paczkę jako artefakt Actions. Referencyjna biblioteka SDL ma zależności SigmaStar `libmi_*`, które dostarcza system Miyoo/OnionOS; nie kopiuje się ich z niezweryfikowanego obrazu urządzenia.
+
+Wydanie korzysta z standalone launcher template OnionOS, `Roms/PORTS/Games/GwentClassic/`, `Roms/PORTS/Shortcuts/Cards/GwentClassic.notfound` i oficjalnego kroku `~Import ports`. Pakiet obejmuje SDL2, EGL/GLES, json-c oraz biblioteki GCC runtime wraz z licencjami. Sama poprawna kompilacja i instalacja na karcie nie potwierdzają jeszcze startu gry ani wejścia/audio na fizycznym Miyoo.
 
 ## Odtwarzalność
 
-Audyt referencyjnych commitów i ograniczeń licencji znajduje się w `PROGRESS.md` i `LICENSES.md`. Wydanie musi zapisać commit toolchaina, wersje SDL oraz SHA-256 paczki; nie są jeszcze dostępne.
+Audyt referencyjnych commitów i ograniczeń licencji znajduje się w `PROGRESS.md` i `LICENSES.md`. Pakiet zapisuje rewizję SDL, sumę SDK oraz SHA-256 artefaktu; końcowa QA urządzenia oraz wydanie GitHub Release pozostają do wykonania.

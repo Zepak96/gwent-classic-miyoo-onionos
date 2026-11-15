@@ -1,0 +1,62 @@
+name: Miyoo OnionOS package
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/miyoo-onion.yml'
+      - 'CMakeLists.txt'
+      - 'src/**'
+      - 'include/**'
+      - 'data/**'
+      - 'assets/gwent-classic/**'
+      - 'packaging/onion/**'
+      - 'third_party/**'
+      - 'tools/build_onion.sh'
+      - 'tools/package_onion.sh'
+
+jobs:
+  miyoo-armhf:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout Gwent Classic port
+        uses: actions/checkout@v4
+
+      - name: Checkout pinned Miyoo SDL2
+        uses: actions/checkout@v4
+        with:
+          repository: steward-fu/sdl2
+          ref: 0631abc8e8916db6f9bc7e2afd0c22913d092a29
+          path: .work/sdl2
+          fetch-depth: 1
+
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y cmake python3 zip unzip binutils
+
+      - name: Download and verify Miyoo toolchain
+        shell: bash
+        run: |
+          archive="$RUNNER_TEMP/mini_toolchain-v1.0.tar.gz"
+          curl --fail --location --retry 3 \
+            https://github.com/steward-fu/website/releases/download/miyoo-mini/mini_toolchain-v1.0.tar.gz \
+            --output "$archive"
+          echo '8addff71be4b015a4e1aef51e43635e50978d558a1675f5b1664124e8437d071  '"$archive" | sha256sum --check
+          test ! -e /opt/mini && test ! -e /opt/prebuilt
+          sudo tar -xzf "$archive" -C /opt
+
+      - name: Cross-build and package OnionOS port
+        run: bash tools/build_onion.sh /opt .work/sdl2 "$RUNNER_TEMP/release" "$RUNNER_TEMP/mini_toolchain-v1.0.tar.gz"
+
+      - name: Verify package archive
+        run: unzip -t "$RUNNER_TEMP/release/GwentClassic-OnionOS.zip"
+
+      - name: Upload Miyoo package
+        uses: actions/upload-artifact@v4
+        with:
+          name: GwentClassic-OnionOS-armhf
+          path: |
+            ${{ runner.temp }}/release/GwentClassic-OnionOS.zip
+            ${{ runner.temp }}/release/GwentClassic-OnionOS.zip.sha256
+          if-no-files-found: error
+          retention-days: 30

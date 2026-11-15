@@ -50,8 +50,8 @@ Docelowa gra to wyłącznie Gwint jako minigra w Wiedźminie 3: Wild Hunt, z zaw
 - [~] Przeniesiono podstawowy lot zagrywanej karty z ręki do rzędu/pogody w 500 ms dla gracza i AI. Audyt CSS/JS wskazał też kaskadowe przesunięcia karuzeli i przejścia/fade; te animacje oraz zmiany układu są nadal niezaimplementowane.
 - [~] Przypięte grafiki kart, plansza, ikony SVG i SFX z repo są w `assets/gwent-classic/`; sześć SVG ma rastrowe odpowiedniki PNG dla SDL. Dodano dekodowanie/odtwarzanie wszystkich 35 referencyjnych MP3 przez SDL Audio i `dr_mp3`, z odgłosami menu, nawigacji, kart, rund i pasowania; CI dekoduje cały zestaw. Muzyki w repo wzorcowym nie ma; jej odtworzenie, ustawienia trwałe i test audio na Miyoo nadal są otwarte.
 - [x] Zgodność pogody: ponowne zagranie już aktywnej karty pogodowej odrzuca duplikat na cmentarz właściciela bez ponownego aktywowania efektu. Dodano regresję dla duplikatu Biting Frost i późniejszego Czystego Nieba; lokalne CTest 2/2 oraz dekodowanie 35 MP3 przechodzą.
-- [~] Przygotowano pliki launchera/pakowania OnionOS; ARM binarka i instalacja na karcie czekają na wierne UI oraz build docelowy.
-- [ ] Desktop/ARM build, regresja, pomiar zasobów oraz test sprzętowy.
+- [~] Zbudowano frontend armhf oficjalnym toolchainem Miyoo GCC 8.2.1 i przypiętym SDL2; ZIP OnionOS z bibliotekami, zasobami, launcherem, licencjami i SHA-256 został zweryfikowany i skopiowany na kartę SD z OnionOS v4.3.1-1. Uruchomienie na fizycznym Miyoo oraz pełna obsługa wejścia/audio pozostają do QA.
+- [~] Desktop/ARM build i smoke; regresja silnika istnieje dla wybranych reguł. Pełne pokrycie, pomiar zasobów i test uruchomienia na sprzęcie nadal otwarte.
 
 ## Rozszerzenie po ukończeniu wiernego silnika — kampania arcade
 

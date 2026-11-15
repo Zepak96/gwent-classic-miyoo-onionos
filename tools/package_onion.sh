@@ -15,6 +15,13 @@ output_dir="$(mkdir -p "$6" && realpath "$6")"
 stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT
 
+expected_sdl_commit="0631abc8e8916db6f9bc7e2afd0c22913d092a29"
+actual_sdl_commit="$(git -C "$sdl_source" rev-parse HEAD)"
+if [[ "$actual_sdl_commit" != "$expected_sdl_commit" ]]; then
+  echo "expected steward-fu/sdl2 $expected_sdl_commit, got $actual_sdl_commit" >&2
+  exit 1
+fi
+
 game_dir="$stage/Roms/PORTS/Games/GwentClassic"
 shortcut_dir="$stage/Roms/PORTS/Shortcuts/Cards"
 mkdir -p "$game_dir" "$shortcut_dir"
@@ -39,13 +46,25 @@ copy_shared "$libgcc_file" libgcc_s.so.1
 
 install -m 644 LICENSE "$game_dir/LICENSE.GwentClassic.txt"
 install -m 644 LICENSES.md "$game_dir/LICENSES.GwentClassic.md"
+install -m 644 third_party/gcc-runtime/COPYING3 "$game_dir/LICENSE.GCC-runtime-GPL-3.0.txt"
+install -m 644 third_party/gcc-runtime/COPYING.RUNTIME "$game_dir/LICENSE.GCC-runtime-exception-3.1.txt"
 install -m 644 "$sdl_source/LICENSE" "$game_dir/LICENSE.SDL2-port.txt"
 install -m 644 "$sdl_source/sdl2/LICENSE.txt" "$game_dir/LICENSE.SDL2-core.txt"
 install -m 644 "$sdl_source/swiftshader/LICENSE.txt" "$game_dir/LICENSE.SwiftShader.txt"
 install -m 644 "$sdl_source/sdl2/dependency/json-c-0.15.tar.gz" "$game_dir/json-c-0.15-source.tar.gz"
 install -m 644 packaging/onion/THIRD_PARTY.txt "$game_dir/THIRD_PARTY.txt"
 install -m 644 assets/gwent-classic/ASSET_ORIGIN.md "$game_dir/assets/gwent-classic/ASSET_ORIGIN.md"
-printf '%s\n' 'steward-fu/sdl2 commit 0631abc8e8916db6f9bc7e2afd0c22913d092a29' > "$game_dir/BUILD-SDL.txt"
+printf 'steward-fu/sdl2 commit %s\n' "$actual_sdl_commit" > "$game_dir/BUILD-SDL.txt"
+{
+  printf 'SDL2 source: steward-fu/sdl2 %s\n' "$actual_sdl_commit"
+  printf 'Miyoo toolchain: steward-fu mini_toolchain-v1.0\n'
+  printf 'Miyoo toolchain archive SHA-256: %s\n' "${GWENT_TOOLCHAIN_SHA256:-not recorded}"
+  printf 'Target: Miyoo Mini Plus, 32-bit ARM hard-float, OnionOS\n'
+  printf 'GCC runtime: libstdc++ and libgcc_s from GCC 8.2.1\n'
+} > "$game_dir/BUILD-INFO.txt"
+if [[ -f "$sdl_source/COPYING.RUNTIME" ]]; then
+  install -m 644 "$sdl_source/COPYING.RUNTIME" "$game_dir/LICENSE.GCC-runtime.txt"
+fi
 
 archive="$output_dir/GwentClassic-OnionOS.zip"
 rm -f "$archive"

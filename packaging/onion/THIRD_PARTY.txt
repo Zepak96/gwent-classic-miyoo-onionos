@@ -21,6 +21,13 @@ json-c
 - License: MIT; upstream source archive and license are available in the pinned
   steward-fu/sdl2 tree under sdl2/dependency/json-c-0.15.tar.gz.
 
+GNU GCC runtime libraries
+- Components: libstdc++.so.6 and libgcc_s.so.1 from the Miyoo GCC 8.2.1
+  toolchain.
+- License: GPL-3.0-or-later with the GCC Runtime Library Exception 3.1.
+- License texts are included as LICENSE.GCC-runtime-GPL-3.0.txt and
+  LICENSE.GCC-runtime-exception-3.1.txt.
+
 The package includes the pinned reference artwork, SVG icons, and SFX under
 assets/gwent-classic/. Asset origins, CDPR authorization as reported by the
 project owner, and the upstream RandomPianist SFX credit are documented in

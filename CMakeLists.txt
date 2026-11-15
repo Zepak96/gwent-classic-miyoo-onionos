@@ -23,6 +23,10 @@ add_custom_command(
 
 add_library(gwent_engine src/game.cpp src/ai.cpp src/save.cpp src/deck.cpp ${GWENT_CATALOG_SOURCE})
 target_include_directories(gwent_engine PUBLIC include)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9)
+  # GCC 8 ships std::filesystem in a separate compatibility library.
+  target_link_libraries(gwent_engine PUBLIC stdc++fs)
+endif()
 if(MSVC)
   target_compile_options(gwent_engine PRIVATE /W4 /permissive-)
 else()
@@ -36,6 +40,10 @@ if(GWENT_WITH_SDL)
     target_include_directories(gwent PRIVATE third_party)
     target_include_directories(gwent SYSTEM PRIVATE ${GWENT_SDL2_INCLUDE_DIR})
     target_link_libraries(gwent PRIVATE gwent_engine ${GWENT_SDL2_LIBRARY})
+    if(GWENT_SDL2_LIBRARY AND NOT MSVC)
+      # The Miyoo SDL port leaves SigmaStar MI symbols for OnionOS to resolve.
+      target_link_options(gwent PRIVATE "LINKER:--allow-shlib-undefined")
+    endif()
     set_target_properties(gwent PROPERTIES INSTALL_RPATH "$ORIGIN")
     target_compile_definitions(gwent PRIVATE GWENT_HAS_SDL=1)
     if(MSVC)
