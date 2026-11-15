@@ -17,11 +17,14 @@ Docelowa gra to wyłącznie Gwint jako minigra w Wiedźminie 3: Wild Hunt, z zaw
 - [x] Sprawdzono dokumentację OnionOS Ports Collection oraz SDL2 dla Miyoo; pakowanie wymaga launcherów i bibliotek zgodnych z docelowym wydaniem OnionOS.
 - [x] Zidentyfikowano wariant next-gen Wiedźmina 3 (m.in. Roach i Muster na Geralt/Ciri); został przyjęty jako docelowy po doprecyzowaniu użytkownika.
 - [x] Utworzono publiczne repozytorium GitHub i dodano workflow CI przez integrację GitHub.
+- [x] Zaimportowano 216 rekordów katalogu kart z przypiętego repozytorium referencyjnego wraz z upstreamową licencją i manifestem pochodzenia.
 
 ### Etap 2 — silnik
 
 - [~] Model danych kart i graczy; podstawowe punktowanie z pogodą, rogiem, Morale, Więzią i immunitetem Bohaterów.
 - [~] Szpieg, Medyk, Manekin, Zbiórka, Pożoga, pasowanie, remis, przejście rundy i wstępne zdolności frakcji.
+- [~] Rozdanie 10 kart z deterministycznie tasowanej talii oraz jednorazowa wymiana do 2 kart dla każdego gracza.
+- [~] Zaimportowany katalog 216 rekordów; natywny silnik nie odtwarza jeszcze wszystkich rekordów/zdolności.
 - [~] Rozdanie 10 kart z deterministycznie tasowanej talii oraz jednorazowa wymiana do 2 kart dla każdego gracza.
 - [ ] Pełna weryfikacja obliczeń (w tym zachowania 3+ kart Więzi) względem Wiedźmina 3 na ustalonym buildzie.
 - [ ] Pełny katalog kart zweryfikowany z ustalonym profilem wersji.

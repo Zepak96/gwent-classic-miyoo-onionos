@@ -1,0 +1,8 @@
+{
+  "source": "https://github.com/asundr/gwent-classic",
+  "commit": "08592d847f2573440a34deb9f32bc855b2544cdd",
+  "source_file": "cards.js: card_dict",
+  "record_count": 216,
+  "profile": "Witcher 3 minigame, including upstream next-gen content",
+  "license": "MIT + Commons Clause v1.0; see ../third_party/gwent-classic/LICENSE"
+}

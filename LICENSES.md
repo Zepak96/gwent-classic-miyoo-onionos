@@ -11,6 +11,10 @@ Oryginalny kod tego projektu jest objęty dołączoną licencją MIT. Nie obejmu
 - `steward-fu/sdl2`, audytowany HEAD `0631abc8e8916db6f9bc7e2afd0c22913d092a29` — SDL2, licencja LGPL-2.1. Biblioteki nie są na razie dołączone.
 - `OnionUI/Ports-Collection`, audytowany HEAD `685c7e6e9065232d6350765022baa4723a641f13` — wzorzec integracji systemowej. Launcher i materiały muszą zachować licencje upstream przy użyciu.
 
+## Zaimportowane dane
+
+`data/cards.json` zawiera 216 mechanicznych rekordów wyciągniętych z `card_dict` w `asundr/gwent-classic` commit `08592d847f2573440a34deb9f32bc855b2544cdd`. Zapisano upstreamowy plik `LICENSE` i informację o pochodzeniu w `third_party/gwent-classic/`. Dane podlegają MIT + Commons Clause v1.0; warunek Commons Clause ogranicza sprzedaż. Przed wydaniem należy zachować ten notice i sprawdzić ograniczenia dystrybucyjne.
+
 Obecność zasobów w którymkolwiek repozytorium nie oznacza praw do ich redystrybucji. Nie dołączono ilustracji, fontów, muzyki, SFX ani kodu z tych repozytoriów. Nie dołączono zasobów CD PROJEKT RED. Nowe zasoby audio/graficzne wymagają własnej dokumentacji autorstwa i licencji przed dystrybucją.
 
 ## Materiały referencyjne
