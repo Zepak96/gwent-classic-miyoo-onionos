@@ -297,6 +297,10 @@ int sourceAbilityScalePercent(Uint32 elapsed) {
   if(elapsed<1600)return interpolate(80,40,elapsed-1350);
   return 40;
 }
+const char* sourceWeatherOverlayForRow(int row) {
+  static constexpr std::array<const char*,3> overlays{"frost","fog","rain"};
+  return overlays[static_cast<std::size_t>(std::clamp(row,0,2))];
+}
 SDL_Texture* textureFor(SDL_Renderer* renderer,const App& app,const std::string& relative) {
   if(relative.empty()||app.assetDirectory.empty())return nullptr;
   const auto found=app.textures.find(relative);
@@ -1156,7 +1160,7 @@ void drawRow(SDL_Renderer* r,const App& a,int owner,int row,int y) {
     drawSourceCard(r,a,static_cast<int>(std::lround(geometry.firstX+i*geometry.pitch)),y,card);
   }
   if(a.weatherTransition[owner][row]||a.game.weather[row]) {
-    const std::string& overlay=a.weatherOverlay[owner][row].empty()?std::string("frost"):a.weatherOverlay[owner][row];
+    const std::string overlay=a.weatherOverlay[owner][row].empty()?sourceWeatherOverlayForRow(row):a.weatherOverlay[owner][row];
     Uint8 alpha=255;
     if(a.weatherTransition[owner][row]) {
       const Uint32 elapsed=SDL_GetTicks()-a.weatherChangedAt[owner][row];
@@ -1171,8 +1175,11 @@ void updateWeatherTransitions(App& a) {
   const Uint32 now=SDL_GetTicks();
   for(int owner=0;owner<2;++owner)for(int row=0;row<3;++row) {
     const bool active=a.game.weather[row];
-    if(active)for(const auto& weather:a.game.weatherCards)for(const auto& ability:weather.card.abilities)
-      if(ability=="rain"||ability=="fog"||ability=="frost")a.weatherOverlay[owner][row]=ability;
+    // The source adds a weather class to each affected row: frost on melee,
+    // fog on ranged, rain on siege. Skellige Storm carries fog + rain, so its
+    // two row visuals naturally use the same source overlays. Do not pick the
+    // last weather card globally; that made one card's art leak onto every row.
+    if(active)a.weatherOverlay[owner][row]=sourceWeatherOverlayForRow(row);
     if(!a.weatherInitialized) {
       a.weatherFrom[owner][row]=active;a.weatherTo[owner][row]=active;
       a.weatherChangedAt[owner][row]=now;a.weatherTransition[owner][row]=false;
@@ -1945,6 +1952,9 @@ int main(int argc,char** argv) {
          sourceAbilityScalePercent(300)==100&&sourceAbilityScalePercent(350)==100&&
          sourceAbilityScalePercent(600)==80&&sourceAbilityScalePercent(1350)==80&&
          sourceAbilityScalePercent(1600)==40&&sourceAbilityScalePercent(1650)==40;
+    okay=okay&&std::string(sourceWeatherOverlayForRow(0))=="frost"&&
+         std::string(sourceWeatherOverlayForRow(1))=="fog"&&
+         std::string(sourceWeatherOverlayForRow(2))=="rain";
     const auto oneCardRow=sourceRowGeometry(1),nineCardRow=sourceRowGeometry(9),tenCardRow=sourceRowGeometry(10),
                twentyCardRow=sourceRowGeometry(20);
     okay=okay&&oneCardRow.firstX>356&&oneCardRow.firstX<358&&nineCardRow.firstX>238&&nineCardRow.firstX<240&&
