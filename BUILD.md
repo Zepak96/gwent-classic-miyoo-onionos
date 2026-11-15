@@ -46,7 +46,7 @@ Po pobraniu i sprawdzeniu toolchaina oraz checkoutcie powyższej rewizji SDL, w 
 bash tools/build_onion.sh /opt /path/to/steward-fu-sdl2 out/miyoo /path/to/mini_toolchain-v1.0.tar.gz
 ```
 
-Skrypt kompiluje frontend z biblioteką SDL Miyoo, wymusza zgodność rewizji i sumy SDK, weryfikuje ELF32 ARM hard-float, pakuje foldery `Roms/PORTS` i tworzy SHA-256 ZIP-a. Workflow `Miyoo OnionOS package` wykonuje te kroki i publikuje paczkę jako artefakt Actions. Referencyjna biblioteka SDL ma zależności SigmaStar `libmi_*`, które dostarcza system Miyoo/OnionOS; nie kopiuje się ich z niezweryfikowanego obrazu urządzenia.
+Skrypt kompiluje frontend z biblioteką SDL Miyoo, wymusza zgodność rewizji i sumy SDK, weryfikuje ELF32 ARM hard-float, normalizuje ścieżki/końce linii/metadane ZIP i tworzy SHA-256 paczki. Workflow `Miyoo OnionOS package` wykonuje te kroki i publikuje paczkę jako artefakt Actions. Referencyjna biblioteka SDL ma zależności SigmaStar `libmi_*`, które dostarcza system Miyoo/OnionOS; nie kopiuje się ich z niezweryfikowanego obrazu urządzenia.
 
 Wydanie korzysta z standalone launcher template OnionOS, `Roms/PORTS/Games/GwentClassic/`, `Roms/PORTS/Shortcuts/Cards/GwentClassic.notfound` i oficjalnego kroku `~Import ports`. Pakiet obejmuje SDL2, EGL/GLES, json-c oraz biblioteki GCC runtime wraz z licencjami. Sama poprawna kompilacja i instalacja na karcie nie potwierdzają jeszcze startu gry ani wejścia/audio na fizycznym Miyoo.
 

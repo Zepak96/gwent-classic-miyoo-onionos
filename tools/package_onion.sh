@@ -37,6 +37,12 @@ copy_shared() {
   install -m 644 "$source" "$game_dir/$name"
 }
 
+copy_text() {
+  local source="$1" name="$2"
+  tr -d '\r' < "$source" > "$game_dir/$name"
+  chmod 644 "$game_dir/$name"
+}
+
 copy_shared "$sdl_source/prebuilt/640x480/libSDL2-2.0.so.0" libSDL2-2.0.so.0
 copy_shared "$sdl_source/prebuilt/640x480/libEGL.so" libEGL.so
 copy_shared "$sdl_source/prebuilt/640x480/libGLESv2.so" libGLESv2.so
@@ -44,16 +50,16 @@ copy_shared "$(find "$json_lib_dir" -name 'libjson-c.so.5*' -type f -print -quit
 copy_shared "$libstdcxx_file" libstdc++.so.6
 copy_shared "$libgcc_file" libgcc_s.so.1
 
-install -m 644 LICENSE "$game_dir/LICENSE.GwentClassic.txt"
-install -m 644 LICENSES.md "$game_dir/LICENSES.GwentClassic.md"
-install -m 644 third_party/gcc-runtime/COPYING3 "$game_dir/LICENSE.GCC-runtime-GPL-3.0.txt"
-install -m 644 third_party/gcc-runtime/COPYING.RUNTIME "$game_dir/LICENSE.GCC-runtime-exception-3.1.txt"
-install -m 644 "$sdl_source/LICENSE" "$game_dir/LICENSE.SDL2-port.txt"
-install -m 644 "$sdl_source/sdl2/LICENSE.txt" "$game_dir/LICENSE.SDL2-core.txt"
-install -m 644 "$sdl_source/swiftshader/LICENSE.txt" "$game_dir/LICENSE.SwiftShader.txt"
+copy_text LICENSE LICENSE.GwentClassic.txt
+copy_text LICENSES.md LICENSES.GwentClassic.md
+copy_text third_party/gcc-runtime/COPYING3 LICENSE.GCC-runtime-GPL-3.0.txt
+copy_text third_party/gcc-runtime/COPYING.RUNTIME LICENSE.GCC-runtime-exception-3.1.txt
+copy_text "$sdl_source/LICENSE" LICENSE.SDL2-port.txt
+copy_text "$sdl_source/sdl2/LICENSE.txt" LICENSE.SDL2-core.txt
+copy_text "$sdl_source/swiftshader/LICENSE.txt" LICENSE.SwiftShader.txt
 install -m 644 "$sdl_source/sdl2/dependency/json-c-0.15.tar.gz" "$game_dir/json-c-0.15-source.tar.gz"
-install -m 644 packaging/onion/THIRD_PARTY.txt "$game_dir/THIRD_PARTY.txt"
-install -m 644 assets/gwent-classic/ASSET_ORIGIN.md "$game_dir/assets/gwent-classic/ASSET_ORIGIN.md"
+copy_text packaging/onion/THIRD_PARTY.txt THIRD_PARTY.txt
+copy_text assets/gwent-classic/ASSET_ORIGIN.md assets/gwent-classic/ASSET_ORIGIN.md
 printf 'steward-fu/sdl2 commit %s\n' "$actual_sdl_commit" > "$game_dir/BUILD-SDL.txt"
 {
   printf 'SDL2 source: steward-fu/sdl2 %s\n' "$actual_sdl_commit"
@@ -68,5 +74,5 @@ fi
 
 archive="$output_dir/GwentClassic-OnionOS.zip"
 rm -f "$archive"
-(cd "$stage" && zip -qr "$archive" Roms)
+(cd "$stage" && find Roms -exec touch -h -d '1980-01-01 00:00:00 UTC' {} + && find Roms -print | LC_ALL=C sort | zip -X -q "$archive" -@)
 sha256sum "$archive" | tee "$archive.sha256"

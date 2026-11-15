@@ -58,7 +58,8 @@ cmake -S "$repo_root" -B "$build_dir" \
   -DCMAKE_SYSTEM_PROCESSOR=arm \
   -DCMAKE_SYSROOT="$sysroot" \
   -DCMAKE_CXX_COMPILER="$compiler" \
-  -DCMAKE_CXX_FLAGS="-B$links/" \
+  -DCMAKE_CXX_FLAGS="-B$links/ -ffile-prefix-map=$repo_root=. -ffile-prefix-map=$sdl_source=third_party/miyoo-sdl2" \
+  -DCMAKE_SKIP_BUILD_RPATH=ON \
   -DCMAKE_AR="$prebuilt/arm-linux-gnueabihf/bin/ar" \
   -DCMAKE_RANLIB="$prebuilt/arm-linux-gnueabihf/bin/ranlib" \
   -DCMAKE_NM="$prebuilt/arm-linux-gnueabihf/bin/nm" \
