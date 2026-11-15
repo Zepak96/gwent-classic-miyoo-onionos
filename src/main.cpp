@@ -1132,6 +1132,7 @@ int main(int argc,char** argv) {
          (!app.dataDirectory.empty() && settingsProbe.aiDifficulty!=app.aiDifficulty)) {
         app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 6;
       }
+      app.status.clear();
       clearFrame();drawDeckSelect(renderer,app);SDL_RenderPresent(renderer);
       if(!saveFrame(argv[6])) { app.audio.shutdown();SDL_DestroyRenderer(renderer);SDL_DestroyWindow(window);SDL_Quit();return 4; }
     }
