@@ -262,7 +262,7 @@ void drawMatch(SDL_Renderer* r,const App& a) {
   text(r,98,12,tr(a,"round")+" "+std::to_string(a.game.round),paper,1);
   text(r,206,12,"YOU "+std::to_string(me.score)+"  -  "+std::to_string(op.score)+" AI",gold,1);
   text(r,468,12,"GEMS "+std::to_string(std::max(0,2-me.roundLosses))+" : "+std::to_string(std::max(0,2-op.roundLosses)),paper,1);
-  text(r,18,43,"OPPONENT  "+std::to_string(op.hand.size())+" CARDS",muted,1);
+  text(r,18,43,"OPPONENT - "+shortName(op.leader.name,25)+"  "+std::to_string(op.hand.size())+" CARDS",muted,1);
   for(int row=0;row<3;++row) drawRow(r,a,1,row,59);
   box(r,18,124,604,46,panelLight); frame(r,18,124,604,46,Color{64,70,63});
   text(r,31,132,a.game.phase==gwent::Phase::OpponentTurn?tr(a,"ai_turn"):tr(a,"your_turn"),gold,1);
@@ -271,7 +271,7 @@ void drawMatch(SDL_Renderer* r,const App& a) {
   text(r,350,132,"WEATHER",muted,1);
   const char* weatherNames[]={"FROST","FOG","RAIN"};
   for(int i=0;i<3;++i) { const int x=425+i*58; box(r,x,130,48,17,a.game.weather[i]?blue:panel); frame(r,x,130,48,17,a.game.weather[i]?paper:Color{68,73,65}); text(r,x+3,135,weatherNames[i],a.game.weather[i]?paper:muted,1); }
-  text(r,18,178,"YOUR SIDE  "+std::to_string(me.hand.size())+" CARDS",muted,1);
+  text(r,18,178,"YOU - "+shortName(me.leader.name,25)+"  "+std::to_string(me.hand.size())+" CARDS",muted,1);
   for(int row=0;row<3;++row) drawRow(r,a,0,row,192);
   if(a.targetMode && !a.selectedTargets.empty()) {
     std::vector<gwent::Card> targets;
@@ -288,8 +288,20 @@ void drawMatch(SDL_Renderer* r,const App& a) {
       const int index=start+i,x=18+i*60;
       const bool marked=std::find(a.mulligan.begin(),a.mulligan.end(),me.hand[index].id)!=a.mulligan.end();
       drawCardTile(r,x,270,56,76,me.hand[index],index==a.handIndex,marked);
-      if(marked) text(r,x+3,360,"SWAP",gold,1);
+      if(marked) { box(r,x+43,272,10,10,gold); text(r,x+45,273,"X",ink,1); }
     }
+  }
+  if(a.handIndex>=0 && a.handIndex<static_cast<int>(me.hand.size())) {
+    const auto& selected=me.hand[a.handIndex];
+    text(r,18,350,selected.name+"  POWER "+std::to_string(selected.power),gold,1);
+    std::string abilities;
+    for(const auto& ability:selected.abilities) {
+      if(ability=="hero"||ability=="spy"||ability=="medic"||ability=="morale"||ability=="bond"||ability=="muster"||ability=="horn"||ability=="berserker"||ability.rfind("scorch",0)==0) {
+        if(!abilities.empty()) abilities+=" / ";
+        abilities+=ability;
+      }
+    }
+    if(!abilities.empty())text(r,18,358,abilities,muted,1);
   }
   if(a.game.phase==gwent::Phase::Mulligan) {
     box(r,0,366,W,45,panel); text(r,18,373,tr(a,"mulligan"),paper,1); text(r,18,390,tr(a,"confirm_mulligan"),gold,1);
