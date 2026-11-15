@@ -9,8 +9,8 @@ Data raportu: 2026-11-15.
 - Po ponownym audycie wizualnym podgląd zdolności w meczu zmieniono na czcionkę 2×, ograniczono do czterech wierszy, a dłuższy tekst otrzymuje widoczną wskazówkę `I - PELNY OPIS` / `I - FULL TEXT`. Pełny inspektor pokazuje cały opis Cirilli i cytat. Świeży render 640×480 obejrzano w natywnej skali; testy CTest 2/2 i dekodowanie 35 SFX przeszły. Długie opisy pozostają w inspektorze, a wizualna zgodność 1:1 i test na fizycznym Miyoo nadal są otwarte.
 - Lokalny frontend SDL2 i silnik skompilowały się w Ubuntu 24.04/Dockerze. CTest: 2/2; dodatkowo dekoder audio sprawdził wszystkie 35 MP3, a smoke test zapisał sześć obrazów 640×480 w `docs/screenshots/`. Planszę meczu wycentrowano w ekranie 4:3, zachowując jej źródłowe 16:9; inspektor karty Cirilli pokazuje cały opis i cytat.
 - Regresja Zbiórki sprawdza Geralta i Roacha. Test AI uruchamia pełne mecze AI kontra AI na poziomach Łatwy, Normalny i Trudny; osobny przypadek sprawdza, że trudny wybiera silniejszy ruch w prostym stanie.
-- ARM workflow i desktop workflow zakończyły się sukcesem dla commita `1571642`; test obejmuje trzy poziomy AI, ochronę Roacha przy wymianie oraz sześć klatek smoke dla menu. Paczkę ARM z tego commita skopiowano na kartę i porównano 599 plików SHA-256 bez różnic. SHA-256 ZIP: `df3405e58c6700d6295959db0af68e85c1ab21820aa05af6822fff9d69ff11bf`.
-- Nie wykonano fizycznego startu gry, testu przycisków, długiego testu pamięci/wydajności ani odsłuchu na Miyoo. Skrót nadal jest `.notfound` i wymaga uruchomienia `~Import ports.miyoocmd` na urządzeniu.
+- Desktop CI #43740551176 oraz ARM CI #43740551240 zakończyły się sukcesem dla commita `d4f4e6c`; przeszły testy silnika i katalogu, dekodowanie 35 SFX, smoke SDL i kontrola archiwum OnionOS. SHA-256 ZIP: `012eaaf45416f60e17162c69ec2d8d3d421198a9ae713f39afd5b0c98efa46e4`.
+- Paczkę z tego commita zainstalowano na karcie `E:` (`MIYOO MINI`, OnionOS v4.3.1-1). Porównanie: 598 plików gry bez braków, nadmiarów ani różnic, a skrót `.notfound` zgodny; hash binarki na karcie: `d57e6584fe75ed2c8abb7a01240b832324ee86e8eb9ba05f147519bc698b5844`. Fizyczny start, przyciski, długi test pamięci/wydajności i odsłuch na Miyoo nie zostały jeszcze sprawdzone. Skrót wymaga uruchomienia `~Import ports.miyoocmd` na urządzeniu.
 
 Testy automatyczne C++ obejmują punktowanie, pogodę (w tym Skellige Storm), róg, Bohaterów, Morale, Więź (3 kopie), kolejność Więzi i Morale, pasowanie, remis, Nilfgaard, zdolność pierwszego gracza Scoia'tael, wybór dwóch wskrzeszeń Skellige w rundzie trzeciej, Szpiega, Medyka (wymóg celu i zakaz wskrzeszania Bohatera), Manekina, Zbiórkę Geralta/Roacha oraz AI, Mardroeme/Berserker, Scorch, Avengera Cow/Kambiego po Manekinie, Pożodze i końcu rundy, rozdanie i wymianę kart, walidację talii, katalog, 10 talii referencyjnych, round-trip oraz odrzucenie uszkodzonego przepisu talii użytkownika, wybrane zdolności liderów, zgodność decyzji AI przy zmianie ukrytej ręki przeciwnika, ochronę Roacha w mulliganie, wszystkie trzy poziomy trudności oraz pełny mecz AI kontra AI na każdym poziomie. Dawny test wymuszający wybór lidera usunięto, bo referencyjny `ControllerAI` losuje akcję proporcjonalnie do wag i nie zawsze wybiera najwyżej ważoną możliwość.
 
@@ -25,11 +25,11 @@ Po podłączeniu edytora do menu workflow [desktop-build #43717386389](https://g
 | Obszar | Status | Uwagi |
 |---|---|---|
 | Budowanie desktop | Zaliczone w CI | Ubuntu, CMake, SDL2; budowany frontend oraz silnik/testy |
-| Budowanie ARM | Zaliczone w CI | Miyoo GCC 8.2.1/armhf, SDL2 z przypiętego portu; aktualna paczka z commita `1571642` skopiowana i porównana z kartą. |
+| Budowanie ARM | Zaliczone w CI | Miyoo GCC 8.2.1/armhf, SDL2 z przypiętego portu; paczka `d4f4e6c` skopiowana i porównana z kartą. |
 | Zasady / regresja | Częściowo zaliczone lokalnie i w CI | Wybrane reguły, liderzy, Roach/Muster i pełne mecze AI×AI dla trzech poziomów; kompletne porównanie wszystkich sekwencji z referencją nadal nie istnieje. |
 | Interfejs 640×480 | Smoke wizualny zaliczony | Obejrzano cztery klatki 640×480; plansza jest wycentrowana, opis Ciri czytelny. Brakuje automatyzacji interakcji, porównania wszystkich ekranów 1:1 i testu fizycznego. |
 | Audio | Częściowo zaliczone desktopowo | `dr_mp3` dekoduje wszystkie 35 MP3; SDL Audio miksuje dźwięki zdarzeń. Brak muzyki w repo źródłowym i testu dźwięku na Miyoo. |
-| OnionOS | Paczka na SD; start fizyczny niezweryfikowany | Wszystkie 599 plików paczki z `1571642` zgodne SHA-256; import skrótu i uruchomienie gry pozostają do testu na Miyoo. |
+| OnionOS | Paczka na SD; start fizyczny niezweryfikowany | 598 plików gry i skrót zgodne SHA-256 z paczką `d4f4e6c`; import skrótu i uruchomienie gry pozostają do testu na Miyoo. |
 | Długi test / RAM | Niewykonane | Nie przeprowadzono |
 
 ## Test renderowania assetów i UI
@@ -38,7 +38,7 @@ W tej sesji dołączono 531 plików obrazów, 35 SFX MP3 i 6 SVG z przypiętego 
 
 ## Test sprzętowy
 
-Port nie został jeszcze uruchomiony na fizycznym Miyoo Mini Plus. Karta microSD jest wykryta jako `E:` (`MIYOO MINI`, FAT32); paczka z commita `1571642` znajduje się w `Roms/PORTS/Games/GwentClassic`, a skrót `.notfound` wymaga uruchomienia `~Import ports.miyoocmd` na urządzeniu. Zweryfikowano wszystkie pliki paczki przez SHA-256, ale nie potwierdza to startu, wejścia, audio ani wydajności na konsoli.
+Port nie został jeszcze uruchomiony na fizycznym Miyoo Mini Plus. Karta microSD jest wykryta jako `E:` (`MIYOO MINI`, FAT32); paczka z commita `d4f4e6c` znajduje się w `Roms/PORTS/Games/GwentClassic`. Porównano SHA-256 598 plików gry i skrótu `.notfound`; skrót wymaga uruchomienia `~Import ports.miyoocmd` na urządzeniu. Zgodność plików nie potwierdza startu, wejścia, audio ani wydajności na konsoli.
 
 ## Ponowna kontrola zgodności układu źródłowego
 
