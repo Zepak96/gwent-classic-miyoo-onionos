@@ -4,7 +4,7 @@ Data raportu: 2026-11-15.
 
 ## Wynik
 
-Testy automatyczne C++ obejmują teraz podstawowe punktowanie, pogodę, róg, Bohaterów, Morale, Więź (3 kopie), pasowanie, remis, Nilfgaard, Szpiega, Medyka, Manekina, Zbiórkę, rozdanie i wymianę kart oraz część walidacji talii. Commit `7d44379` został zbudowany w GitHub Actions; `ctest` zaliczył 1/1 testów. Dalsze zmiany importują i sprawdzają katalog kart, lecz CI dla nich nie uruchomił się jeszcze. Wciąż jest to jeden C++ program testowy; zakres nadal nie pokrywa wszystkich kart i zasad.
+Testy automatyczne C++ obejmują teraz podstawowe punktowanie, pogodę, róg, Bohaterów, Morale, Więź (3 kopie), pasowanie, remis, Nilfgaard, Szpiega, Medyka, Manekina, Zbiórkę, rozdanie i wymianę kart oraz część walidacji talii. Commit `5273ba3` został zbudowany w GitHub Actions; `ctest` zaliczył 2/2 testy (`engine_rules`, `card_catalog`). Test katalogu potwierdza 216 rekordów, w tym next-gen Roach oraz muster na Geralt/Ciri. Wciąż są to podstawowe asercje i walidacja danych; zakres nie pokrywa wszystkich kart i zasad.
 
 | Obszar | Status | Uwagi |
 |---|---|---|
