@@ -35,7 +35,7 @@ Docelowa gra to wyłącznie Gwint jako minigra w Wiedźminie 3: Wild Hunt, z zaw
 - [ ] Pełny katalog kart zweryfikowany z ustalonym profilem wersji.
 - [ ] Wszystkie zdolności jednostek, dowódców i frakcji oraz prawidłowa kolejność ich rozstrzygania.
 - [ ] Pełna walidacja talii, mulligan, medyk, manekin i zapis odrzuconych kart.
-- [ ] AI Easy/Normal/Hard bez informacji ukrytej.
+- [~] AI Easy/Normal/Hard: sprawdzono brak zależności decyzji od ukrytej zawartości ręki przeciwnika, pełny mecz Hard kontra Hard oraz wybór aktywnej zdolności lidera. Strategia i obsługa doboru opcji nie pokrywają jeszcze wszystkich interakcji referencji.
 - [ ] Porównawcza weryfikacja wszystkich sekwencji względem źródła referencyjnego.
 
 ### Etapy 3–8 — port, UI, lokalizacja, audio, integracja, QA i release
