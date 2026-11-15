@@ -52,7 +52,9 @@ source behavior. A build or screenshot alone does not count as parity.
   viewers; five-card carousel; confirmation popup; notifications; end screens.
 - [ ] Upload/download deck flows replaced only with suitable local-device flows.
 - [ ] Music, SFX, notification toggles and persisted settings.
-- [ ] All original board/card/status animations and their timing.
+- [ ] All original board/card/status animations and their timing. Partial work is
+  recorded in `docs/REFERENCE_ANIMATIONS.md`; this item remains open until every
+  source effect is ported and compared.
 - [ ] Exact 16:9 source stage scaled to 640x360 on the Miyoo 640x480 display;
   no invented title screen or re-centered/rearranged layout.
 

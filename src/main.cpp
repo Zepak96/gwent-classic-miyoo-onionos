@@ -129,6 +129,13 @@ struct App {
     int fromX{0},fromY{0},toX{0},toY{0};
     Uint32 startedAt{0};
   };
+  struct CardEffect {
+    bool active{false};
+    std::string icon;
+    int x{0},y{0};
+    Uint32 startedAt{0};
+    Uint32 duration{1650};
+  };
   Screen screen{Screen::Title};
   Language language{Language::Polish};
   std::size_t deckIndex{0};
@@ -145,6 +152,13 @@ struct App {
   bool sfxEnabled{true};
   std::vector<std::string> leaderSelections;
   CardFlight cardFlight;
+  CardEffect cardEffect;
+  std::array<std::array<bool,3>,2> weatherFrom{};
+  std::array<std::array<bool,3>,2> weatherTo{};
+  std::array<std::array<Uint32,3>,2> weatherChangedAt{};
+  std::array<std::array<bool,3>,2> weatherTransition{};
+  std::array<std::array<std::string,3>,2> weatherOverlay{};
+  bool weatherInitialized{false};
   Uint32 selectDownAt{0};
   bool selectLongPressed{false};
   int editorPane{0};
@@ -215,6 +229,13 @@ SDL_Texture* textureFor(SDL_Renderer* renderer,const App& app,const std::string&
 }
 void drawImage(SDL_Renderer* renderer,const App& app,const std::string& relative,int x,int y,int w,int h) {
   if(auto* image=textureFor(renderer,app,relative)) { SDL_Rect destination{x,y,w,h};SDL_RenderCopy(renderer,image,nullptr,&destination); }
+}
+void drawImageAlpha(SDL_Renderer* renderer,const App& app,const std::string& relative,int x,int y,int w,int h,Uint8 alpha) {
+  if(auto* image=textureFor(renderer,app,relative)) {
+    SDL_SetTextureAlphaMod(image,alpha);
+    SDL_Rect destination{x,y,w,h};SDL_RenderCopy(renderer,image,nullptr,&destination);
+    SDL_SetTextureAlphaMod(image,255);
+  }
 }
 const std::vector<gwent::ReferenceDeck>& recipes() { return gwent::referencePremadeDecks(); }
 std::string tr(const App& a,const std::string& key) {
@@ -607,19 +628,57 @@ void animatePlayedCard(App& a,const gwent::Card& card,int player,int handIndex,i
   }
   if(!found) {
     const auto it=std::find_if(a.game.weatherCards.begin(),a.game.weatherCards.end(),[&](const gwent::ActiveWeather& item){return item.card.id==card.id;});
-    if(it==a.game.weatherCards.end())return;
-    const int index=static_cast<int>(it-a.game.weatherCards.begin());
-    flight.owner=-1;flight.row=-1;flight.toX=47+index*29;flight.toY=149;found=true;
+    if(it!=a.game.weatherCards.end()) {
+      const int index=static_cast<int>(it-a.game.weatherCards.begin());
+      flight.owner=-1;flight.row=-1;flight.toX=47+index*29;flight.toY=149;found=true;
+    } else if(card.kind==gwent::Kind::CommanderHorn) {
+      // Source places Commander's Horn in its row's special slot. In this
+      // renderer that slot is represented by the horn marker at row's left.
+      int targetRow=player==0?a.rowIndex:0;
+      if(player==1)for(int row=0;row<3;++row)if(a.game.horn[player][row]){targetRow=row;break;}
+      flight.owner=player;flight.row=targetRow;flight.toX=190;flight.toY=player==0?143+targetRow*45:5+(2-targetRow)*45;found=true;
+    }
   }
-  if(found) { flight.active=true;flight.startedAt=SDL_GetTicks();a.cardFlight=std::move(flight); }
+  if(found) {
+    flight.active=true;flight.startedAt=SDL_GetTicks();a.cardFlight=std::move(flight);
+    // Source Card.animate() attaches the matching anim_<ability> artwork to
+    // the card: 50 ms setup, 300 ms fade in, 1000 ms hold, 300 ms fade out.
+    // Scorch has its own 50 + 1300 + 300 ms sequence and cover sizing.
+    std::string effect;
+    for(const auto* ability:{"horn","spy","muster","morale","bond","cerys"}) {
+      if(std::find(card.abilities.begin(),card.abilities.end(),ability)!=card.abilities.end()) { effect=ability;break; }
+    }
+    if(effect=="cerys")effect="muster";
+    if(effect.empty()&&card.kind==gwent::Kind::CommanderHorn)effect="horn";
+    if(effect.empty()&&card.spy)effect="spy";
+    if(!effect.empty()) {
+      a.cardEffect.active=true;a.cardEffect.icon=effect;a.cardEffect.x=flight.toX;a.cardEffect.y=flight.toY;
+      a.cardEffect.startedAt=SDL_GetTicks()+499;a.cardEffect.duration=1650;
+    }
+  }
 }
 void drawCardFlight(SDL_Renderer* r,const App& a) {
   const auto& flight=a.cardFlight;if(!flight.active)return;
-  const float t=std::clamp(static_cast<float>(SDL_GetTicks()-flight.startedAt)/500.0f,0.0f,1.0f);
+  const float t=std::clamp(static_cast<float>(SDL_GetTicks()-flight.startedAt)/499.0f,0.0f,1.0f);
   const float eased=t*t*(3.0f-2.0f*t);
   const int x=static_cast<int>(std::lround(flight.fromX+(flight.toX-flight.fromX)*eased));
   const int y=static_cast<int>(std::lround(flight.fromY+(flight.toY-flight.fromY)*eased));
   drawSourceCard(r,a,x,y,flight.card,true);
+}
+void drawCardEffect(SDL_Renderer* r,const App& a) {
+  const auto& effect=a.cardEffect;if(!effect.active)return;
+  const Uint32 now=SDL_GetTicks();
+  if(SDL_TICKS_PASSED(now,effect.startedAt+effect.duration))return;
+  const Uint32 elapsed=now-effect.startedAt;
+  Uint8 alpha=255;
+  if(elapsed<50)alpha=0;
+  else if(elapsed<350)alpha=static_cast<Uint8>(std::clamp((elapsed-50)*255/300,0u,255u));
+  else if(elapsed>=effect.duration-300)alpha=static_cast<Uint8>(std::clamp((effect.duration-elapsed)*255/300,0u,255u));
+  float size=1.0f;
+  if(effect.icon!="scorch")size=elapsed<350?1.0f:elapsed<1350?0.8f:0.4f;
+  const int width=std::max(1,static_cast<int>(std::lround(28*size)));
+  const int height=std::max(1,static_cast<int>(std::lround(43*size)));
+  drawImageAlpha(r,a,"img/icons/anim_"+effect.icon+".png",effect.x+(28-width)/2,effect.y+(43-height)/2,width,height,alpha);
 }
 std::vector<std::string> wrapDetailText(const std::string& value,std::size_t limit);
 void drawCardPreview(SDL_Renderer* r,const App& a,const gwent::Card& card) {
@@ -726,12 +785,35 @@ void drawRow(SDL_Renderer* r,const App& a,int owner,int row,int y) {
     drawSourceCard(r,a,start+i*29,y,card);
   }
   if(cards.size()>static_cast<std::size_t>(shown))text(r,left+width-15,y+15,"+",paper,1);
-  if(a.game.weather[row]) {
-    std::string overlay="frost";
-    for(const auto& active:a.game.weatherCards)for(const auto& ability:active.card.abilities)
-      if(ability=="rain"||ability=="fog"||ability=="frost")overlay=ability;
-    drawImage(r,a,"img/icons/overlay_"+overlay+".png",left+19,y,width-20,rowHeight);
+  if(a.weatherTransition[owner][row]||a.game.weather[row]) {
+    const std::string& overlay=a.weatherOverlay[owner][row].empty()?std::string("frost"):a.weatherOverlay[owner][row];
+    Uint8 alpha=255;
+    if(a.weatherTransition[owner][row]) {
+      const Uint32 elapsed=SDL_GetTicks()-a.weatherChangedAt[owner][row];
+      const Uint32 step=std::min(elapsed,500u);
+      const Uint8 amount=static_cast<Uint8>(step*255/500);
+      alpha=a.weatherTo[owner][row]?amount:static_cast<Uint8>(255-amount);
+    }
+    if(alpha)drawImageAlpha(r,a,"img/icons/overlay_"+overlay+".png",left+19,y,width-20,rowHeight,alpha);
   }
+}
+void updateWeatherTransitions(App& a) {
+  const Uint32 now=SDL_GetTicks();
+  for(int owner=0;owner<2;++owner)for(int row=0;row<3;++row) {
+    const bool active=a.game.weather[row];
+    if(active)for(const auto& weather:a.game.weatherCards)for(const auto& ability:weather.card.abilities)
+      if(ability=="rain"||ability=="fog"||ability=="frost")a.weatherOverlay[owner][row]=ability;
+    if(!a.weatherInitialized) {
+      a.weatherFrom[owner][row]=active;a.weatherTo[owner][row]=active;
+      a.weatherChangedAt[owner][row]=now;a.weatherTransition[owner][row]=false;
+    } else if(a.weatherTo[owner][row]!=active) {
+      a.weatherFrom[owner][row]=!active;a.weatherTo[owner][row]=active;
+      a.weatherChangedAt[owner][row]=now;a.weatherTransition[owner][row]=true;
+    }
+    if(a.weatherTransition[owner][row]&&SDL_TICKS_PASSED(now,a.weatherChangedAt[owner][row]+500))
+      a.weatherTransition[owner][row]=false;
+  }
+  a.weatherInitialized=true;
 }
 void drawTitle(SDL_Renderer* r,const App& a) {
   drawImage(r,a,"img/board.jpg",0,0,W,H);box(r,0,0,W,H,Color{13,19,20,205});box(r,0,0,W,5,gold);box(r,0,H-5,W,5,gold);
@@ -977,6 +1059,7 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     drawCardPreview(r,a,me.hand[static_cast<std::size_t>(selected)]);
   }
   if(a.cardFlight.active)drawCardFlight(r,a);
+  drawCardEffect(r,a);
   if(a.cardDetailsOpen&&!me.hand.empty()&&showHand) {
     const int selected=std::clamp(a.handIndex,0,static_cast<int>(me.hand.size())-1);
     drawCardDetails(r,a,me.hand[static_cast<std::size_t>(selected)]);
@@ -1668,7 +1751,9 @@ int main(int argc,char** argv) {
        SDL_TICKS_PASSED(SDL_GetTicks(),app.selectDownAt+500)) {
       app.cardDetailsOpen=true;app.selectLongPressed=true;app.audio.play("open");
     }
-    if(app.cardFlight.active&&SDL_TICKS_PASSED(SDL_GetTicks(),app.cardFlight.startedAt+500))app.cardFlight.active=false;
+    if(app.cardFlight.active&&SDL_TICKS_PASSED(SDL_GetTicks(),app.cardFlight.startedAt+499))app.cardFlight.active=false;
+    if(app.cardEffect.active&&SDL_TICKS_PASSED(SDL_GetTicks(),app.cardEffect.startedAt+app.cardEffect.duration))app.cardEffect.active=false;
+    updateWeatherTransitions(app);
     if(app.screen==Screen::Match && !app.leaderSelectionMode && !app.leaderRevealOpen && !app.pauseOpen && !app.passConfirmationOpen &&
        app.game.phase==gwent::Phase::OpponentTurn && SDL_GetTicks()>=app.aiAt)performAi(app);
     if(app.screen==Screen::Match&&app.game.phase!=observedPhase) {

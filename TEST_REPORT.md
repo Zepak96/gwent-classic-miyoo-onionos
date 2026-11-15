@@ -112,3 +112,16 @@ Nie wykonano w tej gałęzi cross-builda ARM, kontroli paczki OnionOS, odczytu S
 ani testu na fizycznym Miyoo. Testy nie dowodzą jeszcze parytetu pełnego zestawu
 kart, liderów, interfejsu ani animacji. Lista elementów otwartych jest w
 `docs/SOURCE_PARITY.md`.
+
+## Source animation port — 15.11.2026
+
+- Added use of the upstream `anim_<ability>.png` overlays for source ability
+  visuals, using the reference 50/300/1000/300 ms sequence; Scorch uses its
+  reference 50/300/1300/300 ms sequence.
+- Native played-card movement now follows the source `translate()` duration
+  (499 ms). Weather row overlays now fade over 500 ms.
+- Desktop CMake build succeeded in `gwent-miyoo-verify`; CTest passed 2/2 and
+  `gwent --input-test` passed with dummy SDL video/audio.
+- This is a partial animation port. `docs/REFERENCE_ANIMATIONS.md` records the
+  remaining source behaviors; no ARM build, SD copy, or physical Miyoo check was
+  made for this change.
