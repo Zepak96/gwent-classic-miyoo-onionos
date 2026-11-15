@@ -72,6 +72,11 @@ if [[ -f "$sdl_source/COPYING.RUNTIME" ]]; then
   install -m 644 "$sdl_source/COPYING.RUNTIME" "$game_dir/LICENSE.GCC-runtime.txt"
 fi
 
+# Normalize mode bits so archive metadata is stable across build hosts.
+find "$stage/Roms" -type d -exec chmod 755 {} +
+find "$stage/Roms" -type f -exec chmod 644 {} +
+chmod 755 "$game_dir/gwent" "$game_dir/launch.sh" "$shortcut_dir/GwentClassic.notfound"
+
 archive="$output_dir/GwentClassic-OnionOS.zip"
 rm -f "$archive"
 (cd "$stage" && find Roms -exec touch -h -d '1980-01-01 00:00:00 UTC' {} + && find Roms -print | LC_ALL=C sort | zip -X -q "$archive" -@)
