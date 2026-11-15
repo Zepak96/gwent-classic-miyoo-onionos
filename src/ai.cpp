@@ -167,10 +167,10 @@ int weightMedic(const Game& game,int who,const BoardData& data,int score,int gra
   for(const auto& card:game.players[graveOwner].graveyard)if(isUnit(card)){hasEligible=true;break;}
   if(!hasEligible)return std::min(1,score);
   int bonus=0;
-  const int opponent=1-who;
-  if(!data.graveSpies[opponent].empty())bonus=50;
-  else if(!data.graveMedics[opponent].empty())bonus=15;
-  else if(!data.graveScorches[opponent].empty())bonus=10;
+  const int ownerOpponent=1-graveOwner;
+  if(!data.graveSpies[ownerOpponent].empty())bonus=50;
+  else if(!data.graveMedics[ownerOpponent].empty())bonus=15;
+  else if(!data.graveScorches[ownerOpponent].empty())bonus=10;
   else if(game.players[who].roundLosses==1)bonus=1;
   return score+bonus;
 }
@@ -315,7 +315,7 @@ int weightLeader(const Game& game,int who,const BoardData& data,const std::strin
     if(game.round<2)return 0;
     if(hasInHand(game.players[who],"medic")||hasInHand(game.players[who],"spy"))return 0;
     if(hasInHand(game.players[who],"decoy") &&
-       (!data.graveMedics[who].empty() || (!data.graveSpies[who].empty() &&
+       (!data.medics.empty() || (!data.spies.empty() &&
         std::any_of(game.players[who].deck.begin(),game.players[who].deck.end(),[](const Card& c){return c.medic;}))))return 0;
     return 15;
   }

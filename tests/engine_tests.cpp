@@ -79,6 +79,7 @@ static void factionStartAndSkelligeRoundThree() {
   Game scoiatael;
   beginMatchWithLeaders(scoiatael,deck,scoiaLeader0,deck,scoiaLeader1,0x12345,1);
   assert(scoiatael.scoiataelChoicePending && scoiatael.firstPlayer==0);
+  assert(!replaceMulliganCards(scoiatael,0,{}));
   assert(chooseScoiataelFirstPlayer(scoiatael,1));
   assert(!scoiatael.scoiataelChoicePending && scoiatael.firstPlayer==1);
   assert(!chooseScoiataelFirstPlayer(scoiatael,0));
@@ -117,6 +118,8 @@ static void factionStartAndSkelligeRoundThree() {
   skellige.players[0].graveyard.push_back(agile);
   assert(startNextRound(skellige));
   assert(skellige.round==3 && skellige.phase==Phase::RoundSetup && skellige.skelligeRevivesRemaining==2);
+  skellige.players[0].hand.push_back(unit("blocked-during-setup",1));
+  assert(!playCard(skellige,0,"blocked-during-setup") && !pass(skellige,0));
   assert(!chooseSkelligeRevive(skellige,0,"skellige-agile",Row::None));
   assert(chooseSkelligeRevive(skellige,0,"skellige-agile",Row::Ranged));
   assert(skellige.skelligeRevivesRemaining==1 && skellige.players[0].board[1].size()==1);
