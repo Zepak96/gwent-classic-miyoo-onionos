@@ -40,7 +40,7 @@ Docelowa gra to wyłącznie Gwint jako minigra w Wiedźminie 3: Wild Hunt, z zaw
 
 ### Etapy 3–8 — port, UI, lokalizacja, audio, integracja, QA i release
 
-- [~] Prototyp SDL2 640×480 ma menu, wybór talii i poziomu AI, mecz, mulligan, planszę, rękę, cele Manekina/Medyków, lidera i pasowanie; kompletność UI, lokalizacja i mapowanie fizycznych przycisków wymagają dalszej pracy/testów.
+- [~] Prototyp SDL2 640×480 ma menu, wybór talii i poziomu AI, mecz, mulligan, planszę, rękę, cele Manekina/Medyków, lidera i pasowanie; CI buduje frontend i wykonuje startowy smoke test. Kompletność UI, lokalizacja i mapowanie fizycznych przycisków wymagają dalszej pracy/testów.
 - [ ] Pełne PL/EN, tutorial, deck builder, ustawienia, zapis i odtwarzanie.
 - [ ] Legalne i udokumentowane grafiki, muzyka oraz efekty dźwiękowe.
 - [ ] ARM toolchain, binarka, launcher OnionOS i archiwum instalacyjne.
