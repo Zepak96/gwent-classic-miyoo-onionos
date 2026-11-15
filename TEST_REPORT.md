@@ -125,3 +125,7 @@ kart, liderów, interfejsu ani animacji. Lista elementów otwartych jest w
 - This is a partial animation port. `docs/REFERENCE_ANIMATIONS.md` records the
   remaining source behaviors; no ARM build, SD copy, or physical Miyoo check was
   made for this change.
+
+## Random source opponent setup — 15.11.2026
+
+`DeckMaker.constructOpponentDeck()` in the pinned reference chooses a random premade deck and then a random legal leader from that deck's faction. Replaced the port's predictable "next recipe" opponent with that behavior. `makeReferenceOpponentDeck(seed)` uses a local deterministic PRNG so it can be tested and replayed; the SDL front end supplies a per-match seed. CTest verifies 500 seeds, all ten premade recipes, faction-legal leaders, valid card lists, and repeatability. Desktop build and CTest passed (2/2); ARM/device verification remains open.

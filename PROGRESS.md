@@ -128,3 +128,7 @@ Funkcja pozostaje nieukończona, dopóki nie ma implementacji i testu. Kompatybi
 ## Animacje z repozytorium źródłowego — 15.11.2026
 
 Przeniesiono do SDL wybrane istniejące animacje źródłowe: lot karty trwa 499 ms, oryginalne grafiki `anim_*.png` są używane dla efektów kart, a nakładka pogody pojawia się i znika w 500 ms. Szczegóły timingów i lista efektów nadal wymagających portu są w `docs/REFERENCE_ANIMATIONS.md`. To jest częściowy postęp, nie ukończony port animacji 1:1. Desktop build, CTest 2/2 i test wejścia SDL przeszły; ta zmiana nie była cross-buildowana dla Miyoo, kopiowana na kartę SD ani sprawdzana na konsoli.
+
+## Losowanie przeciwnika zgodne ze źródłem — 15.11.2026
+
+Źródłowy `DeckMaker.constructOpponentDeck()` wybiera losową talię z puli startowej, a potem losowego lidera należącego do frakcji tej talii. Port nie wybiera już deterministycznie „następnej” talii. Dodano `makeReferenceOpponentDeck(seed)` z lokalnym, odtwarzalnym PRNG oraz test 500 ziaren obejmujący wszystkie dziesięć talii, legalność liderów i poprawność składów. Build desktop i CTest 2/2 przeszły; kompilacja ARM i test Miyoo pozostają otwarte.

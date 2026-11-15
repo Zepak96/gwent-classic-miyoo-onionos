@@ -82,6 +82,9 @@ items above:
   occupancy, Ermion activation, Berserker transformation on later plays and
   Muster summons, round reset, and save/load state.
 - Decoy fallback considers each own row's maximum units as `ControllerAI` does.
+- Opponent setup now chooses a random source premade recipe and a random leader
+  of that recipe's faction; a deterministic 500-seed regression covers legal
+  leaders/decks, repeatability, and reachability of all ten premade recipes.
 - An AI action rejected by the port is reported; it is not converted into a
   voluntary pass.
 

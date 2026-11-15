@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gwent/game.hpp"
+#include <cstdint>
 #include <string>
 #include <utility>
 #include <vector>
@@ -15,9 +16,16 @@ struct UserDeck {
   std::vector<std::pair<int, int>> cardCounts;
 };
 
+struct ReferenceOpponentDeck {
+  int sourceDeckIndex{-1};
+  Card leader;
+  std::vector<Card> cards;
+};
+
 std::string validateUserDeck(const UserDeck& deck);
 bool materializeUserDeck(const UserDeck& recipe, std::vector<Card>& cards,
                          Card& leader, std::string* error = nullptr);
+ReferenceOpponentDeck makeReferenceOpponentDeck(std::uint64_t seed);
 bool saveUserDeck(const std::string& path, const UserDeck& deck,
                   std::string* error = nullptr);
 bool loadUserDeck(const std::string& path, UserDeck& deck,

@@ -360,6 +360,20 @@ static void referenceCatalog() {
     assert(!premade.empty() && referenceLeader(recipe.leaderReferenceIndex, chosenLeader));
     assert(validateDeck(premade, chosenLeader, recipe.faction).empty());
   }
+  std::vector<bool> observed(recipes.size(),false);
+  for(std::uint64_t seed=1;seed<=500;++seed) {
+    const auto opponent=makeReferenceOpponentDeck(seed);
+    assert(opponent.sourceDeckIndex>=0&&opponent.sourceDeckIndex<static_cast<int>(recipes.size()));
+    observed[static_cast<std::size_t>(opponent.sourceDeckIndex)]=true;
+    const auto& recipe=recipes[static_cast<std::size_t>(opponent.sourceDeckIndex)];
+    assert(opponent.leader.kind==Kind::Leader&&opponent.leader.faction==recipe.faction);
+    assert(validateDeck(opponent.cards,opponent.leader,recipe.faction).empty());
+    const auto repeat=makeReferenceOpponentDeck(seed);
+    assert(repeat.sourceDeckIndex==opponent.sourceDeckIndex&&
+           repeat.leader.referenceIndex==opponent.leader.referenceIndex&&
+           repeat.cards.size()==opponent.cards.size());
+  }
+  assert(std::all_of(observed.begin(),observed.end(),[](bool value){return value;}));
 
   Game mardroeme; Card potion; potion.id="potion"; potion.kind=Kind::Mardroeme;
   mardroeme.players[0].hand.push_back(potion);

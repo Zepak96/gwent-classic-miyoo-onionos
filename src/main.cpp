@@ -422,13 +422,17 @@ gwent::Card recipeLeader(std::size_t index) {
 }
 void startMatch(App& a) {
   if(recipes().size()<2) { a.status="REFERENCE DECKS MISSING"; return; }
-  const std::size_t aiIndex=(a.deckIndex+1)%recipes().size();
   gwent::Card humanLeader=recipeLeader(a.deckIndex);std::vector<gwent::Card> humanDeck;
   if(a.userDeckSelected) {
     if(!gwent::materializeUserDeck(a.editDeck,humanDeck,humanLeader)) { a.status=tr(a,"deck_invalid");return; }
   } else humanDeck=gwent::makeReferenceDeck(recipes()[a.deckIndex]);
-  gwent::Card aiLeader=recipeLeader(aiIndex);
-  gwent::beginMatchWithLeaders(a.game,std::move(humanDeck),humanLeader,gwent::makeReferenceDeck(recipes()[aiIndex]),aiLeader,SDL_GetTicks(),-1);
+  const auto seed=static_cast<std::uint64_t>(SDL_GetTicks())^SDL_GetPerformanceCounter();
+  auto opponent=gwent::makeReferenceOpponentDeck(seed);
+  if(opponent.sourceDeckIndex<0||opponent.cards.empty()||opponent.leader.kind!=gwent::Kind::Leader) {
+    a.status="REFERENCE OPPONENT DECK INVALID";return;
+  }
+  gwent::beginMatchWithLeaders(a.game,std::move(humanDeck),humanLeader,
+      std::move(opponent.cards),opponent.leader,seed,-1);
   a.mulligan.clear(); a.handIndex=0; a.rowIndex=0; a.screen=Screen::Match;
   a.audio.play("game_opening");
   a.status=tr(a,"mulligan");

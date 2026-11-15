@@ -81,6 +81,24 @@ bool materializeUserDeck(const UserDeck& recipe,std::vector<Card>& cards,Card& l
   cards=std::move(resolvedCards);leader=std::move(resolvedLeader);setError(error,{});return true;
 }
 
+ReferenceOpponentDeck makeReferenceOpponentDeck(std::uint64_t seed){
+  const auto& decks=referencePremadeDecks();
+  const auto& catalog=referenceCardCatalog();
+  ReferenceOpponentDeck result;
+  if(decks.empty())return result;
+  auto state=static_cast<std::uint32_t>(seed^(seed>>32));
+  if(state==0)state=1;
+  const auto next=[&](){state^=state<<13;state^=state>>17;state^=state<<5;return state;};
+  result.sourceDeckIndex=static_cast<int>(next()%decks.size());
+  const auto& recipe=decks[static_cast<std::size_t>(result.sourceDeckIndex)];
+  result.cards=makeReferenceDeck(recipe);
+  std::vector<const Card*> leaders;
+  for(const auto& card:catalog)
+    if(card.kind==Kind::Leader&&card.faction==recipe.faction)leaders.push_back(&card);
+  if(!leaders.empty())result.leader=*leaders[next()%leaders.size()];
+  return result;
+}
+
 bool saveUserDeck(const std::string& path,const UserDeck& deck,std::string* error){
   const auto invalid=validateUserDeck(deck);if(!invalid.empty()){setError(error,invalid);return false;}
   Writer payload;payload.string(deck.name);payload.u8(static_cast<std::uint8_t>(deck.faction));payload.i32(deck.leaderReferenceIndex);
