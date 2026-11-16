@@ -16,10 +16,14 @@ jobs:
         run: ctest --test-dir build --output-on-failure
       - name: Campaign draft balance comparison
         run: ./build/gwent_campaign_benchmark > campaign-balance.csv
+      - name: Summarize campaign progression
+        run: python3 tools/campaign_balance_report.py campaign-balance.csv campaign-balance.md
       - uses: actions/upload-artifact@v4
         with:
           name: campaign-balance
-          path: campaign-balance.csv
+          path: |
+            campaign-balance.csv
+            campaign-balance.md
   frontend:
     runs-on: ubuntu-latest
     steps:

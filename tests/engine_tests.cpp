@@ -1140,6 +1140,32 @@ static void graveLeadersReturnWithoutPlaying() {
   }
 }
 
+static void skelligeChoiceAcceptsGraveyardIdReference() {
+  Game game;game.phase=Phase::RoundSetup;game.currentPlayer=0;
+  game.skelligeRevivesRemaining=1;game.skelligeRevivePlayer=0;
+  auto agile=unit("skellige-aliased-agile",6,Row::None);agile.agile=true;
+  game.players[0].graveyard={agile,unit("skellige-next-grave-entry",4)};
+  game.skelligeAgileReviveIds={agile.id};
+  const auto& aliasedId=game.players[0].graveyard.front().id;
+  assert(chooseSkelligeRevive(game,0,aliasedId,Row::Ranged));
+  assert(game.skelligeRevivesRemaining==0&&game.skelligeAgileReviveIds.empty());
+  assert(game.players[0].board[1].size()==1&&game.players[0].board[1][0].id==agile.id);
+  assert(game.players[0].graveyard.size()==1&&game.players[0].graveyard[0].id=="skellige-next-grave-entry");
+}
+
+static void rejectedRandomMedicPreservesRng() {
+  Game game;game.randomRespawn=true;game.rngState=0x456789;
+  auto medic=unit("invalid-row-random-medic",5);medic.medic=true;
+  auto agile=unit("invalid-row-random-agile",6,Row::None);agile.agile=true;
+  game.players[0].hand={medic};game.players[0].graveyard={agile};
+  const auto state=game.rngState;
+  assert(!playCard(game,0,medic.id,Row::None));
+  assert(!playCard(game,0,medic.id,Row::Siege));
+  assert(game.rngState==state&&game.players[0].hand.size()==1&&game.players[0].graveyard.size()==1);
+  assert(playCard(game,0,medic.id,Row::Ranged));
+  assert(game.rngState!=state&&game.players[0].board[1].size()==1);
+}
+
 static void randomNestedMedicKeepsTarget() {
   Game game;game.phase=Phase::OpponentTurn;game.currentPlayer=1;
   game.pendingMedicPlayer=1;game.randomRespawn=true;game.rngState=419;
@@ -1178,6 +1204,11 @@ static void nestedMedicWaitsForChoice() {
   assert(game.pendingMedicPlayer==0&&game.currentPlayer==0);
   assert(!pass(game,0)&&!playCard(game,0,"nested-spare"));
   assert(!chooseMedicRevive(game,0,"missing"));
+  auto wrongPhase=game;wrongPhase.phase=Phase::MatchResult;
+  assert(!chooseMedicRevive(wrongPhase,0,revived.id));
+  auto passedOwner=game;passedOwner.players[0].passed=true;
+  assert(!chooseMedicRevive(passedOwner,0,revived.id));
+  assert(wrongPhase.players[0].graveyard.size()==1&&passedOwner.players[0].graveyard.size()==1);
   const auto path=(std::filesystem::temp_directory_path()/"gwent-pending-medic-test.sav").string();
   std::string error;Game restored;
   assert(saveGame(path,game,&error)&&loadGame(path,restored,&error));
@@ -1770,4 +1801,4 @@ static void leaderAbilities() {
   for(int owner=0;owner<2;++owner)
     for(std::size_t i=0;i<untouchedDecks[owner].size();++i)assert(emptyCrach.players[owner].deck[i].id==untouchedDecks[owner][i]);
 }
-int main() { scoreRules(); duplicateWeatherIsDiscarded(); allSourceWeatherTypesAndOwnership(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiFractionalHornTickets(); sourceAiAgileWeatherRows(); graveLeadersReturnWithoutPlaying(); randomNestedMedicKeepsTarget(); nestedMedicWaitsForChoice(); medicReplaysSpyPlacement(); medicReplaysMusterAndScorch(); sourceAiDefersRandomActionTargets(); sourceAiHeroMoraleWeight(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
+int main() { scoreRules(); duplicateWeatherIsDiscarded(); allSourceWeatherTypesAndOwnership(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiFractionalHornTickets(); sourceAiAgileWeatherRows(); graveLeadersReturnWithoutPlaying(); skelligeChoiceAcceptsGraveyardIdReference(); rejectedRandomMedicPreservesRng(); randomNestedMedicKeepsTarget(); nestedMedicWaitsForChoice(); medicReplaysSpyPlacement(); medicReplaysMusterAndScorch(); sourceAiDefersRandomActionTargets(); sourceAiHeroMoraleWeight(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }

@@ -27,7 +27,12 @@ int main() {
             const int owner=game.skelligeRevivePlayer;
             const auto& grave=game.players[owner].graveyard;
             const auto c=std::find_if(grave.begin(),grave.end(),[&](const Card& c){return std::find(game.skelligeAgileReviveIds.begin(),game.skelligeAgileReviveIds.end(),c.id)!=game.skelligeAgileReviveIds.end();});
-            if(c==grave.end()||!chooseSkelligeRevive(game,owner,c->id,c->agile?Row::Melee:Row::None))throw std::runtime_error("Skellige choice");
+            if(c==grave.end())throw std::runtime_error("Missing Skellige target: "+draft.id+" control="+control.id+" seed="+std::to_string(seed)+" side="+std::to_string(side));
+            // The engine mutates the graveyard; never pass an ID reference into
+            // the container being erased during choice resolution.
+            const std::string reviveId=c->id;
+            const Row reviveRow=c->agile?Row::Melee:Row::None;
+            if(!chooseSkelligeRevive(game,owner,reviveId,reviveRow))throw std::runtime_error("Rejected Skellige choice: "+draft.id+" control="+control.id+" seed="+std::to_string(seed)+" side="+std::to_string(side));
             continue;
           }
           const int actor=game.currentPlayer;const auto a=chooseAiAction(game,actor);
@@ -38,7 +43,7 @@ int main() {
         if(game.phase!=Phase::MatchResult)throw std::runtime_error("Stalled match: "+draft.id);
         if(game.matchWinner==2)++draws;else if(game.matchWinner==side)++wins;else ++losses;
       }
-      std::cout<<draft.id<<','<<wins+draws+losses<<','<<wins<<','<<draws<<','<<losses<<'\n';
+      std::cout<<draft.id<<','<<wins+draws+losses<<','<<wins<<','<<draws<<','<<losses<<std::endl;
     }
   } catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}
 }

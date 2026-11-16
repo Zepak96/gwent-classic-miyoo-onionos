@@ -104,6 +104,7 @@ bool decodeGame(Reader& r,Game& g,std::uint32_t version){
   g.randomRespawn=r.boolean();g.scoiataelChoicePending=r.boolean();g.skelligeRevivesRemaining=r.i32();g.skelligeRevivePlayer=r.i32();const auto reviveIds=r.u32();if(reviveIds>2){r.good=false;return false;}g.skelligeAgileReviveIds.clear();for(std::uint32_t i=0;i<reviveIds;++i)g.skelligeAgileReviveIds.push_back(r.string());g.factionAbilitiesInitialized=r.boolean();
   for(auto& cards:g.revealedCards)if(!readCards(r,cards))return false;g.rngState=r.u64();g.lastError=r.string();g.pendingMedicPlayer=version>=6?r.i32():-1;g.pendingRandomMedicId=version>=7?r.string():std::string{};
   if(g.pendingMedicPlayer>=0&&g.pendingMedicPlayer<2) {
+    if(g.players[g.pendingMedicPlayer].passed)return false;
     const auto& grave=g.players[g.pendingMedicPlayer].graveyard;
     const auto eligible=[](const Card& c){return c.kind==Kind::Unit&&!c.hero&&(c.row!=Row::None||c.agile);};
     if(std::none_of(grave.begin(),grave.end(),eligible))return false;

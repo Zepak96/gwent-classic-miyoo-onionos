@@ -781,6 +781,12 @@ bool loadSavedMatch(App& a) {
   a.game=std::move(restored);a.screen=Screen::Match;a.handIndex=0;a.rowIndex=0;a.targetIndex=0;
   a.endScreenStartedAt=SDL_GetTicks();
   a.targetMode=false;a.cardPlayConfirmOpen=false;a.leaderConfirmOpen=false;
+  a.leaderSelectionMode=false;a.leaderRevealOpen=false;a.passConfirmationOpen=false;
+  a.pauseOpen=false;a.cardDetailsOpen=false;a.leaderSelections.clear();
+  a.cardFlight={};a.triggeredCardFlights.clear();a.cardEffects.clear();a.scheduledSounds.clear();
+  a.actionAnimationLockActive=false;a.weatherInitialized=false;a.rowLayouts={};
+  a.activeNotification.clear();a.notificationQueue.clear();
+  a.selectDownAt=0;a.xDownAt=0;a.selectLongPressed=false;a.xLongPressed=false;
   a.selectedTargets.clear();a.mulligan.clear();a.status=tr(a,"loaded");
   if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+400;
   return true;
@@ -2482,6 +2488,7 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
         a.editDeck.leaderReferenceIndex=a.leaderSelectionOriginalReference;
         a.editingLeader=false;
       } else if(a.editorPane==1) { a.editorPane=0;a.editorCardIndex=0; }
+      else if(a.mainMenuEnabled) { a.screen=Screen::MainMenu;a.status.clear(); }
       return;
     }
     if(key==SDLK_z) { a.language=a.language==Language::Polish?Language::English:Language::Polish;saveSettings(a);return; }
@@ -3290,7 +3297,8 @@ int main(int argc,char** argv) {
   }
   app.audio.play("menu_opening");
   if(argc>2&&std::string(argv[1])=="--menu-smoke-test") {
-    app.screen=Screen::MainMenu;app.mainMenuEnabled=true;app.status.clear();
+    app.screen=Screen::MainMenu;app.mainMenuEnabled=true;app.miyooControls=true;
+    app.language=Language::Polish;app.status.clear();
     SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);
     drawMainMenu(renderer,app);presentFrame();
     auto* surface=SDL_CreateRGBSurfaceWithFormat(0,W,H,32,SDL_PIXELFORMAT_ARGB8888);
@@ -3299,12 +3307,18 @@ int main(int argc,char** argv) {
     bool testRunning=true;
     handleKey(app,SDLK_RIGHT,testRunning);
     const bool moved=app.menuIndex==1;
-    handleKey(app,SDLK_AC_BACK,testRunning);
+    handleKey(app,normalizeMiyooKey(app,SDLK_LALT),testRunning);
     const bool opened=app.screen==Screen::DeckBuilder;
-    handleKey(app,SDLK_ESCAPE,testRunning);
+    app.editorPane=1;
+    handleKey(app,normalizeMiyooKey(app,SDLK_LALT),testRunning);
+    const bool returnedToCollection=app.screen==Screen::DeckBuilder&&app.editorPane==0;
+    handleKey(app,normalizeMiyooKey(app,SDLK_LALT),testRunning);
     const bool returned=app.screen==Screen::MainMenu&&testRunning;
+    app.menuIndex=2;app.savePath.clear();
+    handleKey(app,normalizeMiyooKey(app,SDLK_LALT),testRunning);
+    const bool absentSaveHandled=app.screen==Screen::MainMenu&&app.status==tr(app,"no_save")&&testRunning;
     app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();
-    return saved&&moved&&opened&&returned?0:13;
+    return saved&&moved&&opened&&returnedToCollection&&returned&&absentSaveHandled?0:13;
   }
   if(argc>1 && std::string(argv[1])=="--smoke-test") {
     if(app.screen!=Screen::DeckBuilder) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 11; }

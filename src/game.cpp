@@ -462,7 +462,8 @@ void replayRevivedUnit(Game& g,int who,const Card& revived,int reviveRow) {
 }
 
 bool chooseMedicRevive(Game& g,int who,const std::string& id,Row target) {
-  if(who<0||who>1||g.pendingMedicPlayer!=who||g.currentPlayer!=who)return false;
+  if(who<0||who>1||g.pendingMedicPlayer!=who||g.currentPlayer!=who||g.players[who].passed||
+     (g.phase!=Phase::PlayerTurn&&g.phase!=Phase::OpponentTurn))return false;
   auto& grave=g.players[who].graveyard;
   std::string selected=id;
   if(g.randomRespawn)selected=previewRandomMedicTargetId(g,who);
@@ -506,12 +507,17 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
   }
   int medicIndex = -1;
   int medicReviveRow = -1;
+  auto medicRngAfterValidation=g.rngState;
   if (c.kind == Kind::Unit && c.medic) {
     if (g.randomRespawn) {
       std::vector<int> units;
       for (int i=0;i<static_cast<int>(p.graveyard.size());++i)
         if (isCombatUnit(p.graveyard[i])) units.push_back(i);
-      if (!units.empty()) medicIndex=units[nextRandom(g)%units.size()];
+      if (!units.empty()) {
+        Game preview=g;
+        medicIndex=units[nextRandom(preview)%units.size()];
+        medicRngAfterValidation=preview.rngState;
+      }
     } else if (!selectedId.empty()) {
       const auto found=findCard(p.graveyard,selectedId);
       if(found==p.graveyard.end() || !isCombatUnit(*found)) return false;
@@ -523,6 +529,7 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
     }
   }
 
+  g.rngState=medicRngAfterValidation;
   p.hand.erase(it);
   switch (c.kind) {
     case Kind::Weather:
@@ -864,10 +871,13 @@ bool chooseSkelligeRevive(Game& g,int who,const std::string& cardId,Row target) 
     if(target!=Row::Melee && target!=Row::Ranged)return false;
     row=rowIndex(target);
   } else if(target!=Row::None && target!=found->row)return false;
+  // cardId may alias found->id when AI passes a graveyard iterator's ID.
+  // Keep a value before erase invalidates that reference.
+  const std::string chosenId=cardId;
   const Card revived=*found;
   grave.erase(found);
   insertSourceBoardCard(g.players[who].board[row],revived);
-  g.skelligeAgileReviveIds.erase(std::find(g.skelligeAgileReviveIds.begin(),g.skelligeAgileReviveIds.end(),cardId));
+  g.skelligeAgileReviveIds.erase(std::find(g.skelligeAgileReviveIds.begin(),g.skelligeAgileReviveIds.end(),chosenId));
   --g.skelligeRevivesRemaining;
   if(g.skelligeRevivesRemaining==0) {
     g.skelligeRevivePlayer=-1;
