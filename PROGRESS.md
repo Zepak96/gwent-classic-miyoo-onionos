@@ -260,3 +260,9 @@ Pin `gwent.js` kończy inicjalizację przez `let dm = new DeckMaker()`, bez ekra
 - Zgodnie z kodem źródłowym, Eredin odrzuca do dwóch kart z ręki (zależnie od liczby dostępnych), a następnie pokazuje wybór jednej karty z talii z możliwością pominięcia dobierania. Po rozpoczęciu zdolności anulowanie wyboru odrzucenia jest zablokowane, a anulowanie wyboru dobierania kończy zdolność bez pobrania karty.
 - Uzupełniono przypadki: ręka z jedną kartą, pusta ręka i wybór tylko dobierania, pusta talia i samo odrzucanie oraz całkowicie pusta ręka i talia. Dodano regresje silnika i testu wejścia SDL.
 - Desktop CTest (2/2), `--input-test` i zrzuty smoke 640×480 przechodzą. Fizyczne testy na Miyoo nadal są otwarte.
+
+## Animacja wskrzeszenia Medyka — 16.11.2026
+
+- Nakładka `anim_medic` pojawia się raz na wskrzeszanej karcie w cmentarzu; usunięto błędną drugą nakładkę z zagrywanej karty Medyka.
+- Lot cmentarz → rząd zaczyna się dokładnie po sekwencji `Card.animate()` trwającej 1650 ms. Test SDL sprawdza pozycję w cmentarzu, jeden efekt oraz granicę nakładka/lot.
+- CTest (2/2) i `--input-test` przechodzą. Inne animacje źródłowe i test sprzętowy pozostają otwarte.

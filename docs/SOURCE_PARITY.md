@@ -259,3 +259,7 @@ round-setup revive selection. Full interactive device testing remains open.
 ## Eredin Destroyer of Worlds selection flow
 
 The source leader ability opens a non-cancellable hand carousel for up to two cards, then an optional one-card deck carousel that can be canceled. The discard carousel accepts fewer than two cards when the hand is smaller, and the ability is spent once resolution begins even if the optional draw is canceled. The SDL flow and engine now mirror those cases, including a draw-only choice with an empty hand and an empty activation when both hand and deck are empty. Engine regressions cover the two-discard/no-draw, one-discard/no-draw, and draw-only cases; SDL input regressions cover cancel timing and draw-only selection. Physical Miyoo interaction still requires confirmation.
+
+## Animacja wskrzeszenia Medyka — 16.11.2026
+
+Źródłowy handler `Medic` animuje wybraną kartę, gdy nadal leży w cmentarzu, a dopiero po 1650 ms rozpoczyna jej 499 ms lot do rzędu. SDL nakładał efekt drugi raz również na zagrany egzemplarz Medyka i rysował pierwszą nakładkę w miejscu docelowym. Renderer pokazuje teraz pojedynczy efekt na karcie w cmentarzu, a lot startuje na końcu sekwencji animacji. Regresja wejścia SDL sprawdza liczbę i pozycję nakładki, punkt startu lotu i dokładną granicę czasową. CTest (2/2) i `--input-test` przechodzą; pozostałe efekty i fizyczny test Miyoo pozostają otwarte.

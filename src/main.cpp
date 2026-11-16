@@ -1208,18 +1208,21 @@ void queueTriggeredEffects(App& a,const gwent::Game& before,const gwent::Card& p
       const bool existed=std::any_of(before.players[0].board.begin(),before.players[0].board.end(),[&](const auto& r){return containsId(r,target.id);})||
                          std::any_of(before.players[1].board.begin(),before.players[1].board.end(),[&](const auto& r){return containsId(r,target.id);});
       const auto [x,y]=boardPosition(owner,row,index,current.size());
-      if(played.medic&&!existed&&containsId(before.players[player].graveyard,target.id))
-        queueTargetEffect(a,"medic",x,y,placedEffectsStart-now);
+      if(played.medic&&!existed&&containsId(before.players[player].graveyard,target.id)) {
+        // abilities.js animates the selected card while it is still in the
+        // graveyard, then moves it to the chosen row after Card.animate ends.
+        const auto oldGrave=std::find_if(before.players[player].graveyard.begin(),before.players[player].graveyard.end(),
+          [&](const gwent::Card& item){return item.id==target.id;});
+        if(oldGrave!=before.players[player].graveyard.end()) {
+          const int graveIndex=static_cast<int>(oldGrave-before.players[player].graveyard.begin());
+          const auto [graveX,graveY]=cardLocationPosition({*oldGrave,App::CardZone::Grave,player,-1,graveIndex,before.players[player].graveyard.size()});
+          queueTargetEffect(a,"medic",graveX,graveY,placedEffectsStart-now);
+        }
+      }
       if(played.bond&&owner==player&&containsId(current,played.id)&&target.id!=played.id&&bondCount>1&&target.name==played.name)
         queueTargetEffect(a,"bond",x,y,placedEffectsStart-now);
       if(target.id==played.id&&owner==player) {
         if(played.bond&&bondCount>1)queueTargetEffect(a,"bond",x,y,placedEffectsStart-now);
-        const bool revived=played.medic&&std::any_of(current.begin(),current.end(),[&](const gwent::Card& item) {
-          return !std::any_of(before.players[0].board.begin(),before.players[0].board.end(),[&](const auto& oldRow){return containsId(oldRow,item.id);})&&
-                 !std::any_of(before.players[1].board.begin(),before.players[1].board.end(),[&](const auto& oldRow){return containsId(oldRow,item.id);})&&
-                 containsId(before.players[player].graveyard,item.id);
-        });
-        if(revived)queueTargetEffect(a,"medic",x,y,placedEffectsStart-now);
         const auto isMusterGroup=[&](const gwent::Card& item) {
           return !played.group.empty()&&(item.group==played.group||item.name==played.group||
                  item.name.rfind(played.group+" - ",0)==0);
@@ -2342,6 +2345,25 @@ int main(int argc,char** argv) {
          moraleEffectDelay>=2450&&moraleEffectDelay<=2550&&placementSound!=timingProbe.scheduledSounds.end()&&
          static_cast<Sint32>(placementSound->startedAt-SDL_GetTicks())>=1400&&
          static_cast<Sint32>(placementSound->startedAt-SDL_GetTicks())<=1550;
+    App medicAnimationProbe;
+    gwent::Card medicPlayed;medicPlayed.id="medic-animation-source";medicPlayed.name="Medic";
+    medicPlayed.kind=gwent::Kind::Unit;medicPlayed.row=gwent::Row::Melee;medicPlayed.medic=true;medicPlayed.abilities={"medic"};
+    gwent::Card medicRevived;medicRevived.id="medic-animation-revived";medicRevived.name="Revived Unit";
+    medicRevived.kind=gwent::Kind::Unit;medicRevived.row=gwent::Row::Melee;
+    gwent::Game medicBefore;medicBefore.players[0].graveyard={medicRevived};
+    medicAnimationProbe.game.players[0].board[0]={medicPlayed,medicRevived};
+    queueTriggeredEffects(medicAnimationProbe,medicBefore,medicPlayed,0);
+    const auto medicEffects=std::count_if(medicAnimationProbe.cardEffects.begin(),medicAnimationProbe.cardEffects.end(),
+      [](const App::CardEffect& effect){return effect.icon=="medic";});
+    const auto gravePosition=cardLocationPosition({medicRevived,App::CardZone::Grave,0,-1,0,1});
+    okay=okay&&medicEffects==1&&medicAnimationProbe.cardEffects.size()==1&&
+         medicAnimationProbe.cardEffects.front().x==gravePosition.first&&
+         medicAnimationProbe.cardEffects.front().y==gravePosition.second&&
+         medicAnimationProbe.triggeredCardFlights.size()==1&&
+         medicAnimationProbe.triggeredCardFlights.front().fromX==gravePosition.first&&
+         medicAnimationProbe.triggeredCardFlights.front().fromY==gravePosition.second&&
+         static_cast<Sint32>(medicAnimationProbe.triggeredCardFlights.front().startedAt-
+           medicAnimationProbe.cardEffects.front().startedAt-medicAnimationProbe.cardEffects.front().duration)==0;
     timingProbe.screen=Screen::Match;timingProbe.game.phase=gwent::Phase::PlayerTurn;
     timingProbe.game.players[0].hand={moraleTiming};timingProbe.handIndex=0;
     lockCardActionUntilAnimationsFinish(timingProbe,moraleTiming,gwent::Game{},0,gwent::Row::Melee);
