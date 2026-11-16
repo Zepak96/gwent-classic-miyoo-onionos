@@ -179,11 +179,10 @@ items above:
   rows so Clear Weather has exactly zero raw value, then verifies the AI still
   selects it rather than passing. This closes only this fallback case; full AI
   weight and action distribution parity remains open.
-- AI Scorch maxima now use the source's unmodified `Card.power` values rather
-  than row score after weather/horn effects. A seeded selection regression
-  verifies Global Scorch is down-weighted when weather changes displayed row
-  order but not the source maximum-card comparison. Full AI weight parity is
-  still open.
+- AI Scorch maxima use each unit's current `Card.power`, which the source
+  updates when row effects resolve; this includes weather, Horn, Morale, and
+  Tight Bond. A seeded selection regression verifies the maximum comparison
+  against weather-adjusted power. Full AI weight parity is still open.
 - Francesca Hope's AI weight now preserves the source helper's `-1` result
   when no Agile units are present, and its action weight is no longer clipped
   to zero. A 128-seed regression verifies how that negative weight shifts the
