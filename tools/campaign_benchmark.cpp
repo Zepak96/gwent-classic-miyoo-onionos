@@ -5,15 +5,18 @@
 #include <stdexcept>
 using namespace gwent;
 #include "campaign_drafts.hpp"
-int main() {
+int main(int argc,char** argv) {
   try {
+    const int seedStart=argc>1?std::stoi(argv[1]):1;
+    const int seedCount=argc>2?std::stoi(argv[2]):12;
+    if(seedStart<1||seedCount<1||seedCount>10000)throw std::runtime_error("Invalid seed range");
     std::cout<<"deck,matches,wins,draws,losses\n";
     for(const auto& draft:campaignDrafts) {
       auto cards=makeReferenceDeck(draft);Card leader;
       if(!referenceLeader(draft.leaderReferenceIndex,leader)||!validateDeck(cards,leader,draft.faction).empty())
         throw std::runtime_error("Illegal campaign draft: "+draft.id);
       int wins=0,draws=0,losses=0;
-      for(const auto& control:referencePremadeDecks())for(int seed=1;seed<=12;++seed)for(int side=0;side<2;++side) {
+      for(const auto& control:referencePremadeDecks())for(int seed=seedStart;seed<seedStart+seedCount;++seed)for(int side=0;side<2;++side) {
         Card controlLeader;referenceLeader(control.leaderReferenceIndex,controlLeader);
         const auto controlCards=makeReferenceDeck(control);Game game;
         beginMatchWithLeaders(game,side?controlCards:cards,side?controlLeader:leader,
