@@ -72,6 +72,7 @@ static bool matchCardIdsAreUnique(const Game& game) {
   }
   for(const auto& active:game.weatherCards)
     if(!include(std::vector<Card>{active.card}))return false;
+  if(!include(game.skelligeAiReviveQueue))return false;
   return true;
 }
 static bool matchContainsOriginalIds(const Game& game,const std::vector<std::string>& expected) {
@@ -85,6 +86,7 @@ static bool matchContainsOriginalIds(const Game& game,const std::vector<std::str
     for(const auto& special:player.specialCards)if(!special.id.empty())actual.push_back(special.id);
   }
   for(const auto& active:game.weatherCards)actual.push_back(active.card.id);
+  collect(game.skelligeAiReviveQueue);
   return std::all_of(expected.begin(),expected.end(),[&](const std::string& id){
     return std::count(actual.begin(),actual.end(),id)==1;
   });
@@ -316,7 +318,7 @@ static void factionStartAndSkelligeRoundThree() {
   auto agile2=unit("skellige-agile-2",4,Row::None); agile2.agile=true;
   skellige.players[0].graveyard={agile,agile2};
   assert(startNextRound(skellige));
-  assert(skellige.round==3 && skellige.phase==Phase::RoundSetup && skellige.skelligeRevivesRemaining==2);
+  assert(skellige.round==3 && skellige.phase==Phase::RoundSetup && skellige.skelligeRevivesRemaining==1);
   assert(!playCard(skellige,0,"blocked-during-setup") && !pass(skellige,0));
   assert(!chooseSkelligeRevive(skellige,0,"skellige-agile",Row::None));
   const auto chosenAgile=skellige.skelligeAgileReviveIds.front();
@@ -1027,7 +1029,7 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
     while(simulation.phase!=Phase::MatchResult&&actions<500) {
       assert(matchCardIdsAreUnique(simulation)&&matchContainsOriginalIds(simulation,originalIds));
       if(simulation.phase==Phase::RoundResult) { assert(startNextRound(simulation));continue; }
-      if(simulation.phase==Phase::RoundSetup) {
+      if(simulation.phase==Phase::RoundSetup&&simulation.pendingMedicPlayer<0) {
         const int owner=simulation.skelligeRevivePlayer;
         const auto candidate=std::find_if(simulation.players[owner].graveyard.begin(),simulation.players[owner].graveyard.end(),[&](const Card& card){
           return std::find(simulation.skelligeAgileReviveIds.begin(),simulation.skelligeAgileReviveIds.end(),card.id)!=simulation.skelligeAgileReviveIds.end();
@@ -1165,6 +1167,36 @@ static void rejectedRandomMedicPreservesRng() {
   assert(game.rngState==state&&game.players[0].hand.size()==1&&game.players[0].graveyard.size()==1);
   assert(playCard(game,0,medic.id,Row::Ranged,agile.id));
   assert(game.rngState!=state&&game.players[0].board[1].size()==1);
+}
+
+static void skelligeRoundSetupReplaysSpyAndMedic() {
+  Game spy;spy.phase=Phase::RoundResult;spy.round=2;spy.firstPlayer=0;
+  spy.players[0].faction=Faction::Skellige;
+  spy.players[0].hand={unit("setup-spy-spare",1)};spy.players[1].hand={unit("setup-opponent-spare",1)};
+  auto restoredSpy=unit("setup-restored-spy",4);restoredSpy.spy=true;
+  spy.players[0].graveyard={restoredSpy};spy.players[0].deck={unit("setup-draw-a",2),unit("setup-draw-b",3)};
+  assert(startNextRound(spy));
+  assert(spy.players[1].board[0].size()==1&&spy.players[1].board[0][0].id==restoredSpy.id);
+  assert(spy.players[0].hand.size()==3&&spy.players[0].deck.empty());
+  assert(spy.phase==Phase::PlayerTurn&&spy.currentPlayer==0);
+
+  Game medic;medic.phase=Phase::RoundResult;medic.round=2;medic.firstPlayer=1;medic.rngState=2;
+  medic.players[0].faction=Faction::Skellige;
+  medic.players[0].hand={unit("setup-medic-spare",1)};medic.players[1].hand={unit("setup-medic-opponent-spare",1)};
+  auto restoredMedic=unit("setup-restored-medic",5);restoredMedic.medic=true;
+  auto target=unit("setup-medic-target",7);
+  medic.players[0].graveyard={restoredMedic,target};
+  assert(startNextRound(medic));
+  assert(medic.phase==Phase::RoundSetup&&medic.pendingMedicPlayer==0&&medic.pendingMedicDuringRoundSetup);
+  assert(medic.skelligeRoundRemaining==1&&medic.players[0].board[0].size()==1);
+  const auto path=(std::filesystem::temp_directory_path()/"gwent-setup-medic.sav").string();
+  Game saved;std::string error;
+  assert(saveGame(path,medic,&error)&&loadGame(path,saved,&error));std::filesystem::remove(path);
+  assert(saved.skelligeRoundOwner==0&&saved.skelligeRoundRemaining==1&&saved.pendingMedicDuringRoundSetup);
+  assert(chooseMedicRevive(saved,0,target.id));
+  assert(saved.players[0].board[0].size()==2&&saved.players[0].graveyard.empty());
+  assert(saved.pendingMedicPlayer==-1&&!saved.pendingMedicDuringRoundSetup);
+  assert(saved.phase==Phase::OpponentTurn&&saved.currentPlayer==1&&saved.skelligeRoundOwner==-1);
 }
 
 static void firstMedicCommitsBeforeChoiceAndAgileCancel() {
@@ -1822,4 +1854,4 @@ static void leaderAbilities() {
   for(int owner=0;owner<2;++owner)
     for(std::size_t i=0;i<untouchedDecks[owner].size();++i)assert(emptyCrach.players[owner].deck[i].id==untouchedDecks[owner][i]);
 }
-int main() { scoreRules(); duplicateWeatherIsDiscarded(); allSourceWeatherTypesAndOwnership(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiFractionalHornTickets(); sourceAiAgileWeatherRows(); graveLeadersReturnWithoutPlaying(); skelligeChoiceAcceptsGraveyardIdReference(); rejectedRandomMedicPreservesRng(); firstMedicCommitsBeforeChoiceAndAgileCancel(); randomNestedMedicKeepsTarget(); nestedMedicWaitsForChoice(); medicReplaysSpyPlacement(); medicReplaysMusterAndScorch(); sourceAiDefersRandomActionTargets(); sourceAiHeroMoraleWeight(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
+int main() { scoreRules(); duplicateWeatherIsDiscarded(); allSourceWeatherTypesAndOwnership(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiFractionalHornTickets(); sourceAiAgileWeatherRows(); graveLeadersReturnWithoutPlaying(); skelligeChoiceAcceptsGraveyardIdReference(); rejectedRandomMedicPreservesRng(); skelligeRoundSetupReplaysSpyAndMedic(); firstMedicCommitsBeforeChoiceAndAgileCancel(); randomNestedMedicKeepsTarget(); nestedMedicWaitsForChoice(); medicReplaysSpyPlacement(); medicReplaysMusterAndScorch(); sourceAiDefersRandomActionTargets(); sourceAiHeroMoraleWeight(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }

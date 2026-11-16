@@ -67,6 +67,10 @@ struct Game {
   int pendingMedicPlayer{-1};
   std::string pendingRandomMedicId;
   std::string pendingMedicAgileId;
+  bool pendingMedicDuringRoundSetup{false};
+  int skelligeRoundOwner{-1};
+  int skelligeRoundRemaining{0};
+  std::vector<Card> skelligeAiReviveQueue;
   bool scoiataelChoicePending{false};
   int skelligeRevivesRemaining{0};
   int skelligeRevivePlayer{-1};
