@@ -50,6 +50,8 @@ Skrypt kompiluje frontend z biblioteką SDL Miyoo, wymusza zgodność rewizji i 
 
 Wydanie korzysta z standalone launcher template OnionOS, `Roms/PORTS/Games/GwentClassic/`, `Roms/PORTS/Shortcuts/Cards/GwentClassic.notfound` i oficjalnego kroku `~Import ports`. Pakiet obejmuje SDL2, EGL/GLES, json-c oraz biblioteki GCC runtime wraz z licencjami. Sama poprawna kompilacja i instalacja na karcie nie potwierdzają jeszcze startu gry ani wejścia/audio na fizycznym Miyoo.
 
+Skrót portu ustawia `KillAudioserver=1`: przypięty SDL Mini otwiera bezpośrednio urządzenie MI_AO, a log z urządzenia pokazał błąd `0xa0052009` (`MI_AO_ERR_NOT_PERM`), gdy serwer OnionOS nadal zajmował wyjście audio. Standardowy launcher OnionOS zatrzymuje serwer przed startem portu. Trzeba jeszcze potwierdzić odtwarzanie na konsoli i zachowanie audio po wyjściu z gry.
+
 Launcher zapisuje stdout i stderr uruchomienia do `/mnt/SDCARD/Saves/Ports/GwentClassic/last-run.log`, a gdy ten folder nie jest zapisywalny, do `Roms/PORTS/Games/GwentClassic/last-run.log`. Niepowodzenie zapisu logu nie zatrzymuje uruchamiania gry. Plik zawiera punkty kontrolne inicjalizacji SDL, okna i renderera oraz komunikaty o błędach, które zgłosi proces lub dynamiczny loader.
 
 Skrót OnionOS zapisuje osobny log `shortcut.log` w tym samym katalogu Saves, z kopią awaryjną w katalogu gry. Rejestruje wejście do skrótu, obecność launchera i binarki oraz kod wyjścia launchera; ten log pozwala odróżnić problem importu/uruchomienia skrótu od błędu samej aplikacji.

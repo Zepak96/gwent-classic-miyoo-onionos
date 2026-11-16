@@ -4,7 +4,9 @@ GameName="Gwent Classic"
 GameDir="GwentClassic"
 GameExecutable="launch.sh"
 GameDataFile="gwent"
-KillAudioserver=0
+# SDL's Mini backend opens MI_AO directly. Stop OnionOS's audio server first
+# so the port can acquire the hardware output device.
+KillAudioserver=1
 PerformanceMode=0
 Arguments=""
 
