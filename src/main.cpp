@@ -913,6 +913,9 @@ std::string activeLeaderAbility(const gwent::Card& leader) {
   });
   return it==leader.abilities.end()?std::string{}:*it;
 }
+std::size_t leaderDiscardQuota(const App& a) {
+  return std::min<std::size_t>(2,a.game.players[0].hand.size());
+}
 std::vector<gwent::Card> leaderChoiceCards(const App& a) {
   const auto& player=a.game.players[0];
   const std::string ability=activeLeaderAbility(player.leader);
@@ -920,7 +923,7 @@ std::vector<gwent::Card> leaderChoiceCards(const App& a) {
   if(ability=="emhyr_relentless"||ability=="eredin_bringer_of_death") {
     const auto& grave=ability=="emhyr_relentless"?a.game.players[1].graveyard:player.graveyard;
     for(const auto& card:grave)if(card.kind==gwent::Kind::Unit&&!card.hero&&(card.row!=gwent::Row::None||card.agile))cards.push_back(card);
-  } else if(ability=="eredin_destroyer"&&a.leaderSelections.size()<2) {
+  } else if(ability=="eredin_destroyer"&&a.leaderSelections.size()<leaderDiscardQuota(a)) {
     for(const auto& card:player.hand)
       if(std::find(a.leaderSelections.begin(),a.leaderSelections.end(),card.id)==a.leaderSelections.end())cards.push_back(card);
   } else if(ability=="eredin_destroyer") {
@@ -932,7 +935,7 @@ std::vector<gwent::Card> leaderChoiceCards(const App& a) {
 }
 std::string leaderChoicePrompt(const App& a) {
   const std::string ability=activeLeaderAbility(a.game.players[0].leader);
-  if(ability=="eredin_destroyer")return tr(a,a.leaderSelections.size()<2?"leader_choose_discard":"leader_choose_draw");
+  if(ability=="eredin_destroyer")return tr(a,a.leaderSelections.size()<leaderDiscardQuota(a)?"leader_choose_discard":"leader_choose_draw");
   if(ability=="eredin_king")return tr(a,"leader_choose_weather");
   return tr(a,"leader_choose_grave");
 }
@@ -971,8 +974,12 @@ void beginLeaderChoice(App& a) {
     } else a.status=tr(a,"leader_cannot_use");
     return;
   }
-  if((ability=="eredin_destroyer"&&(a.game.players[0].hand.size()<2||a.game.players[0].deck.empty()))||
-     leaderChoiceCards(a).empty()) { a.status=tr(a,"leader_no_target");return; }
+  if(ability=="eredin_destroyer") {
+    if(a.game.players[0].hand.empty()&&a.game.players[0].deck.empty()) {
+      finishLeaderChoice(a);return;
+    }
+    if(leaderChoiceCards(a).empty()) { a.status=tr(a,"leader_no_target");return; }
+  } else if(leaderChoiceCards(a).empty()) { a.status=tr(a,"leader_no_target");return; }
   a.leaderSelectionMode=true;
   a.targetIndex=0;
   a.audio.play("open");
@@ -1925,14 +1932,21 @@ void handleMatchKey(App& a,SDL_Keycode key) {
     const auto cards=leaderChoiceCards(a);
     if(cards.empty()) { a.leaderSelectionMode=false;a.leaderSelections.clear();a.status=tr(a,"leader_no_target");return; }
     if(key==SDLK_ESCAPE||key==SDLK_z||key==SDLK_BACKSPACE) {
+      if(activeLeaderAbility(a.game.players[0].leader)=="eredin_destroyer") {
+        if(a.leaderSelections.size()<leaderDiscardQuota(a))return;
+        finishLeaderChoice(a);return;
+      }
       a.leaderSelectionMode=false;a.leaderSelections.clear();a.targetIndex=0;a.status=tr(a,"your_turn");return;
     }
     if(key==SDLK_LEFT||key==SDLK_a) { const int old=a.targetIndex;a.targetIndex=std::max(0,a.targetIndex-1);a.audio.play("ui_card");if(old!=a.targetIndex)noteCarouselMove(a,-1); }
     else if(key==SDLK_RIGHT||key==SDLK_d) { const int old=a.targetIndex;a.targetIndex=std::min(static_cast<int>(cards.size())-1,a.targetIndex+1);a.audio.play("ui_card");if(old!=a.targetIndex)noteCarouselMove(a,1); }
     else if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x||key==SDLK_SPACE) {
       a.leaderSelections.push_back(cards[static_cast<std::size_t>(a.targetIndex)].id);
-      if(activeLeaderAbility(a.game.players[0].leader)=="eredin_destroyer"&&a.leaderSelections.size()<3) {
-        a.targetIndex=0;a.status=leaderChoicePrompt(a);a.audio.play("ui_card");noteCarouselMove(a,1);
+      if(activeLeaderAbility(a.game.players[0].leader)=="eredin_destroyer") {
+        if(a.leaderSelections.size()<=leaderDiscardQuota(a)) {
+          if(a.leaderSelections.size()==leaderDiscardQuota(a)&&a.game.players[0].deck.empty())finishLeaderChoice(a);
+          else { a.targetIndex=0;a.status=leaderChoicePrompt(a);a.audio.play("ui_card");noteCarouselMove(a,1); }
+        } else finishLeaderChoice(a);
       } else finishLeaderChoice(a);
     }
     return;
@@ -2419,6 +2433,14 @@ int main(int argc,char** argv) {
     handleMatchKey(app,SDLK_x);
     okay=okay&&app.language==Language::English;
     app.pauseOpen=false;
+    const auto inputTestLeaderFor=[&](const std::string& ability) {
+      const auto& catalog=gwent::referenceCardCatalog();
+      const auto it=std::find_if(catalog.begin(),catalog.end(),[&](const gwent::Card& card){
+        return card.kind==gwent::Kind::Leader&&
+               std::find(card.abilities.begin(),card.abilities.end(),ability)!=card.abilities.end();
+      });
+      return it==catalog.end()?gwent::Card{}:*it;
+    };
     app.game=gwent::Game{};app.screen=Screen::Match;app.miyooControls=true;
     app.game.phase=gwent::Phase::Mulligan;
     gwent::Card mulliganCard;mulliganCard.id="mulligan-test";mulliganCard.kind=gwent::Kind::Unit;
@@ -2453,8 +2475,37 @@ int main(int argc,char** argv) {
     okay=okay&&app.game.players[0].board[1].size()==1&&
          std::any_of(app.game.players[0].board[1].begin(),app.game.players[0].board[1].end(),[](const gwent::Card& card){return card.id=="agile-input";})&&
          std::none_of(app.game.players[0].board[0].begin(),app.game.players[0].board[0].end(),[](const gwent::Card& card){return card.id=="agile-input";});
+    app.game=gwent::Game{};app.screen=Screen::Match;app.miyooControls=true;
+    app.game.phase=gwent::Phase::PlayerTurn;app.game.currentPlayer=0;
+    app.game.players[0].leader=inputTestLeaderFor("eredin_destroyer");app.game.players[0].leaderAbilityAvailable=true;
+    app.game.players[0].hand={gwent::Card{},gwent::Card{}};
+    app.game.players[0].hand[0].id="destroyer-ui-discard-a";app.game.players[0].hand[0].name="Discard A";
+    app.game.players[0].hand[0].kind=gwent::Kind::Unit;app.game.players[0].hand[0].row=gwent::Row::Melee;
+    app.game.players[0].hand[1].id="destroyer-ui-discard-b";app.game.players[0].hand[1].name="Discard B";
+    app.game.players[0].hand[1].kind=gwent::Kind::Unit;app.game.players[0].hand[1].row=gwent::Row::Melee;
+    app.game.players[0].deck={gwent::Card{}};app.game.players[0].deck[0].id="destroyer-ui-draw";
+    app.game.players[0].deck[0].name="Draw";app.game.players[0].deck[0].kind=gwent::Kind::Unit;
+    app.game.players[0].deck[0].row=gwent::Row::Melee;
+    app.leaderSelections.clear();app.leaderSelectionMode=false;app.targetIndex=0;
+    beginLeaderChoice(app);
+    handleMatchKey(app,SDLK_ESCAPE); // source hand carousel cannot be cancelled.
+    okay=okay&&app.leaderSelectionMode&&app.leaderSelections.empty();
+    handleMatchKey(app,SDLK_x);handleMatchKey(app,SDLK_x);
+    okay=okay&&app.leaderSelectionMode&&leaderChoiceCards(app).size()==1&&app.leaderSelections.size()==2;
+    handleMatchKey(app,SDLK_ESCAPE); // source deck carousel may be cancelled after discarding.
+    okay=okay&&!app.leaderSelectionMode&&!app.game.players[0].leaderAbilityAvailable&&
+         app.game.players[0].hand.empty()&&app.game.players[0].graveyard.size()==2&&app.game.players[0].deck.size()==1;
+
+    app.game=gwent::Game{};app.screen=Screen::Match;app.game.phase=gwent::Phase::PlayerTurn;
+    app.game.currentPlayer=0;app.game.players[0].leader=inputTestLeaderFor("eredin_destroyer");
+    app.game.players[0].leaderAbilityAvailable=true;app.game.players[0].deck={gwent::Card{}};
+    app.game.players[0].deck[0].id="destroyer-ui-draw-only";app.game.players[0].deck[0].kind=gwent::Kind::Unit;
+    app.game.players[0].deck[0].row=gwent::Row::Melee;app.leaderSelections.clear();app.leaderSelectionMode=false;
+    beginLeaderChoice(app);handleMatchKey(app,SDLK_x);
+    okay=okay&&!app.leaderSelectionMode&&!app.game.players[0].leaderAbilityAvailable&&
+         app.game.players[0].hand.size()==1&&app.game.players[0].graveyard.empty();
     if(okay)std::cout<<"Miyoo controls, source-timed action lock/preview/flight/audio/ability effects, mulligan, guarded pass and Agile Medic row selection passed.\n";
-    else std::cerr<<"Miyoo controls, action timing/lock, target selection, Agile revival or guarded pass failed.\n";
+    else std::cerr<<"Miyoo controls, action timing/lock, target selection, Agile revival, Eredin discard/draw or guarded pass failed.\n";
     app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return okay?0:10;
   }
   if(char* directory=SDL_GetPrefPath("GwentClassic","MiyooMiniPlus")) {

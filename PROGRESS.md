@@ -254,3 +254,9 @@ Generator katalogu kompiluje teraz osobne nazwy kart oraz tytuły/opisy zdolnoś
 ## Start z ekranem DeckMaker jak w źródle — 15.11.2026
 
 Pin `gwent.js` kończy inicjalizację przez `let dm = new DeckMaker()`, bez ekranu tytułowego. SDL uruchamia się teraz od razu w edytorze talii; usunięto nieźródłowy ekran tytułowy, a powrót z pomocniczego selektora talii prowadzi z powrotem do edytora. Test wejścia sprawdza domyślny ekran, a smoke przetestował render DeckMakera oraz powrót selektora. Build, CTest (2/2), `--input-test` i pełny smoke z sześcioma zrzutami zakończyły się poprawnie. Edytor nie odtwarza jeszcze całej geometrii i wszystkich operacji DeckMakera, dlatego pozycja parytetu pozostaje otwarta. Bez cross-builda i zapisu na SD.
+
+## Przepływ zdolności Eredina — 16.11.2026
+
+- Zgodnie z kodem źródłowym, Eredin odrzuca do dwóch kart z ręki (zależnie od liczby dostępnych), a następnie pokazuje wybór jednej karty z talii z możliwością pominięcia dobierania. Po rozpoczęciu zdolności anulowanie wyboru odrzucenia jest zablokowane, a anulowanie wyboru dobierania kończy zdolność bez pobrania karty.
+- Uzupełniono przypadki: ręka z jedną kartą, pusta ręka i wybór tylko dobierania, pusta talia i samo odrzucanie oraz całkowicie pusta ręka i talia. Dodano regresje silnika i testu wejścia SDL.
+- Desktop CTest (2/2), `--input-test` i zrzuty smoke 640×480 przechodzą. Fizyczne testy na Miyoo nadal są otwarte.

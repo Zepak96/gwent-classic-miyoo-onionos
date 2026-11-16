@@ -591,24 +591,39 @@ bool activateLeader(Game& g, int who, Row target, const std::vector<std::string>
     else { insertSourceHandCard(player,*found,who); grave.erase(found); }
   }
   else if (id=="eredin_destroyer") {
-    if(player.hand.size()<2 || player.deck.empty()) canActivate=false;
-    else {
-      std::vector<std::string> discardIds;
-      if(selectedIds.size()>=3) discardIds={selectedIds[0],selectedIds[1]};
-      else canActivate=false;
+    std::vector<std::string> discardIds;
+    std::string drawId;
+    for(const auto& selectedId:selectedIds) {
+      const auto inHand=findCard(player.hand,selectedId);
+      const auto inDeck=findCard(player.deck,selectedId);
+      if(inHand!=player.hand.end() && discardIds.size()<2 && drawId.empty())
+        discardIds.push_back(selectedId);
+      else if(inDeck!=player.deck.end() && drawId.empty())
+        drawId=selectedId;
+      else { canActivate=false; break; }
+    }
+    const std::size_t requiredDiscards=std::min<std::size_t>(2,player.hand.size());
+    if(discardIds.size()!=requiredDiscards || (selectedIds.empty() && requiredDiscards>0))
+      canActivate=false;
+    if(canActivate) {
+      std::vector<Card> discarded;
+      for(const auto& discardId:discardIds) {
+        auto found=findCard(player.hand,discardId);
+        if(found==player.hand.end()) { canActivate=false; break; }
+        discarded.push_back(*found);
+      }
+      auto draw=drawId.empty()?player.deck.end():findCard(player.deck,drawId);
+      if(!drawId.empty() && draw==player.deck.end())canActivate=false;
       if(canActivate) {
-        auto first=findCard(player.hand,discardIds[0]); auto second=findCard(player.hand,discardIds[1]);
-        if(first==player.hand.end() || second==player.hand.end() || first==second) canActivate=false;
-        else {
-          auto draw=findCard(player.deck,selectedIds[2]);
-          if(draw==player.deck.end()) canActivate=false;
-          else {
-            Card a=*first, b=*second;
-            Card drawn=*draw;
-            player.hand.erase(std::remove_if(player.hand.begin(),player.hand.end(),[&](const Card& c){return c.id==a.id||c.id==b.id;}),player.hand.end());
-            player.graveyard.push_back(a); player.graveyard.push_back(b);
-            insertSourceHandCard(player,std::move(drawn),who); player.deck.erase(draw);
-          }
+        for(const auto& card:discarded) {
+          auto found=findCard(player.hand,card.id);
+          player.hand.erase(found);
+          player.graveyard.push_back(card);
+        }
+        if(draw!=player.deck.end()) {
+          Card drawn=*draw;
+          insertSourceHandCard(player,std::move(drawn),who);
+          player.deck.erase(draw);
         }
       }
     }

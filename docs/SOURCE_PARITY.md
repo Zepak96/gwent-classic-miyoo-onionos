@@ -255,3 +255,7 @@ result. AI discard ordering includes Clear Weather whenever its hand contains
 multiple cards from source row `weather`. Release CTest also passes 100 seeded
 complete matches across premade decks, including mulligans and the Skellige
 round-setup revive selection. Full interactive device testing remains open.
+
+## Eredin Destroyer of Worlds selection flow
+
+The source leader ability opens a non-cancellable hand carousel for up to two cards, then an optional one-card deck carousel that can be canceled. The discard carousel accepts fewer than two cards when the hand is smaller, and the ability is spent once resolution begins even if the optional draw is canceled. The SDL flow and engine now mirror those cases, including a draw-only choice with an empty hand and an empty activation when both hand and deck are empty. Engine regressions cover the two-discard/no-draw, one-discard/no-draw, and draw-only cases; SDL input regressions cover cancel timing and draw-only selection. Physical Miyoo interaction still requires confirmation.

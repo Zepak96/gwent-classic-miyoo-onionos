@@ -1068,6 +1068,31 @@ static void leaderAbilities() {
   assert(discard.players[0].hand.size()==1 && discard.players[0].hand[0].id=="draw-a");
   assert(discard.players[0].graveyard.size()==2 && discard.players[0].deck.size()==1);
 
+  Game cancelledDestroyerDraw;
+  cancelledDestroyerDraw.players[0].leader=leader("eredin_destroyer");
+  cancelledDestroyerDraw.players[0].leaderAbilityAvailable=true;
+  cancelledDestroyerDraw.players[0].hand={unit("cancel-discard-a",2),unit("cancel-discard-b",3)};
+  cancelledDestroyerDraw.players[0].deck={unit("cancel-draw",4)};
+  assert(activateLeader(cancelledDestroyerDraw,0,Row::None,{"cancel-discard-a","cancel-discard-b"}));
+  assert(cancelledDestroyerDraw.players[0].hand.empty()&&cancelledDestroyerDraw.players[0].graveyard.size()==2&&
+         cancelledDestroyerDraw.players[0].deck.size()==1&&!cancelledDestroyerDraw.players[0].leaderAbilityAvailable);
+
+  Game destroyerOneDiscard;
+  destroyerOneDiscard.players[0].leader=leader("eredin_destroyer");
+  destroyerOneDiscard.players[0].leaderAbilityAvailable=true;
+  destroyerOneDiscard.players[0].hand={unit("only-discard",2)};
+  assert(activateLeader(destroyerOneDiscard,0,Row::None,{"only-discard"}));
+  assert(destroyerOneDiscard.players[0].hand.empty()&&destroyerOneDiscard.players[0].graveyard.size()==1&&
+         !destroyerOneDiscard.players[0].leaderAbilityAvailable);
+
+  Game destroyerDrawOnly;
+  destroyerDrawOnly.players[0].leader=leader("eredin_destroyer");
+  destroyerDrawOnly.players[0].leaderAbilityAvailable=true;
+  destroyerDrawOnly.players[0].deck={unit("draw-only-target",4)};
+  assert(activateLeader(destroyerDrawOnly,0,Row::None,{"draw-only-target"}));
+  assert(destroyerDrawOnly.players[0].hand.size()==1&&destroyerDrawOnly.players[0].graveyard.empty()&&
+         destroyerDrawOnly.players[0].deck.empty()&&!destroyerDrawOnly.players[0].leaderAbilityAvailable);
+
   Game kingWeather;
   kingWeather.players[0].leader=leader("eredin_king"); kingWeather.players[0].leaderAbilityAvailable=true;
   kingWeather.players[0].deck={referenceCard("Biting Frost"),referenceCard("Torrential Rain")};
