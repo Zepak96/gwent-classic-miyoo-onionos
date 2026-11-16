@@ -2027,7 +2027,7 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     drawChoiceCarousel(r,a,candidates,a.targetIndex,tr(a,"skellige_revival"),controls);
     if(agile)centeredTextInBox(r,180,252,280,15,tr(a,a.rowIndex==0?"melee":"ranged"),gold,1);
   }
-  if(a.game.pendingMedicPlayer==0) {
+  if(a.game.pendingMedicPlayer==0&&!actionAnimationLocked(a,SDL_GetTicks())) {
     const auto choices=pendingMedicChoices(a);
     if(!a.game.pendingMedicAgileId.empty()&&!choices.empty()) {
       const int selectedRow=std::clamp(a.rowIndex,0,1),y=143+selectedRow*45;
@@ -3660,7 +3660,9 @@ int main(int argc,char** argv) {
     if(app.screen==Screen::Match&&!app.pauseOpen&&app.game.pendingMedicPlayer==0&&
        app.game.randomRespawn&&!actionAnimationLocked(app,now)) {
       const auto choices=pendingMedicChoices(app);
-      if(choices.size()==1&&!choices.front()->agile)
+      // Random revival skips target selection. An Agile result enters only
+      // its source row-choice stage; later frames must not auto-confirm it.
+      if(choices.size()==1&&(app.game.pendingMedicAgileId.empty()||!choices.front()->agile))
         handleMatchKey(app,SDLK_AC_BACK);
     }
     if(app.screen==Screen::Match&&app.activeNotification.empty()&&
