@@ -173,6 +173,7 @@ struct App {
   struct CardFlight {
     bool active{false};
     gwent::Card card;
+    int displayPower{-1};
     CardZone destination{CardZone::Board};
     int owner{-1};
     int row{-1};
@@ -322,6 +323,12 @@ std::vector<CardLocation> cardLocations(const gwent::Game& game) {
   }
   return locations;
 }
+int boardCardPower(const gwent::Game& game,int owner,int row,const gwent::Card& card) {
+  if(owner<0||owner>1||row<0||row>2)return card.power;
+  const auto& player=game.players[owner];
+  return gwent::calculateCardPower(card,player.board[row],game.weather[row],game.horn[owner][row],
+                                   player.halfWeather,player.doubleSpyPower);
+}
 std::pair<int,int> cardLocationPosition(const CardLocation& location) {
   switch(location.zone) {
     case App::CardZone::Board: {
@@ -436,6 +443,11 @@ void queueCardTransitionFlights(App& app,const gwent::Game& before,const gwent::
     App::CardFlight flight;flight.active=true;flight.card=current->card;flight.destination=current->zone;
     flight.owner=current->owner;flight.row=current->row;flight.fromX=fromX;flight.fromY=fromY;
     flight.toX=toX;flight.toY=toY;flight.startedAt=startsAt;
+    if(current->zone==App::CardZone::Board)
+      flight.displayPower=boardCardPower(app.game,current->owner,current->row,current->card);
+    else if(oldLocation.zone==App::CardZone::Board)
+      flight.displayPower=boardCardPower(before,oldLocation.owner,oldLocation.row,oldLocation.card);
+    else flight.displayPower=current->card.power;
     app.triggeredCardFlights.push_back(std::move(flight));
   }
 }
@@ -1106,7 +1118,7 @@ void drawCardTile(SDL_Renderer* r,const App& app,int x,int y,int w,int h,const g
   if(card.spy) text(r,x+w-10,y+4,"S",blue,1);
   if(card.medic) text(r,x+w-10,y+4,"M",green,1);
 }
-void drawSourceCard(SDL_Renderer* r,const App& a,int x,int y,const gwent::Card& card,bool selected=false) {
+void drawSourceCard(SDL_Renderer* r,const App& a,int x,int y,const gwent::Card& card,bool selected=false,int displayPower=-1) {
   constexpr int w=28,h=43;
   drawImage(r,a,"img/sm/"+gwent::referenceCardImage(card.referenceIndex),x,y,w,h);
   std::string powerIcon="normal";
@@ -1115,7 +1127,7 @@ void drawSourceCard(SDL_Renderer* r,const App& a,int x,int y,const gwent::Card& 
   if(powerIcon.rfind("scorch",0)==0)powerIcon="scorch";
   drawImage(r,a,"img/icons/power_"+powerIcon+".png",x-1,y-2,24,25);
   if(card.kind==gwent::Kind::Unit||card.kind==gwent::Kind::Leader) {
-    const std::string power=std::to_string(card.power);
+    const std::string power=std::to_string(displayPower>=0?displayPower:card.power);
     powerBadgeNumber(r,x-1,y-2,24,25,power);
   }
   if(card.row!=gwent::Row::None) {
@@ -1144,6 +1156,7 @@ void animatePlayedCard(App& a,const gwent::Card& card,int player,int handIndex,i
     const auto it=std::find_if(cards.begin(),cards.end(),[&](const gwent::Card& item){return item.id==card.id;});
     if(it==cards.end())continue;
     const int index=static_cast<int>(it-cards.begin());
+    flight.displayPower=boardCardPower(a.game,owner,row,*it);
     const auto geometry=sourceRowGeometry(cards.size());
     flight.owner=owner;flight.row=row;flight.toX=static_cast<int>(std::lround(geometry.firstX+index*geometry.pitch));
     flight.toY=owner==0?143+row*45:5+(2-row)*45;found=true;
@@ -1298,14 +1311,14 @@ void queueLeaderTransitionVisuals(App& a,const gwent::Game& before,const std::st
 void drawCardFlight(SDL_Renderer* r,const App& a,const App::CardFlight& flight) {
   if(!flight.active)return;
   if(!SDL_TICKS_PASSED(SDL_GetTicks(),flight.startedAt)) {
-    drawSourceCard(r,a,flight.fromX,flight.fromY,flight.card,true);
+    drawSourceCard(r,a,flight.fromX,flight.fromY,flight.card,true,flight.displayPower);
     return;
   }
   const float t=std::clamp(static_cast<float>(SDL_GetTicks()-flight.startedAt)/499.0f,0.0f,1.0f);
   const float eased=static_cast<float>(sourceEase(t));
   const int x=static_cast<int>(std::lround(flight.fromX+(flight.toX-flight.fromX)*eased));
   const int y=static_cast<int>(std::lround(flight.fromY+(flight.toY-flight.fromY)*eased));
-  drawSourceCard(r,a,x,y,flight.card,true);
+  drawSourceCard(r,a,x,y,flight.card,true,flight.displayPower);
 }
 void drawCardEffect(SDL_Renderer* r,const App& a) {
   const Uint32 now=SDL_GetTicks();
@@ -1518,7 +1531,8 @@ void drawRow(SDL_Renderer* r,const App& a,int owner,int row,int y) {
   for(std::size_t i=0;i<cards.size();++i) {
     const auto& card=cards[i];
     if(cardFlightHides(a,card,App::CardZone::Board,owner,row))continue;
-    drawSourceCard(r,a,static_cast<int>(std::lround(geometry.firstX+i*geometry.pitch)),y,card);
+    drawSourceCard(r,a,static_cast<int>(std::lround(geometry.firstX+i*geometry.pitch)),y,card,false,
+                   boardCardPower(a.game,owner,row,card));
   }
   if(a.weatherTransition[owner][row]||a.game.weather[row]) {
     const std::string overlay=a.weatherOverlay[owner][row].empty()?sourceWeatherOverlayForRow(row):a.weatherOverlay[owner][row];
@@ -2425,10 +2439,16 @@ int main(int argc,char** argv) {
     app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return okay?0:5;
   }
   if(argc>1&&std::string(argv[1])=="--input-test") {
+    App powerBadgeProbe;gwent::Card powerEight;
+    powerEight.id="power-badge-eight";powerEight.kind=gwent::Kind::Unit;powerEight.power=8;
+    powerEight.row=gwent::Row::Melee;powerBadgeProbe.game.players[0].board[0].push_back(powerEight);
+    powerBadgeProbe.game.horn[0][0]=true;
+    bool okay=boardCardPower(powerBadgeProbe.game,0,0,powerEight)==16&&
+              rowScore(powerBadgeProbe.game,0,0)==16;
     const bool startsInDeckMaker=app.screen==Screen::DeckBuilder;
     app.miyooControls=true;
     app.screen=Screen::Match;
-    bool okay=startsInDeckMaker&&
+    okay=okay&&startsInDeckMaker&&
               normalizeMiyooKey(app,SDLK_LCTRL)==SDLK_x&&
               normalizeMiyooKey(app,SDLK_LALT)==SDLK_AC_BACK&&
               normalizeMiyooKey(app,SDLK_LSHIFT)==SDLK_i&&

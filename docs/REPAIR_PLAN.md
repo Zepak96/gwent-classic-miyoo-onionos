@@ -74,9 +74,13 @@ objawy, dopóki nie da się ich odtworzyć w kodzie lub logu.
    rozgrywać karty z tej samej grupy z ręki i talii; zwykłe usunięcie karty z
    wachlarza zmienia pozycje pozostałych. Trzeba porównać stan silnika przed i
    po ruchu oraz animacje, by odróżnić poprawny Muster od przypadkowego ruchu.
-10. **Wynik 16 przy sile 8 nie jest sam w sobie dowodem błędu.** Róg albo
-    Więź mogą go podwoić; należy sprawdzić pełny stan rzędu i osobne wyniki
-    kart. Bez zrzutu lub zapisu meczu nie da się przypisać konkretnej przyczyny.
+10. **Wynik 16 przy sile 8 — błąd wyświetlania potwierdzony i naprawiony.**
+    Silnik prawidłowo liczył premie, ale znaczek siły na karcie planszy zawsze
+    pokazywał siłę bazową. Przy Rogu suma rzędu wynosiła więc 16, a karta nadal
+    pokazywała 8. Karty na planszy i w locie wyświetlają teraz aktualną siłę;
+    ręka i podgląd nadal pokazują bazową wartość. Regresja sprawdza jednostkę
+    o sile 8 pod Rogiem (16 na karcie i w wyniku rzędu). Weryfikacja na Miyoo
+    wymaga jeszcze uruchomienia nowej paczki.
 11. **Animacja Muster ma oddzielny filtr od silnika.** Należy go ujednolicić z
     regułą źródłową, aby nie pokazywał fałszywego przywołania bohatera.
 12. **Spójność cyfr po zmianie siły.** Renderer wspólny musi zachować krój,
