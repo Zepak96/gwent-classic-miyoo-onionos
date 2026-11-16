@@ -518,3 +518,21 @@ card's own power, as in determineAgileRow. Engine job in desktop run
 versus clear melee, actual placement and absence of tie-break RNG consumption
 when the row gains differ. This coverage does not establish parity for every
 Agile interaction; frontend checks and a new ARM package are pending.
+
+## SD update — 2026-11-16, 19963ba
+
+ARM workflow 43881715129 succeeded for 19963ba. The installed archive has
+SHA-256 8e1b3e12e163620f226a1a6df2131674f5c501e2079dc203c0f2a0a750c84ab4.
+The installer verified all 604 archive files on E: (MIYOO MINI, FAT32).
+Previous files were backed up locally to
+artifacts/qa/package-19963ba/sd-backup-20261116-150527.
+This revision includes fractional Horn AI weights, integer weighted tickets,
+and full score-delta selection for ordinary Agile cards. Desktop workflow
+43881580573 passed; additional Horn-row regression workflow 43881814606
+also passed (test-only follow-up 15bcc6a). Hardware behavior remains unverified.
+
+Opponent creation code review: src/main.cpp startMatch calls
+makeReferenceOpponentDeck, which chooses a source premade recipe then a Leader
+filtered by that recipe's faction. Source constructOpponentDeck follows those
+two selection stages. Existing 500-seed tests validate deck legality, Leader
+faction and repeatability; they do not compare the JavaScript PRNG sequence.
