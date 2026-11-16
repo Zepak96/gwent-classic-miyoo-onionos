@@ -2,6 +2,7 @@
 #include "gwent/catalog.hpp"
 #include <algorithm>
 #include <iostream>
+#include <fstream>
 #include <stdexcept>
 using namespace gwent;
 #include "campaign_drafts.hpp"
@@ -10,6 +11,12 @@ int main(int argc,char** argv) {
     const int seedStart=argc>1?std::stoi(argv[1]):1;
     const int seedCount=argc>2?std::stoi(argv[2]):12;
     if(seedStart<1||seedCount<1||seedCount>10000)throw std::runtime_error("Invalid seed range");
+    std::ofstream detail;
+    if(argc>3) {
+      detail.open(argv[3]);
+      if(!detail)throw std::runtime_error("Cannot write per-match report");
+      detail<<"deck,control,seed,candidate_side,first_player,winner,actions\n";
+    }
     std::cout<<"deck,matches,wins,draws,losses\n";
     for(const auto& draft:campaignDrafts) {
       auto cards=makeReferenceDeck(draft);Card leader;
@@ -45,6 +52,7 @@ int main(int argc,char** argv) {
         }
         if(game.phase!=Phase::MatchResult)throw std::runtime_error("Stalled match: "+draft.id);
         if(game.matchWinner==2)++draws;else if(game.matchWinner==side)++wins;else ++losses;
+        if(detail)detail<<draft.id<<','<<control.id<<','<<seed<<','<<side<<','<<game.firstPlayer<<','<<game.matchWinner<<','<<actions<<'\n';
       }
       std::cout<<draft.id<<','<<wins+draws+losses<<','<<wins<<','<<draws<<','<<losses<<std::endl;
     }
