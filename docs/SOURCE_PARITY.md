@@ -426,10 +426,10 @@ screen confirmation remains open.
 
 The match rules panel now renders in the reserved 4:3 display band below the
 centered 16:9 board, instead of covering the hand. Compact cards keep the
-source ability icons, while the row-class badge uses a high-contrast miniature
-symbol for melee/ranged/siege/agile. The original row sprites are still used on
-enlarged cards and other source-sized screens; at 11px on a Miyoo hand they
-lost the weapon shape. The power badge PNGs contain a large transparent export margin; drawing their full canvas
+source ability icons, while the row-class badge uses a short, localized tag
+(WR/DY/OB/ZW in Polish; CL/RA/SI/AG in English). The source weapon medallions
+are still used on enlarged cards; at 11px on a Miyoo hand their details collapsed
+into ambiguous marks. The power badge PNGs contain a large transparent export margin; drawing their full canvas
 made the medal half-size and placed its number away from the visible circle.
 The renderer now crops that margin before scaling the medal into the number's
 24x25 box. The mini row and ability badges have a stronger dark/gold backing.
