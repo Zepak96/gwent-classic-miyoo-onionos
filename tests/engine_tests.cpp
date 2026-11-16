@@ -19,8 +19,29 @@ static std::uint32_t expectedRandom(std::uint64_t& state) {
   auto x=static_cast<std::uint32_t>(state);
   x^=x<<13;x^=x>>17;x^=x<<5;state=x;return x;
 }
+static bool expectedSourceCardBefore(const Card& left,const Card& right) {
+  const auto rank=[](const Card& card) {
+    if(card.kind==Kind::Weather)return -1;
+    if(card.kind==Kind::ClearWeather||card.kind==Kind::Decoy||card.kind==Kind::Scorch||card.kind==Kind::CommanderHorn||card.kind==Kind::Mardroeme)return -2;
+    return 0;
+  };
+  if(rank(left)!=rank(right))return rank(left)<rank(right);
+  if(left.power!=right.power)return left.power<right.power;
+  return left.name<right.name;
+}
+static void expectedSourceHandAdd(std::vector<Card>& hand,Card card,int owner,std::size_t requestedIndex) {
+  if(owner==0&&requestedIndex==0) {
+    const auto position=std::upper_bound(hand.begin(),hand.end(),card,expectedSourceCardBefore);
+    hand.insert(position,std::move(card));
+  } else if(owner==1&&requestedIndex==static_cast<std::size_t>(-1)) {
+    hand.insert(hand.begin(),std::move(card));
+  } else {
+    const auto index=std::min(requestedIndex,hand.size());
+    hand.insert(hand.begin()+static_cast<std::ptrdiff_t>(index),std::move(card));
+  }
+}
 static void expectedSourceDeckSwap(std::vector<Card>& hand,std::vector<Card>& deck,
-                                   const std::string& id,std::uint64_t& rngState) {
+                                   const std::string& id,std::uint64_t& rngState,int owner=0) {
   auto found=std::find_if(hand.begin(),hand.end(),[&](const Card& card){return card.id==id;});
   assert(found!=hand.end());
   const auto index=static_cast<std::size_t>(found-hand.begin());
@@ -29,7 +50,7 @@ static void expectedSourceDeckSwap(std::vector<Card>& hand,std::vector<Card>& de
   const auto randomIndex=static_cast<std::size_t>(expectedRandom(rngState))%deck.size();
   std::swap(deck[randomIndex],deck.back());
   Card drawn=deck.front();deck.erase(deck.begin());
-  hand.insert(hand.begin()+static_cast<std::ptrdiff_t>(index),std::move(drawn));
+  expectedSourceHandAdd(hand,std::move(drawn),owner,index);
 }
 static void scoreRules() {
   Player p;
@@ -317,6 +338,22 @@ static void abilitiesAndValidation() {
   assert(playCard(decoy,0,"decoy",Row::None,"return"));
   assert(decoy.players[0].board[0].size()==1 && decoy.players[0].board[0][0].kind==Kind::Decoy);
   assert(decoy.players[0].hand.size()==1 && decoy.players[0].hand[0].id=="return");
+
+  Game chosenDecoy;
+  auto decoyCard=referenceCard("Decoy");decoyCard.id="chosen-decoy";
+  auto existingHandCard=unit("hand-existing",6);
+  chosenDecoy.players[0].hand={existingHandCard,decoyCard};
+  auto low=unit("decoy-low",2);low.name="Low Unit";
+  auto chosen=unit("decoy-chosen",5);chosen.name="Chosen Unit";
+  auto high=unit("decoy-high",10);high.name="High Unit";
+  chosenDecoy.players[0].board[0]={low,chosen,high};
+  assert(playCard(chosenDecoy,0,"chosen-decoy",Row::None,"decoy-chosen"));
+  const auto& decoyRow=chosenDecoy.players[0].board[0];
+  assert(decoyRow.size()==3&&decoyRow[0].kind==Kind::Decoy&&
+         decoyRow[1].id=="decoy-low"&&decoyRow[2].id=="decoy-high");
+  assert(chosenDecoy.players[0].hand.size()==2&&chosenDecoy.players[0].hand[0].id=="decoy-chosen"&&
+         chosenDecoy.players[0].hand[1].id=="hand-existing"); // source Hand re-sorts returned cards.
+
   Game decoyRejectsNonCombat;
   decoyRejectsNonCombat.players[0].hand.push_back(Card{"decoy-noncombat","Decoy",Kind::Decoy});
   auto nonCombat=unit("noncombat-decoy-target",5);nonCombat.row=Row::None;nonCombat.agile=false;
@@ -431,8 +468,8 @@ static void sourceMulliganSwapSemantics() {
   ai.players[1].hand={unit("ai-redraw",1)};
   ai.players[1].deck={unit("ai-deck-a",2),unit("ai-deck-b",3)};
   auto expectedAiHand=ai.players[1].hand;auto expectedAiDeck=ai.players[1].deck;auto expectedAiState=ai.rngState;
-  expectedSourceDeckSwap(expectedAiHand,expectedAiDeck,"ai-redraw",expectedAiState);
-  expectedSourceDeckSwap(expectedAiHand,expectedAiDeck,expectedAiHand[0].id,expectedAiState);
+  expectedSourceDeckSwap(expectedAiHand,expectedAiDeck,"ai-redraw",expectedAiState,1);
+  expectedSourceDeckSwap(expectedAiHand,expectedAiDeck,expectedAiHand[0].id,expectedAiState,1);
   assert(performAiMulligan(ai,1));
   assert(ai.players[1].hand.size()==1&&ai.players[1].deck.size()==2);
   assert(ai.players[1].hand[0].id==expectedAiHand[0].id);
@@ -576,6 +613,25 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
   const auto mardroemeChoice=chooseAiAction(mardroemeAi,1);
   assert(!mardroemeChoice.pass&&mardroemeChoice.cardId==aiMardroeme.id&&mardroemeChoice.target==Row::Ranged);
 
+  Game decoyAi;
+  decoyAi.phase=Phase::OpponentTurn;decoyAi.currentPlayer=1;decoyAi.players[1].roundLosses=1;
+  Card aiDecoy;aiDecoy.id="ai-decoy";aiDecoy.name="Decoy";aiDecoy.kind=Kind::Decoy;
+  decoyAi.players[1].hand.push_back(aiDecoy);
+  decoyAi.players[1].board[0]={unit("ai-decoy-strong-a",10),unit("ai-decoy-weaker-a",5)};
+  decoyAi.players[1].board[1]={unit("ai-decoy-strong-b",10),unit("ai-decoy-weaker-b",3)};
+  decoyAi.players[1].board[2]={unit("ai-decoy-outside-max-row",9)};
+  bool selectedWeakerSourceCandidate=false;
+  for(std::uint64_t seed=1;seed<=64;++seed) {
+    auto sample=decoyAi;sample.rngState=seed;
+    const auto choice=chooseAiAction(sample,1);
+    assert(!choice.pass&&choice.cardId==aiDecoy.id);
+    assert(choice.selectedCardId=="ai-decoy-strong-a"||choice.selectedCardId=="ai-decoy-weaker-a"||
+           choice.selectedCardId=="ai-decoy-strong-b"||choice.selectedCardId=="ai-decoy-weaker-b");
+    selectedWeakerSourceCandidate=selectedWeakerSourceCandidate||
+      choice.selectedCardId=="ai-decoy-weaker-a"||choice.selectedCardId=="ai-decoy-weaker-b";
+  }
+  assert(selectedWeakerSourceCandidate); // source max.me includes every unit in globally strongest rows.
+
   Game roachMulligan;roachMulligan.phase=Phase::Mulligan;
   roachMulligan.players[1].hand={referenceCard("Roach"),referenceCard("Geralt of Rivia"),unit("low-priority",2)};
   roachMulligan.players[1].deck={unit("replacement-a",4),unit("replacement-b",5)};
@@ -687,6 +743,9 @@ static void sourceMatchInitializationOrder() {
     playerDeck.push_back(unit("initial-player-"+std::to_string(i),i+1));
     opponentDeck.push_back(unit("initial-opponent-"+std::to_string(i),i+1));
   }
+  playerDeck[0]=referenceCard("Decoy");playerDeck[0].id="initial-player-decoy-a";
+  playerDeck[1]=referenceCard("Decoy");playerDeck[1].id="initial-player-decoy-b";
+  playerDeck[2]=referenceCard("Biting Frost");playerDeck[2].id="initial-player-weather";
   constexpr std::uint64_t seed=0x5a17c3;
   std::uint64_t expectedRng=seed;
   auto expectedPlayer=expectedSourceDeckInitialization(playerDeck,expectedRng);
@@ -697,10 +756,11 @@ static void sourceMatchInitializationOrder() {
                         leader("ordinary_leader"),seed,0);
   assert(daisy.players[0].hand.size()==11&&daisy.players[0].deck.size()==1);
   assert(daisy.players[1].hand.size()==10&&daisy.players[1].deck.size()==2);
-  for(std::size_t i=0;i<11;++i)
-    assert(daisy.players[0].hand[i].id==expectedPlayer[i].id);
+  std::vector<Card> expectedHumanHand(expectedPlayer.begin(),expectedPlayer.begin()+11);
+  std::stable_sort(expectedHumanHand.begin(),expectedHumanHand.end(),expectedSourceCardBefore);
+  for(std::size_t i=0;i<11;++i)assert(daisy.players[0].hand[i].id==expectedHumanHand[i].id);
   for(std::size_t i=0;i<10;++i)
-    assert(daisy.players[1].hand[i].id==expectedOpponent[i].id);
+    assert(daisy.players[1].hand[i].id==expectedOpponent[9-i].id); // HandAI inserts every draw at index zero.
   assert(daisy.players[0].deck.front().id==expectedPlayer[11].id);
   assert(daisy.players[1].deck[0].id==expectedOpponent[10].id&&
          daisy.players[1].deck[1].id==expectedOpponent[11].id);
@@ -713,9 +773,11 @@ static void sourceMatchInitializationOrder() {
   Game coin;
   beginMatch(coin,playerDeck,Faction::NorthernRealms,opponentDeck,Faction::Monsters,seed);
   assert(coin.firstPlayer==expectedStarter&&coin.rngState==expectedRng);
+  expectedHumanHand.assign(expectedPlayer.begin(),expectedPlayer.begin()+10);
+  std::stable_sort(expectedHumanHand.begin(),expectedHumanHand.end(),expectedSourceCardBefore);
   for(std::size_t i=0;i<10;++i) {
-    assert(coin.players[0].hand[i].id==expectedPlayer[i].id);
-    assert(coin.players[1].hand[i].id==expectedOpponent[i].id);
+    assert(coin.players[0].hand[i].id==expectedHumanHand[i].id);
+    assert(coin.players[1].hand[i].id==expectedOpponent[9-i].id);
   }
 }
 static void avengerCards() {

@@ -15,9 +15,9 @@ namespace {
 struct WeightedAction { AiAction action; double weight{0.0}; bool legal{false}; };
 struct BoardData {
   std::vector<const Card*> spies, medics, scorches;
+  std::vector<const Card*> decoyFallbackOwn;
   std::array<std::vector<const Card*>,2> graveSpies, graveMedics, graveScorches;
   std::array<std::vector<const Card*>,3> strongestOwn, strongestEnemy;
-  std::array<std::vector<const Card*>,3> rowMaximumOwn, rowMaximumEnemy;
   int ownMax{-1}, enemyMax{-1};
 };
 
@@ -68,16 +68,15 @@ BoardData collectBoardData(const Game& game,int who) {
     if(owner==who)for(const auto& row:game.players[owner].board) collectCards(row,owner,data);
     collectCards(game.players[owner].graveyard,owner,data,true);
     int best=-1;
+    std::array<int,3> rowMaximum{{-1,-1,-1}};
     for(int row=0;row<3;++row) {
-      int rowBest=-1;
       for(const auto& card:game.players[owner].board[row])
-        if(isUnit(card))rowBest=std::max(rowBest,cardPower(game,owner,row,card,game.players[owner].board[row]));
-      for(const auto& card:game.players[owner].board[row])if(isUnit(card)) {
-        const int power=cardPower(game,owner,row,card,game.players[owner].board[row]);
-        if(power==rowBest)(owner==who?data.rowMaximumOwn[row]:data.rowMaximumEnemy[row]).push_back(&card);
-        best=std::max(best,power);
-      }
+        if(isUnit(card))rowMaximum[row]=std::max(rowMaximum[row],cardPower(game,owner,row,card,game.players[owner].board[row]));
+      best=std::max(best,rowMaximum[row]);
     }
+    if(owner==who)for(int row=0;row<3;++row)
+      if(rowMaximum[row]>=0&&rowMaximum[row]==best)
+        for(const auto& card:game.players[owner].board[row])if(isUnit(card))data.decoyFallbackOwn.push_back(&card);
     for(int row=0;row<3;++row) for(const auto& card:game.players[owner].board[row])
       if(isUnit(card) && cardPower(game,owner,row,card,game.players[owner].board[row])==best)
         (owner==who?data.strongestOwn[row]:data.strongestEnemy[row]).push_back(&card);
@@ -404,11 +403,8 @@ AiAction cardAction(Game& game,int who,const Card& card,const BoardData& data) {
     target=lowest(data.spies);
     if(!target && !data.medics.empty())target=data.medics[roll(game)%data.medics.size()];
     if(!target && !data.scorches.empty())target=data.scorches[roll(game)%data.scorches.size()];
-    if(!target) {
-      std::vector<const Card*> rowMaximums;
-      for(const auto& row:data.rowMaximumOwn)rowMaximums.insert(rowMaximums.end(),row.begin(),row.end());
-      if(!rowMaximums.empty())target=rowMaximums[roll(game)%rowMaximums.size()];
-    }
+    if(!target&&!data.decoyFallbackOwn.empty())
+      target=data.decoyFallbackOwn[roll(game)%data.decoyFallbackOwn.size()];
     if(target)action.selectedCardId=target->id;
   } else if(card.kind==Kind::Unit && card.medic) {
     const auto* target=chooseMedicTarget(game,game.players[who].graveyard);
@@ -521,7 +517,7 @@ bool performAiMulligan(Game& game,int who) {
     std::swap(player.deck[randomIndex],player.deck.back());
     Card drawn=std::move(player.deck.front());
     player.deck.erase(player.deck.begin());
-    player.hand.insert(player.hand.begin()+static_cast<std::ptrdiff_t>(handIndex),std::move(drawn));
+    insertSourceHandCard(player,std::move(drawn),who,static_cast<int>(handIndex));
   }
   return replaceMulliganCards(game,who,{});
 }

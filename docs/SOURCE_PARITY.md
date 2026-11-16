@@ -94,9 +94,17 @@ items above:
   by random-position insertion, leader passives and faction setup run before
   the coin toss, and the opening deal alternates between players. Francesca
   Daisy's extra card therefore precedes the ten-card deal as in the reference.
-  Seeded regressions verify full deck/hand order and RNG state for a Daisy start
-  and a normal coin toss. The port still uses xorshift32; identical numeric
-  results to browser `Math.random()` are not claimed.
+  Human-hand draws use the source base-power/name sort, while AI-hand draws
+  insert at index zero. Seeded regressions verify full deck/hand order and RNG
+  state for a Daisy start and a normal coin toss. The port still uses xorshift32;
+  identical numeric results to browser `Math.random()` are not claimed.
+- Decoy now returns the specifically selected unit, restores its source base
+  power, runs Avenger removal effects, inserts the returned card using the
+  correct human/AI hand rules, and leaves Decoy in the chosen combat row in its
+  source-sorted position. The AI fallback now considers every unit in its
+  globally strongest row(s), matching `max.me`, rather than only the strongest
+  units within those rows. Regressions cover exact target identity, row order,
+  hand order, and seeded AI fallback choices.
 - Agile Medic target plus melee/ranged revive row, including Miyoo-style SDL
   directional input and rejection of an incomplete choice.
 - Mardroeme's persistent row effect, its distinction from special-slot
@@ -219,11 +227,12 @@ input/audio/gameplay still need confirmation.
 
 Mulligan parity now uses the source `Deck.swap()` sequence for human and AI:
 each discarded card is inserted with `Deck.addCardRandom()`, the new front card
-is drawn immediately, and the replacement returns to the selected hand index
-before the next redraw decision. The engine uses the same front-of-deck draw
-convention for opening hands and later draws. Seeded regressions lock the order
-for two human swaps and the AI's two recalculated discard decisions, reject a
-third redraw without mutation, and preserve the RNG result. Release CTest also
-passes 100 seeded complete matches across premade decks, including mulligans
-and the Skellige round-setup revive selection. Full interactive device testing
-remains open.
+is drawn immediately, and the replacement is inserted with the source Hand
+behavior: the human hand re-sorts when the selected index is zero, while other
+indices are retained; the AI hand uses the requested index. The engine uses the
+same front-of-deck draw convention for opening hands and later draws. Seeded
+regressions lock the order for two human swaps and the AI's two recalculated
+discard decisions, reject a third redraw without mutation, and preserve the RNG
+result. Release CTest also passes 100 seeded complete matches across premade
+decks, including mulligans and the Skellige round-setup revive selection. Full
+interactive device testing remains open.

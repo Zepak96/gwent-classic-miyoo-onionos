@@ -83,6 +83,8 @@ void beginMatch(Game&, std::vector<Card> playerDeck, Faction playerFaction,
 void beginMatchWithLeaders(Game&, std::vector<Card> playerDeck, Card playerLeader,
                            std::vector<Card> opponentDeck, Card opponentLeader,
                            std::uint64_t seed, int firstPlayer = -1);
+// Match the source Hand/HandAI insertion rules when a card is drawn or returned.
+void insertSourceHandCard(Player&, Card, int ownerIndex, int requestedIndex = -1);
 bool assignLeader(Game&, int playerIndex, const Card& leader);
 void resolveLeaderPassives(Game&);
 bool chooseScoiataelFirstPlayer(Game&, int firstPlayer);

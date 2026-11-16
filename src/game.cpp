@@ -39,6 +39,27 @@ void addCardRandom(Game& g,std::vector<Card>& deck,const Card& card) {
   const std::size_t index=nextRandom(g)%deck.size();
   std::swap(deck[index],deck.back());
 }
+int sourceHandFactionRank(const Card& card) {
+  if(card.kind==Kind::Weather)return -1;
+  if(card.kind==Kind::ClearWeather||card.kind==Kind::Decoy||card.kind==Kind::Scorch||
+     card.kind==Kind::CommanderHorn||card.kind==Kind::Mardroeme)return -2;
+  return 0;
+}
+int sourceBasePower(const Card& card) {
+  if(card.referenceIndex>=0) {
+    const auto& catalog=referenceCardCatalog();
+    const auto found=std::find_if(catalog.begin(),catalog.end(),[&](const Card& item){return item.referenceIndex==card.referenceIndex;});
+    if(found!=catalog.end())return found->power;
+  }
+  return card.power;
+}
+bool sourceHandCardBefore(const Card& left,const Card& right) {
+  const int leftRank=sourceHandFactionRank(left),rightRank=sourceHandFactionRank(right);
+  if(leftRank!=rightRank)return leftRank<rightRank;
+  const int leftPower=sourceBasePower(left),rightPower=sourceBasePower(right);
+  if(leftPower!=rightPower)return leftPower<rightPower;
+  return left.name<right.name;
+}
 int cardPower(const Card& c, const std::vector<Card>& row, bool weather, bool horn,
               bool halfWeather = false, bool doubleSpyPower = false) {
   if (c.hero) return c.power; // Heroes ignore all row effects.
@@ -105,7 +126,9 @@ void triggerAvenger(Game& g, int owner, const Card& removed) {
   if(summoned==catalog.end()) return;
   Card unit=*summoned;
   unit.id="summoned_"+removed.id;
-  g.players[owner].board[rowIndex(unit.row)].push_back(std::move(unit));
+  auto& row=g.players[owner].board[rowIndex(unit.row)];
+  const auto insertion=std::upper_bound(row.begin(),row.end(),unit,sourceHandCardBefore);
+  row.insert(insertion,std::move(unit));
 }
 void removeBoardCard(Game& g, int owner, int row, int index) {
   auto& cards=g.players[owner].board[row];
@@ -223,6 +246,19 @@ void transformBerserkers(Player& player, int rowNumber) {
 }
 }
 
+void insertSourceHandCard(Player& player,Card card,int ownerIndex,int requestedIndex) {
+  auto position=player.hand.begin();
+  if(ownerIndex==0 && (requestedIndex<0||requestedIndex==0)) {
+    position=std::upper_bound(player.hand.begin(),player.hand.end(),card,sourceHandCardBefore);
+  } else if(ownerIndex==1 && requestedIndex<0) {
+    position=player.hand.begin(); // HandAI inherits CardContainer.addCard(), whose default index is zero.
+  } else {
+    const auto index=std::clamp(requestedIndex<0?0:requestedIndex,0,static_cast<int>(player.hand.size()));
+    position=player.hand.begin()+index;
+  }
+  player.hand.insert(position,std::move(card));
+}
+
 int calculateScore(const Player& p, const std::array<bool, 3>& weather,
                    const std::array<bool, 3>& horn) {
   int total = 0;
@@ -265,7 +301,7 @@ void beginMatchImpl(Game& g,std::vector<Card> playerDeck,Faction playerFaction,
   for(int n=0;n<10;++n)for(int i=0;i<2;++i) {
     auto& deck=g.players[i].deck;
     if(deck.empty())continue;
-    g.players[i].hand.push_back(std::move(deck.front()));
+    insertSourceHandCard(g.players[i],std::move(deck.front()),i);
     deck.erase(deck.begin());
   }
   g.currentPlayer = g.firstPlayer;
@@ -302,7 +338,7 @@ bool replaceMulliganCards(Game& g, int who, const std::vector<std::string>& ids)
     addCardRandom(g,player.deck,discarded);
     Card drawn=std::move(player.deck.front());
     player.deck.erase(player.deck.begin());
-    player.hand.insert(player.hand.begin()+static_cast<std::ptrdiff_t>(handIndex),std::move(drawn));
+    insertSourceHandCard(player,std::move(drawn),who,static_cast<int>(handIndex));
   }
   player.mulliganDone = true;
   if (g.players[0].mulliganDone && g.players[1].mulliganDone) {
@@ -330,7 +366,7 @@ void resolveLeaderPassives(Game& g) {
       for (auto& affected : g.players) affected.doubleSpyPower=true;
     if (hasAbility(player.leader,"king_bran")) player.halfWeather=true;
     if (hasAbility(player.leader,"francesca_daisy") && !player.deck.empty()) {
-      player.hand.push_back(std::move(player.deck.front())); player.deck.erase(player.deck.begin());
+      insertSourceHandCard(player,std::move(player.deck.front()),who); player.deck.erase(player.deck.begin());
     }
   }
   if(!g.factionAbilitiesInitialized) {
@@ -450,16 +486,20 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
     case Kind::CommanderHorn:
       p.specialOccupied[rowIndex(target)]=true; g.horn[who][rowIndex(target)] = true; p.graveyard.push_back(c); break;
     case Kind::Decoy: {
-      const Card returned=*boardTarget;
-      p.hand.push_back(returned);
-      *boardTarget = c; // The zero-strength Decoy stays in the replaced unit's battlefield slot.
+      Card returned=*boardTarget;
+      returned.power=sourceBasePower(returned); // Row.removeCard() resets transformed cards before returning them.
+      auto& row=p.board[targetRow];
+      row.erase(boardTarget);
       triggerAvenger(g,who,returned);
+      insertSourceHandCard(p,std::move(returned),who);
+      const auto insertion=std::upper_bound(row.begin(),row.end(),c,sourceHandCardBefore);
+      row.insert(insertion,c); // Decoy is a zero-strength row card, sorted by its special-faction rank.
       break;
     }
     case Kind::Unit:
       if (c.spy) {
         g.players[1 - who].board[rowIndex(deployRow)].push_back(c);
-        for (int i = 0; i < 2 && !p.deck.empty(); ++i) { p.hand.push_back(std::move(p.deck.front())); p.deck.erase(p.deck.begin()); }
+        for (int i = 0; i < 2 && !p.deck.empty(); ++i) { insertSourceHandCard(p,std::move(p.deck.front()),who); p.deck.erase(p.deck.begin()); }
       } else p.board[rowIndex(deployRow)].push_back(c);
       if (c.muster) {
         applyMuster(p, c);
@@ -540,7 +580,7 @@ bool activateLeader(Game& g, int who, Row target, const std::vector<std::string>
     auto& grave=g.players[1-who].graveyard;
     auto found=selected.empty()?grave.end():findCard(grave,selected);
     if(found==grave.end() || !isCombatUnit(*found)) canActivate=false;
-    else { player.hand.push_back(*found); grave.erase(found); }
+    else { insertSourceHandCard(player,*found,who); grave.erase(found); }
   }
   else if (id=="emhyr_whiteflame" || id=="emhyr_invader" || id=="eredin_treacherous" || id=="francesca_daisy" || id=="king_bran") canActivate=false;
   else if (id=="eredin_commander") { if(player.specialOccupied[0]) canActivate=false; else {player.specialOccupied[0]=true;g.horn[who][0]=true;} }
@@ -548,7 +588,7 @@ bool activateLeader(Game& g, int who, Row target, const std::vector<std::string>
     auto& grave=player.graveyard;
     auto found=selected.empty()?grave.end():findCard(grave,selected);
     if(found==grave.end() || !isCombatUnit(*found)) canActivate=false;
-    else { player.hand.push_back(*found); grave.erase(found); }
+    else { insertSourceHandCard(player,*found,who); grave.erase(found); }
   }
   else if (id=="eredin_destroyer") {
     if(player.hand.size()<2 || player.deck.empty()) canActivate=false;
@@ -567,7 +607,7 @@ bool activateLeader(Game& g, int who, Row target, const std::vector<std::string>
             Card drawn=*draw;
             player.hand.erase(std::remove_if(player.hand.begin(),player.hand.end(),[&](const Card& c){return c.id==a.id||c.id==b.id;}),player.hand.end());
             player.graveyard.push_back(a); player.graveyard.push_back(b);
-            player.hand.push_back(std::move(drawn)); player.deck.erase(draw);
+            insertSourceHandCard(player,std::move(drawn),who); player.deck.erase(draw);
           }
         }
       }
@@ -654,7 +694,7 @@ bool startNextRound(Game& g) {
       }
     }
     if (winner >= 0 && owner == winner && player.faction == Faction::NorthernRealms && !player.deck.empty()) {
-      player.hand.push_back(std::move(player.deck.front())); player.deck.erase(player.deck.begin());
+      insertSourceHandCard(player,std::move(player.deck.front()),owner); player.deck.erase(player.deck.begin());
     }
   }
   g.skelligeRevivesRemaining=0;
