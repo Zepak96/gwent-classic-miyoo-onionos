@@ -967,7 +967,12 @@ static void leaderAbilities() {
   beginMatchWithLeaders(passives,deck,leader("francesca_daisy"),deck,leader("king_bran"),0x1234,0);
   assert(passives.players[0].hand.size()==11 && passives.players[0].deck.size()==13);
   passives.players[1].board[0].push_back(unit("bran-weather",9));
+  passives.players[1].board[0].push_back(unit("bran-weather-odd",1));
+  passives.players[0].board[0].push_back(unit("opponent-weather",9));
   assert(calculateScore(passives.players[1],{true,false,false},{false,false,false})==4);
+  // King Bran applies only to the holder's rows; odd power rounds down in
+  // weather exactly as the source's Math.floor(total / 2) does (1 -> 0).
+  assert(calculateScore(passives.players[0],{true,false,false},{false,false,false})==1);
 
   Game cancellation;
   beginMatchWithLeaders(cancellation,deck,leader("foltest_lord"),deck,leader("emhyr_whiteflame"),0x4321,0);
