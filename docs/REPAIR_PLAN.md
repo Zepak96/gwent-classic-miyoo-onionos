@@ -296,5 +296,14 @@ rodzajami kart; pełny test na urządzeniu opisany wersją binarium i wynikiem.
   `.port` mają zgodne SHA-256. Poprzednią instalację i launcher zachowano jako
   kopie `GwentClassic.previous-1b3a74a` i `GwentClassic.port.previous-1b3a74a`.
   Fizyczny test gry nadal wymaga wykonania przez użytkownika.
+- [x] Build `1de0f0b` rozdzielający tożsamości kopii kart z obu talii przeszedł
+  testy silnika, frontendu, wejścia i build ARM. Regresja wkłada tę samą neutralną
+  kartę do obu talii i sprawdza unikalne ID po rozpoczęciu partii. Pakiet
+  `GwentClassic-OnionOS.zip` ma SHA-256
+  `84dae4072f5367a5a3a8cef955fd57e557b91ab5f35bb4697bbce48b01763b8a`.
+  Jest wgrany na SD; 603 pliki gry i launcher `.port` mają zgodne SHA-256,
+  bez braków i nadmiarów. Poprzednia instalacja i launcher są zachowane jako
+  `GwentClassic.previous-1de0f0b` oraz `GwentClassic.port.previous-1de0f0b`.
+  Potwierdzenie na urządzeniu pozostaje otwarte.
 - [ ] Dokończyć poprawki i testy opisane w etapach 1–5.
 - [ ] Potwierdzić uruchomienie, sterowanie i pełny mecz na fizycznym Miyoo.
