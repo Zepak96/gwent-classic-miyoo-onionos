@@ -156,13 +156,27 @@ void powerBadgeNumber(SDL_Renderer* r,int x,int y,int width,int height,const std
   // two-digit value still fits the 24px medallion without changing font size
   // when a unit gains or loses strength.
   constexpr int scale=2;
-  const int glyphWidth=std::max(0,(static_cast<int>(value.size())*6-1)*scale);
+  const int advance=static_cast<int>(value.size())>1?5*scale:6*scale;
+  const int glyphWidth=value.empty()?0:(static_cast<int>(value.size())-1)*advance+5*scale;
   const int glyphHeight=7*scale;
   const int x0=x+std::max(0,(width-glyphWidth)/2);
   const int y0=y+std::max(0,(height-glyphHeight)/2);
+  const auto draw=[&](int offsetX,int offsetY,Color inkColor) {
+    color(r,inkColor);
+    for(std::size_t index=0;index<value.size();++index) {
+      const auto found=font().find(value[index]);
+      const Glyph glyph=found==font().end()?font().at('?'):found->second;
+      for(int row=0;row<7;++row)for(int column=0;column<5;++column)
+        if(glyph[static_cast<std::size_t>(row)]&(1u<<(4-column))) {
+          SDL_Rect pixel{x0+static_cast<int>(index)*advance+column*scale+offsetX,
+                         y0+row*scale+offsetY,scale,scale};
+          SDL_RenderFillRect(r,&pixel);
+        }
+    }
+  };
   for(const auto& offset:std::array<std::pair<int,int>,8>{{{-1,-1},{0,-1},{1,-1},{-1,0},{1,0},{-1,1},{0,1},{1,1}}})
-    text(r,x0+offset.first,y0+offset.second,value,Color{13,10,7,255},scale);
-  text(r,x0,y0,value,Color{255,247,225,255},scale);
+    draw(offset.first,offset.second,Color{13,10,7,255});
+  draw(0,0,Color{255,247,225,255});
 }
 
 enum class Screen { DeckBuilder, Match };
