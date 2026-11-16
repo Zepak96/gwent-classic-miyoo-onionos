@@ -2414,7 +2414,11 @@ void updateMiyooXHold(App& app,Uint32 now) {
   if(app.xDownAt&&!app.xLongPressed&&app.activeNotification.empty()&&
      app.screen==Screen::Match&&app.game.phase==gwent::Phase::PlayerTurn&&
      !actionAnimationLocked(app,now)&&SDL_TICKS_PASSED(now,app.xDownAt+600)) {
-    app.passConfirmationOpen=true;app.xLongPressed=true;app.audio.play("open");
+    app.xLongPressed=true;
+    if(gwent::pass(app.game,0)) {
+      app.passConfirmationOpen=false;app.audio.play("pass");app.status=tr(app,"you_passed");
+      if(app.game.phase==gwent::Phase::OpponentTurn)app.aiAt=SDL_GetTicks()+400;
+    }
   }
 }
 void releaseMiyooXHold(App& app,bool& running) {
@@ -2693,9 +2697,8 @@ int main(int argc,char** argv) {
     const Uint32 xStart=SDL_GetTicks()+1;
     okay=okay&&beginMiyooXHold(xHoldProbe,xStart);
     updateMiyooXHold(xHoldProbe,xStart+601);
-    okay=okay&&xHoldProbe.passConfirmationOpen&&!xHoldProbe.game.players[0].passed;
+    okay=okay&&!xHoldProbe.passConfirmationOpen&&xHoldProbe.game.players[0].passed;
     releaseMiyooXHold(xHoldProbe,xProbeRunning);
-    handleMatchKey(xHoldProbe,normalizeMiyooKey(xHoldProbe,SDLK_LCTRL));
     okay=okay&&xHoldProbe.game.players[0].passed;
     App xTapProbe;xTapProbe.miyooControls=true;xTapProbe.screen=Screen::Match;
     xTapProbe.game.phase=gwent::Phase::PlayerTurn;bool xTapRunning=true;
