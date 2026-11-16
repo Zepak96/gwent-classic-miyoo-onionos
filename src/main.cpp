@@ -2104,6 +2104,7 @@ void handleMatchKey(App& a,SDL_Keycode key) {
           animatePlayedCard(a,card,0,a.handIndex,handSizeBefore);
           queueTriggeredEffects(a,before,card,0);
           playCardSound(a,card,before,0,playRow);
+          lockCardActionUntilAnimationsFinish(a,card,before,0,playRow);
           a.status=displayCardName(a,card)+(a.language==Language::Polish?" - ZAGRANO":" - PLAYED"); a.handIndex=std::min(a.handIndex,static_cast<int>(a.game.players[0].hand.size())-1);
         } else a.status=tr(a,"illegal_target");
       }
@@ -2791,7 +2792,8 @@ int main(int argc,char** argv) {
     handleMatchKey(app,SDLK_x);
     okay=okay&&app.game.players[0].board[1].size()==1&&
          std::any_of(app.game.players[0].board[1].begin(),app.game.players[0].board[1].end(),[](const gwent::Card& card){return card.id=="agile-input";})&&
-         std::none_of(app.game.players[0].board[0].begin(),app.game.players[0].board[0].end(),[](const gwent::Card& card){return card.id=="agile-input";});
+         std::none_of(app.game.players[0].board[0].begin(),app.game.players[0].board[0].end(),[](const gwent::Card& card){return card.id=="agile-input";})&&
+         app.actionAnimationLockActive;
     app.game=gwent::Game{};app.game.phase=gwent::Phase::PlayerTurn;app.game.currentPlayer=0;
     app.game.randomRespawn=true;app.game.rngState=0x2468;
     medic.id="random-medic-input";agile.id="random-agile-input";

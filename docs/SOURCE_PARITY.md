@@ -142,6 +142,9 @@ items above:
   as in the source; if the random result is Agile, the player chooses only its
   row. The preview uses a copied RNG state so it does not consume or alter the
   match's next random result. Engine and SDL regressions cover both outcomes.
+- Targeted plays now use the same input/action lock as ordinary plays and AI
+  actions, through the end of queued card/effect animations. SDL input
+  regression verifies the Medic target-confirm path activates the lock.
 - Mardroeme's persistent row effect, its distinction from special-slot
   occupancy, Ermion activation, Berserker transformation on later plays and
   Muster summons, round reset, and save/load state.

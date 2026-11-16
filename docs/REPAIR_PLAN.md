@@ -125,6 +125,10 @@ objawy, dopóki nie da się ich odtworzyć w kodzie lub logu.
     Zwykła jednostka wraca automatycznie, a dla wylosowanej karty Agile gracz
     wybiera już tylko rząd. Test wejścia obejmuje oba przypadki. Nadal trzeba
     potwierdzić zachowanie na Miyoo.
+20. **Zatwierdzenie celu Medyka omijało blokadę animacji — naprawione w kodzie.**
+    Zwykłe zagranie i ruch AI blokowały wejście do zakończenia sekwencji lotu,
+    ale ścieżka zatwierdzenia celu Medyka tego nie robiła. Dodano tę samą
+    blokadę po zagrywce i regresję wejścia SDL; fizyczny test pozostaje otwarty.
 
 ## Kolejność naprawy i kryteria odbioru
 
