@@ -122,6 +122,10 @@ items above:
   and selection flows.
 - Eredin Commander now has a direct close-row leader Horn regression, including
   rejection when that row's special slot is already occupied.
+- Scorch regressions now compare source target semantics for global ties across
+  both sides and rows, Hero immunity, and row-Scorch's 10-point threshold (Hero
+  strength counts toward the threshold but Heroes are not destroyed). This is
+  targeted coverage; the full Scorch/leader/AI interaction matrix remains open.
 - Emhyr White Flame's source initialization suppresses both players' leader
   initialization when either side uses it, including passive Invader,
   Treacherous, Daisy, and King Bran effects; each passive suppression case now
