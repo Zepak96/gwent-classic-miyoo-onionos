@@ -2190,13 +2190,16 @@ int main(int argc,char** argv) {
     std::cerr<<"Startup failed in SDL_Init: "<<SDL_GetError()<<"\n";
     return 1;
   }
+  std::cerr<<"Startup: SDL initialized.\n";
   SDL_GameControllerEventState(SDL_ENABLE);
   for(int index=0;index<SDL_NumJoysticks();++index)if(SDL_IsGameController(index))SDL_GameControllerOpen(index);
   SDL_Window* window=SDL_CreateWindow("Gwent Classic - Witcher 3",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,W,H,SDL_WINDOW_SHOWN);
   if(!window){std::cerr<<"Startup failed in SDL_CreateWindow: "<<SDL_GetError()<<"\n";SDL_Quit();return 2;}
+  std::cerr<<"Startup: window created.\n";
   SDL_Renderer* presentationRenderer=SDL_CreateRenderer(window,-1,SDL_RENDERER_ACCELERATED|SDL_RENDERER_PRESENTVSYNC);
   if(!presentationRenderer)presentationRenderer=SDL_CreateRenderer(window,-1,SDL_RENDERER_SOFTWARE);
   if(!presentationRenderer){std::cerr<<"Could not create SDL renderer: "<<SDL_GetError()<<"\n";SDL_DestroyWindow(window);SDL_Quit();return 3;}
+  std::cerr<<"Startup: renderer created.\n";
   SDL_Renderer* renderer=presentationRenderer;
   SDL_Surface* softwareCanvas=nullptr;
   SDL_Texture* softwareFrame=nullptr;

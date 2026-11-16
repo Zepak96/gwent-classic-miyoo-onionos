@@ -290,3 +290,8 @@ Pin `gwent.js` kończy inicjalizację przez `let dm = new DeckMaker()`, bez ekra
 
 - Po ponownym podłączeniu karty SD zainstalowano z paczki `317e6f0` launcher, binarkę ARM i bibliotekę SDL2. Wcześniejsze wersje plików zachowano w `.work/sd-backup-startup-diagnostic-20261116`.
 - Audyt SHA-256 wszystkich 603 plików `Roms/PORTS/Games/GwentClassic` wykazał zero różnic względem paczki. Test uruchomienia na fizycznym Miyoo i odczyt `Saves/Ports/GwentClassic/last-run.log` są następne.
+
+## Utwardzenie diagnostyki startu — 16.11.2026
+
+- Po dwóch próbach użytkowniczki na karcie nie znaleziono `last-run.log`. Pierwsza wersja launchera traktowała brak zapisu logu jako błąd krytyczny; poprawiono to, aby nie blokować startu gry.
+- Log ma teraz awaryjny zapis obok `gwent`, a binarka zapisuje punkty kontrolne po inicjalizacji SDL, okna i renderera. Składnia launchera sprawdzona przez `bash -n`; nowy ARM build oraz kolejny test Miyoo są w toku.
