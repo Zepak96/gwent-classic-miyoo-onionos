@@ -249,6 +249,12 @@ void transformBerserkers(Player& player, int rowNumber) {
     const std::string oldId = card.id;
     card = *target;
     card.id = oldId;
+    // The source Vildkaarl placed callback immediately removes this marker
+    // after playing its one-shot Mardroeme cue. Keeping it on the runtime card
+    // incorrectly suppresses ordinary placement audio when Medic later revives
+    // the transformed unit.
+    card.abilities.erase(std::remove(card.abilities.begin(), card.abilities.end(), "vildkarrl"),
+                         card.abilities.end());
   }
   // Source Berserker.placed() removes the old card and calls Row.addCard() for
   // the Vildkaarl. Row.addCard() sorts by printed base power, then name. A

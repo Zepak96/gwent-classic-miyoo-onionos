@@ -45,7 +45,9 @@ source behavior. A build or screenshot alone does not count as parity.
 - [x] Berserker/Mardroeme transformation ordering now re-sorts the transformed
   Vildkaarl by the source row comparator (base power, then name); engine
   regression covers the transformed card moving after a 9-strength unit. The
-  remaining Vildkaarl callback/audio lifecycle is still under audit.
+  source's one-shot Vildkaarl marker is also removed after transformation, so a
+  later Medic revival receives ordinary placement audio instead of suppressing
+  it as a fresh transformation.
 - [ ] Global Scorch and each row Scorch threshold/targets.
 - [ ] Clear Weather, each individual weather type, Skellige Storm, duplicate
   weather behavior and weather-card ownership/discard.

@@ -667,6 +667,9 @@ static void referenceCatalog() {
   assert(mardroeme.players[0].board[0][0].id=="after-berserker");
   assert(mardroeme.players[0].board[0][1].name=="Transformed Vildkaarl");
   assert(mardroeme.players[0].board[0][1].power==14);
+  assert(std::find(mardroeme.players[0].board[0][1].abilities.begin(),
+                   mardroeme.players[0].board[0][1].abilities.end(),"vildkarrl") ==
+         mardroeme.players[0].board[0][1].abilities.end());
   assert(mardroeme.players[0].mardroeme[0]);
   auto laterBerserker=unit("later-berserker",4);laterBerserker.name="Berserker";laterBerserker.berserker=true;
   mardroeme.players[0].hand.push_back(laterBerserker);
@@ -689,7 +692,8 @@ static void referenceCatalog() {
   assert(playCard(ermion,0,"ermion"));
   assert(ermion.players[0].mardroeme[1]);
   assert(std::any_of(ermion.players[0].board[1].begin(),ermion.players[0].board[1].end(),
-                     [](const Card& card){return card.id=="young-berserker"&&card.name=="Transformed Young Vildkaarl";}));
+                     [](const Card& card){return card.id=="young-berserker"&&card.name=="Transformed Young Vildkaarl"&&
+                       std::find(card.abilities.begin(),card.abilities.end(),"vildkarrl")==card.abilities.end();}));
   Card rowMardroeme;rowMardroeme.id="row-mardroeme";rowMardroeme.kind=Kind::Mardroeme;
   ermion.players[0].hand.push_back(rowMardroeme);ermion.currentPlayer=0;ermion.phase=Phase::PlayerTurn;
   assert(playCard(ermion,0,"row-mardroeme",Row::Ranged));
