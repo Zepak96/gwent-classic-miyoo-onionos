@@ -279,5 +279,14 @@ rodzajami kart; pełny test na urządzeniu opisany wersją binarium i wynikiem.
   SD mają zgodne SHA-256 z paczką (`ff347c261ff6c5f55cdaa1cbd298163bc198f3e3c0b61c2af1db37de3f84d37a`);
   poprzedni katalog zachowano jako `GwentClassic.previous-13075d6`.
   Rzeczywisty test na Miyoo pozostaje otwarty.
+- [x] Build `1b3a74a` naprawiający wartość siły na kartach pod wpływem premii
+  przeszedł testy silnika, frontendu i mapowania wejścia oraz build ARM.
+  Regresja sprawdza, że jednostka o bazowej sile 8 pod Rogiem pokazuje 16,
+  zgodnie z wynikiem rzędu. Pakiet `GwentClassic-OnionOS.zip` ma SHA-256
+  `fd1f161346624c3c35a5441b5a2ad50b6faf7601eaab37c32e20fe9cccfc7b1e`.
+  Zainstalowano go na SD; 603 pliki gry, bez braków i nadmiarów, oraz launcher
+  `.port` mają zgodne SHA-256. Poprzednią instalację i launcher zachowano jako
+  kopie `GwentClassic.previous-1b3a74a` i `GwentClassic.port.previous-1b3a74a`.
+  Fizyczny test gry nadal wymaga wykonania przez użytkownika.
 - [ ] Dokończyć poprawki i testy opisane w etapach 1–5.
 - [ ] Potwierdzić uruchomienie, sterowanie i pełny mecz na fizycznym Miyoo.
