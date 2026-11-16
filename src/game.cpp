@@ -22,9 +22,16 @@ bool hasAbility(const Card& card, const std::string& ability) {
   return std::find(card.abilities.begin(), card.abilities.end(), ability) != card.abilities.end();
 }
 void shuffleDeck(Game& g, std::vector<Card>& deck) {
-  for (std::size_t n = deck.size(); n > 1; --n) {
-    const std::size_t other = nextRandom(g) % n;
-    std::swap(deck[n - 1], deck[other]);
+  // Deck.initialize() builds the reference deck by inserting each card at a
+  // random position. Keep that order and RNG consumption instead of applying
+  // a conventional Fisher-Yates shuffle after the entire vector is built.
+  std::vector<Card> source=std::move(deck);
+  deck.clear();
+  deck.reserve(source.size());
+  for(auto& card:source) {
+    deck.push_back(std::move(card));
+    const std::size_t index=nextRandom(g)%deck.size();
+    std::swap(deck[index],deck.back());
   }
 }
 void addCardRandom(Game& g,std::vector<Card>& deck,const Card& card) {
@@ -230,23 +237,46 @@ int calculateCardPower(const Card& card, const std::vector<Card>& row, bool weat
   return cardPower(card,row,weather,horn,halfWeather,doubleSpyPower);
 }
 
-void beginMatch(Game& g, std::vector<Card> playerDeck, Faction playerFaction,
-                std::vector<Card> opponentDeck, Faction opponentFaction,
-                std::uint64_t seed, int firstPlayer) {
+namespace {
+void beginMatchImpl(Game& g,std::vector<Card> playerDeck,Faction playerFaction,
+                    std::vector<Card> opponentDeck,Faction opponentFaction,
+                    const Card* playerLeader,const Card* opponentLeader,
+                    std::uint64_t seed,int firstPlayer) {
   g = Game{};
   g.rngState = seed ? seed : 1;
-  g.firstPlayer = (firstPlayer == 0 || firstPlayer == 1) ? firstPlayer : static_cast<int>(nextRandom(g) % 2);
+  g.firstPlayer = (firstPlayer == 0 || firstPlayer == 1) ? firstPlayer : 0;
   for (int i = 0; i < 2; ++i) {
     auto& p = g.players[i];
     p.deck = i == 0 ? std::move(playerDeck) : std::move(opponentDeck);
     p.faction = i == 0 ? playerFaction : opponentFaction;
+    if(i==0&&playerLeader)p.leader=*playerLeader;
+    if(i==1&&opponentLeader)p.leader=*opponentLeader;
     shuffleDeck(g, p.deck);
-    for (int n = 0; n < 10 && !p.deck.empty(); ++n) {
-      p.hand.push_back(std::move(p.deck.front())); p.deck.erase(p.deck.begin());
-    }
+  }
+
+  // Game.startGame() runs initPlayers and gameStart faction/leader effects
+  // before the coin toss and before the alternating ten-card deal. In
+  // particular Francesca Daisy draws the first card before the opening deal.
+  g.phase=Phase::Mulligan;
+  resolveLeaderPassives(g);
+  const bool scoiataelChooses=(playerFaction==Faction::Scoiatael)!=(opponentFaction==Faction::Scoiatael);
+  if(firstPlayer!=0&&firstPlayer!=1&&!scoiataelChooses)
+    g.firstPlayer=static_cast<int>(nextRandom(g)%2);
+  for(int n=0;n<10;++n)for(int i=0;i<2;++i) {
+    auto& deck=g.players[i].deck;
+    if(deck.empty())continue;
+    g.players[i].hand.push_back(std::move(deck.front()));
+    deck.erase(deck.begin());
   }
   g.currentPlayer = g.firstPlayer;
-  g.phase = Phase::Mulligan;
+}
+}
+
+void beginMatch(Game& g, std::vector<Card> playerDeck, Faction playerFaction,
+                std::vector<Card> opponentDeck, Faction opponentFaction,
+                std::uint64_t seed, int firstPlayer) {
+  beginMatchImpl(g,std::move(playerDeck),playerFaction,std::move(opponentDeck),opponentFaction,
+                 nullptr,nullptr,seed,firstPlayer);
 }
 
 bool replaceMulliganCards(Game& g, int who, const std::vector<std::string>& ids) {
@@ -338,9 +368,8 @@ bool assignLeader(Game& g, int who, const Card& leader) {
 void beginMatchWithLeaders(Game& g, std::vector<Card> playerDeck, Card playerLeader,
                            std::vector<Card> opponentDeck, Card opponentLeader,
                            std::uint64_t seed, int firstPlayer) {
-  beginMatch(g,std::move(playerDeck),playerLeader.faction,std::move(opponentDeck),opponentLeader.faction,seed,firstPlayer);
-  assignLeader(g,0,playerLeader);
-  assignLeader(g,1,opponentLeader);
+  beginMatchImpl(g,std::move(playerDeck),playerLeader.faction,std::move(opponentDeck),opponentLeader.faction,
+                 &playerLeader,&opponentLeader,seed,firstPlayer);
 }
 
 bool playCard(Game& g, int who, const std::string& id, Row target, const std::string& selectedId) {

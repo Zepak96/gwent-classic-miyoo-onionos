@@ -90,6 +90,13 @@ engine rules, a subset of screens, and asset loading, but it does not meet the
 These focused regression checks pass, but they do not close the broader parity
 items above:
 
+- Match initialization now follows the source order: each deck is constructed
+  by random-position insertion, leader passives and faction setup run before
+  the coin toss, and the opening deal alternates between players. Francesca
+  Daisy's extra card therefore precedes the ten-card deal as in the reference.
+  Seeded regressions verify full deck/hand order and RNG state for a Daisy start
+  and a normal coin toss. The port still uses xorshift32; identical numeric
+  results to browser `Math.random()` are not claimed.
 - Agile Medic target plus melee/ranged revive row, including Miyoo-style SDL
   directional input and rejection of an incomplete choice.
 - Mardroeme's persistent row effect, its distinction from special-slot

@@ -672,6 +672,52 @@ static Card referenceCard(const std::string& name) {
   assert(found!=catalog.end());
   return *found;
 }
+static std::vector<Card> expectedSourceDeckInitialization(const std::vector<Card>& source,std::uint64_t& state) {
+  std::vector<Card> deck;
+  for(const auto& card:source) {
+    deck.push_back(card);
+    const auto index=static_cast<std::size_t>(expectedRandom(state))%deck.size();
+    std::swap(deck[index],deck.back());
+  }
+  return deck;
+}
+static void sourceMatchInitializationOrder() {
+  std::vector<Card> playerDeck,opponentDeck;
+  for(int i=0;i<12;++i) {
+    playerDeck.push_back(unit("initial-player-"+std::to_string(i),i+1));
+    opponentDeck.push_back(unit("initial-opponent-"+std::to_string(i),i+1));
+  }
+  constexpr std::uint64_t seed=0x5a17c3;
+  std::uint64_t expectedRng=seed;
+  auto expectedPlayer=expectedSourceDeckInitialization(playerDeck,expectedRng);
+  auto expectedOpponent=expectedSourceDeckInitialization(opponentDeck,expectedRng);
+
+  Game daisy;
+  beginMatchWithLeaders(daisy,playerDeck,leader("francesca_daisy"),opponentDeck,
+                        leader("ordinary_leader"),seed,0);
+  assert(daisy.players[0].hand.size()==11&&daisy.players[0].deck.size()==1);
+  assert(daisy.players[1].hand.size()==10&&daisy.players[1].deck.size()==2);
+  for(std::size_t i=0;i<11;++i)
+    assert(daisy.players[0].hand[i].id==expectedPlayer[i].id);
+  for(std::size_t i=0;i<10;++i)
+    assert(daisy.players[1].hand[i].id==expectedOpponent[i].id);
+  assert(daisy.players[0].deck.front().id==expectedPlayer[11].id);
+  assert(daisy.players[1].deck[0].id==expectedOpponent[10].id&&
+         daisy.players[1].deck[1].id==expectedOpponent[11].id);
+  assert(daisy.rngState==expectedRng); // a forced starter skips the coin toss
+
+  expectedRng=seed;
+  expectedPlayer=expectedSourceDeckInitialization(playerDeck,expectedRng);
+  expectedOpponent=expectedSourceDeckInitialization(opponentDeck,expectedRng);
+  const int expectedStarter=static_cast<int>(expectedRandom(expectedRng)%2);
+  Game coin;
+  beginMatch(coin,playerDeck,Faction::NorthernRealms,opponentDeck,Faction::Monsters,seed);
+  assert(coin.firstPlayer==expectedStarter&&coin.rngState==expectedRng);
+  for(std::size_t i=0;i<10;++i) {
+    assert(coin.players[0].hand[i].id==expectedPlayer[i].id);
+    assert(coin.players[1].hand[i].id==expectedOpponent[i].id);
+  }
+}
 static void avengerCards() {
   Game decoy;
   decoy.players[0].hand.push_back(referenceCard("Decoy"));
@@ -946,4 +992,4 @@ static void leaderAbilities() {
   for(int owner=0;owner<2;++owner)
     for(std::size_t i=0;i<untouchedDecks[owner].size();++i)assert(emptyCrach.players[owner].deck[i].id==untouchedDecks[owner][i]);
 }
-int main() { scoreRules(); duplicateWeatherIsDiscarded(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
+int main() { scoreRules(); duplicateWeatherIsDiscarded(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceMatchInitializationOrder(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
