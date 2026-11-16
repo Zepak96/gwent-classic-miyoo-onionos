@@ -1188,18 +1188,28 @@ void drawCardTile(SDL_Renderer* r,const App& app,int x,int y,int w,int h,const g
   if(card.medic) text(r,x+w-10,y+4,"M",green,1);
 }
 void drawMiniRowLabel(SDL_Renderer* r,const App&,int x,int y,const char* rowIcon) {
-  const Color ink{255,231,174,255};
-  auto mark=[&](int dx,int dy,int w,int h){box(r,x+dx,y+dy,w,h,ink);};
-  if(std::strcmp(rowIcon,"siege")==0) {
-    mark(2,9,9,2);mark(2,11,3,2);mark(8,11,3,2);
-    mark(5,5,2,5);mark(3,3,2,3);mark(2,2,3,2);mark(7,5,3,2);mark(9,3,2,3);
-  } else if(std::strcmp(rowIcon,"ranged")==0) {
-    mark(2,1,2,2);mark(4,2,2,2);mark(6,4,2,5);mark(4,9,2,2);mark(2,11,2,2);
-    mark(2,2,1,10);mark(1,6,10,2);mark(9,4,2,2);mark(9,8,2,2);
-  } else if(std::strcmp(rowIcon,"agile")==0) {
-    mark(1,5,11,3);mark(1,3,2,2);mark(1,8,2,2);mark(10,3,2,2);mark(10,8,2,2);
-  } else {
-    mark(5,1,3,7);mark(3,7,7,2);mark(5,9,3,3);mark(6,0,1,1);
+  // Pixel masks are authored at their actual display size, including a margin.
+  static const char* sword[]={
+    ".........##","........###",".......###.","......###..",
+    ".....###...",".#..###....",".#####.....","..###......",
+    ".#####.....","###..#.....","##........."};
+  static const char* bow[]={
+    "..##.......","..####.....","..#..##....","..#...##.#.",
+    "..#...#####","###########","..#...#####","..#...##.#.",
+    "..#..##....","..####.....","..##......."};
+  static const char* siege[]={
+    "##.........","###........",".###.......","..###......",
+    "...###..###","....#####..","....###....","...##.##...",
+    "###########",".##.....##.",".##.....##."};
+  static const char* agile[]={
+    "...#.......","..##.......",".##########","###########",
+    ".##........","...........","........##.","###########",
+    "##########.",".......##..",".......#..."};
+  const char* const* mask=std::strcmp(rowIcon,"siege")==0?siege:
+    std::strcmp(rowIcon,"ranged")==0?bow:std::strcmp(rowIcon,"agile")==0?agile:sword;
+  color(r,Color{255,231,174,255});
+  for(int row=0;row<11;++row)for(int col=0;col<11;++col)if(mask[row][col]=='#') {
+    SDL_Rect pixel{x+1+col,y+1+row,1,1};SDL_RenderFillRect(r,&pixel);
   }
 }
 bool drawMiniAbility(SDL_Renderer* r,int x,int y,const std::string& ability) {
