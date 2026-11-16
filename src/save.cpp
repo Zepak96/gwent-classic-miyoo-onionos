@@ -103,6 +103,13 @@ bool decodeGame(Reader& r,Game& g,std::uint32_t version){
   for(std::uint32_t i=0;i<n;++i){ActiveWeather x;if(!readCard(r,x.card))return false;x.owner=r.i32();if(x.owner<0||x.owner>1)r.good=false;g.weatherCards.push_back(std::move(x));}
   g.randomRespawn=r.boolean();g.scoiataelChoicePending=r.boolean();g.skelligeRevivesRemaining=r.i32();g.skelligeRevivePlayer=r.i32();const auto reviveIds=r.u32();if(reviveIds>2){r.good=false;return false;}g.skelligeAgileReviveIds.clear();for(std::uint32_t i=0;i<reviveIds;++i)g.skelligeAgileReviveIds.push_back(r.string());g.factionAbilitiesInitialized=r.boolean();
   for(auto& cards:g.revealedCards)if(!readCards(r,cards))return false;g.rngState=r.u64();g.lastError=r.string();g.pendingMedicPlayer=version>=6?r.i32():-1;g.pendingRandomMedicId=version>=7?r.string():std::string{};
+  if(g.pendingMedicPlayer>=0&&g.pendingMedicPlayer<2) {
+    const auto& grave=g.players[g.pendingMedicPlayer].graveyard;
+    const auto eligible=[](const Card& c){return c.kind==Kind::Unit&&!c.hero&&(c.row!=Row::None||c.agile);};
+    if(std::none_of(grave.begin(),grave.end(),eligible))return false;
+    if(!g.pendingRandomMedicId.empty()&&(!g.randomRespawn||
+       std::none_of(grave.begin(),grave.end(),[&](const Card& c){return eligible(c)&&c.id==g.pendingRandomMedicId;})))return false;
+  } else if(!g.pendingRandomMedicId.empty())return false;
   return r.good&&g.pendingMedicPlayer>=-1&&g.pendingMedicPlayer<=1&&
     (g.pendingMedicPlayer<0||(g.pendingMedicPlayer==g.currentPlayer&&(g.phase==Phase::PlayerTurn||g.phase==Phase::OpponentTurn)))&&g.currentPlayer>=0&&g.currentPlayer<2&&g.firstPlayer>=0&&g.firstPlayer<2&&g.matchWinner>=-1&&g.matchWinner<=2&&g.round>=1&&g.round<=3&&
     g.skelligeRevivesRemaining>=0&&g.skelligeRevivesRemaining<=2&&g.skelligeRevivePlayer>=-1&&g.skelligeRevivePlayer<2&&
