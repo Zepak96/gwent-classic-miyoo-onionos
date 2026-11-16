@@ -35,3 +35,5 @@ project owner, and the upstream RandomPianist SFX credit are documented in
 assets/gwent-classic/ASSET_ORIGIN.md. The card catalog and deck data are
 covered by the notices in the source repository's LICENSES.md and
 third_party/gwent-classic/NOTICE.md.
+See docs/ASSET_RIGHTS.md for the public provenance and redistribution record,
+including the distinction between the upstream code license and bundled media.

@@ -25,6 +25,11 @@ The project owner reports that a CD PROJEKT RED representative authorized
 using CDPR game assets in this non-commercial Miyoo Mini Plus mod. The private
 correspondence is not redistributed here. That report does not claim to grant
 rights to third-party works; the SFX attribution above remains applicable.
+The pinned source README credits RandomPianist for many edited SFX but does not
+identify per-file authors or a separate sound-effect license. See
+[`docs/ASSET_RIGHTS.md`](../../docs/ASSET_RIGHTS.md) for the full provenance
+and redistribution record; the upstream code license is not presented as a
+blanket license for every included media file.
 
 Upstream source: https://github.com/asundr/gwent-classic
 Upstream README: https://github.com/asundr/gwent-classic/blob/08592d847f2573440a34deb9f32bc855b2544cdd/README.md

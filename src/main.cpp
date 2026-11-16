@@ -1290,17 +1290,22 @@ void drawCardEffect(SDL_Renderer* r,const App& a) {
 }
 std::vector<std::string> wrapDetailText(const std::string& value,std::size_t limit);
 void drawCardPreview(SDL_Renderer* r,const App& a,const gwent::Card& card) {
-  constexpr int x=489,y=15,width=127;
+  // Keep the enlarged card in the reserved right-side inspector strip. The
+  // previous x=489 position covered the third deck-builder card column.
+  constexpr int x=512,y=15,width=120;
   const int portraitHeight=cardPortraitHeight(width);
   drawCardPortrait(r,a,"img/lg/"+gwent::referenceCardImage(card.referenceIndex),x,y,width,portraitHeight);
   box(r,x,y+portraitHeight,width,241-portraitHeight,Color{8,8,8,245});
   frame(r,x,y,width,241,gold);
-  const auto nameLines=wrapDetailText(displayCardName(a,card),20);
+  const auto nameLines=wrapDetailText(displayCardName(a,card),18);
   for(std::size_t i=0;i<nameLines.size()&&i<2;++i)
     centeredTextInBox(r,x+3,y+portraitHeight+3+static_cast<int>(i)*8,width-6,8,nameLines[i],paper,1);
   const int statY=y+portraitHeight+22;
-  centeredTextInBox(r,x+3,statY,width-6,8,tr(a,"power")+" "+std::to_string(card.power)+"  "+tr(a,"row")+" "+
-    (card.row==gwent::Row::Melee?tr(a,"melee"):card.row==gwent::Row::Ranged?tr(a,"ranged"):card.row==gwent::Row::Siege?tr(a,"siege"):tr(a,"special")),gold,1);
+  centeredTextInBox(r,x+3,statY,width-6,8,tr(a,"power")+" "+std::to_string(card.power),gold,1);
+  const std::string row=card.row==gwent::Row::Melee?tr(a,"melee"):
+    card.row==gwent::Row::Ranged?tr(a,"ranged"):
+    card.row==gwent::Row::Siege?tr(a,"siege"):tr(a,"special");
+  centeredTextInBox(r,x+3,statY+11,width-6,8,tr(a,"row")+" "+row,gold,1);
 }
 std::vector<std::string> wrapDetailText(const std::string& value,std::size_t limit) {
   std::vector<std::string> lines;
@@ -1557,7 +1562,7 @@ void drawDeckBuilder(SDL_Renderer* r,const App& a) {
   narrowText(r,300,54,pl?"ZMIEN FRAKCJE":"CHANGE FACTION",paper);
   narrowText(r,355,54,pl?"ZAPISZ TALIE":"DOWNLOAD DECK",paper);
   narrowText(r,54,27,pl?"KOLEKCJA KART":"CARD COLLECTION",Color{149,149,149});
-  narrowText(r,540,28,pl?"TALIA":"DECK",Color{149,149,149});
+  narrowText(r,425,28,pl?"TALIA":"DECK",Color{149,149,149});
 
   const auto cards=editorCards(a);
   std::vector<const gwent::Card*> bankCards,deckCards;
@@ -1572,23 +1577,29 @@ void drawDeckBuilder(SDL_Renderer* r,const App& a) {
   const auto drawArray=[&](const std::vector<const gwent::Card*>& source,int x,int pane) {
     const int start=(pane==a.editorPane)?first:0;
     for(int i=start;i<std::min(static_cast<int>(source.size()),start+6);++i) {
-      const int local=i-start,col=local%3,row=local/3;
-      const int cx=x+7+col*71,cy=81+row*123;
+      const int columns=pane==1?2:3;
+      const int local=i-start,col=local%columns,row=local/columns;
+      const int cardWidth=pane==1?50:63;
+      const int cardHeight=pane==1?84:118;
+      const int cx=x+7+col*(pane==1?58:71),cy=81+row*(pane==1?88:123);
       const auto* card=source[static_cast<std::size_t>(i)];
       const int deckCount=deckCopies(a.editDeck,card->referenceIndex);
       const int count=pane==0?card->deckCopies-deckCount:deckCount;
-      const int portraitHeight=std::min(118,cardPortraitHeight(63));
-      drawCardPortrait(r,a,"img/lg/"+gwent::referenceCardImage(card->referenceIndex),cx,cy,63,portraitHeight);
-      box(r,cx,cy+portraitHeight,63,118-portraitHeight,Color{9,8,7,246});
-      drawImage(r,a,"img/icons/preview_count.png",cx+45,cy+3,16,16);
+      const int portraitHeight=std::min(cardHeight,cardPortraitHeight(cardWidth));
+      drawCardPortrait(r,a,"img/lg/"+gwent::referenceCardImage(card->referenceIndex),cx,cy,cardWidth,portraitHeight);
+      box(r,cx,cy+portraitHeight,cardWidth,cardHeight-portraitHeight,Color{9,8,7,246});
+      const int countX=cx+cardWidth-18;
+      drawImage(r,a,"img/icons/preview_count.png",countX,cy+2,16,16);
       const auto countLabel=std::to_string(count);
-      centeredTextInBox(r,cx+45,cy+3,16,16,countLabel,Color{95,73,35},1);
-      const auto cardNameLines=wrapDetailText(displayCardName(a,*card),10);
-      const int titleY=cy+portraitHeight+std::max(0,(118-portraitHeight-static_cast<int>(std::min<std::size_t>(cardNameLines.size(),2)*8))/2);
+      centeredTextInBox(r,countX,cy+2,16,16,countLabel,Color{95,73,35},1);
+      const auto cardNameLines=wrapDetailText(displayCardName(a,*card),pane==1?7:10);
+      const int nameLineHeight=pane==1?7:8;
+      const int titleY=cy+portraitHeight+std::max(0,(cardHeight-portraitHeight-static_cast<int>(std::min<std::size_t>(cardNameLines.size(),2)*nameLineHeight))/2);
       for(std::size_t line=0;line<cardNameLines.size()&&line<2;++line)
-        centeredTextInBox(r,cx+1,titleY+static_cast<int>(line)*8,61,8,cardNameLines[line],paper,1);
-      if(pane==a.editorPane&&i==cursor)frame(r,cx-2,cy-2,67,122,paper);
+        centeredTextInBox(r,cx+1,titleY+static_cast<int>(line)*nameLineHeight,cardWidth-2,nameLineHeight,cardNameLines[line],paper,1);
+      if(pane==a.editorPane&&i==cursor)frame(r,cx-2,cy-2,cardWidth+4,cardHeight+4,paper);
     }
+    if(pane==1)return; // the inspector uses this pane's former scrollbar strip
     const int trackX=x+210;
     box(r,trackX,81,7,245,Color{19,19,19,180});
     const int thumbHeight=std::max(18,245*6/std::max(6,static_cast<int>(source.size())));
@@ -2088,7 +2099,7 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
     }
     if(key==SDLK_RETURN||key==SDLK_KP_ENTER) { startMatch(a);return; }
     if(key==SDLK_LEFT||key==SDLK_RIGHT) { a.editorPane=1-a.editorPane;a.editorCardIndex=0;return; }
-    if(key==SDLK_UP||key==SDLK_w)a.editorCardIndex=std::max(0,a.editorCardIndex-3);
+    if(key==SDLK_UP||key==SDLK_w)a.editorCardIndex=std::max(0,a.editorCardIndex-(a.editorPane==1?2:3));
     else if(key==SDLK_DOWN||key==SDLK_j)++a.editorCardIndex;
     const auto allCards=editorCards(a);
     std::vector<const gwent::Card*> cards;
