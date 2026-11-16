@@ -317,3 +317,7 @@ rodzajami kart; pełny test na urządzeniu opisany wersją binarium i wynikiem.
   rzędów źródłowego `Row.addCard()`. Wcześniej symulacja optymalnego układu
   używała `push_back`, przez co karty po aktywacji mogły pozostać poza
   kolejnością. Regresja sprawdza posortowanie obu rzędów po zdolności.
+- [x] Decyzje AI o spasowaniu porównano ze źródłowym `weightPass()` i
+  `ControllerAI.startTurn()`. Testy blokują szybkie spasowanie po przewadze,
+  remis Nilfgaardu, remis innej frakcji oraz zakaz wydawania ostatniego życia
+  na pas; wymuszony pas nie zużywa RNG.

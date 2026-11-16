@@ -993,6 +993,40 @@ static std::vector<Card> expectedSourceDeckInitialization(const std::vector<Card
   }
   return deck;
 }
+static void sourceAiPassDecisions() {
+  Game passedAhead;
+  passedAhead.phase=Phase::OpponentTurn;passedAhead.currentPlayer=1;
+  passedAhead.players[0].passed=true;
+  passedAhead.players[1].hand={unit("pass-ahead-action",5)};
+  passedAhead.players[1].score=6;passedAhead.players[0].score=5;
+  const auto aheadRng=passedAhead.rngState;
+  const auto ahead=chooseAiAction(passedAhead,1);
+  assert(ahead.pass&&!ahead.activateLeader&&passedAhead.rngState==aheadRng);
+
+  Game nilfgaardTie;
+  nilfgaardTie.phase=Phase::OpponentTurn;nilfgaardTie.currentPlayer=1;
+  nilfgaardTie.players[0].passed=true;nilfgaardTie.players[1].faction=Faction::Nilfgaard;
+  nilfgaardTie.players[1].hand={unit("nilfgaard-pass-tie-action",5)};
+  nilfgaardTie.players[1].score=nilfgaardTie.players[0].score=7;
+  const auto nilfgaardRng=nilfgaardTie.rngState;
+  assert(chooseAiAction(nilfgaardTie,1).pass&&nilfgaardTie.rngState==nilfgaardRng);
+
+  Game nonNilfgaardTie;
+  nonNilfgaardTie.phase=Phase::OpponentTurn;nonNilfgaardTie.currentPlayer=1;
+  nonNilfgaardTie.players[0].passed=true;
+  nonNilfgaardTie.players[1].hand={unit("non-nilfgaard-tie-action",5)};
+  nonNilfgaardTie.players[1].score=nonNilfgaardTie.players[0].score=7;
+  const auto tieAction=chooseAiAction(nonNilfgaardTie,1);
+  assert(!tieAction.pass&&tieAction.cardId=="non-nilfgaard-tie-action");
+
+  Game lastGem;
+  lastGem.phase=Phase::OpponentTurn;lastGem.currentPlayer=1;
+  lastGem.players[1].roundLosses=1;lastGem.players[1].hand={unit("last-gem-action",5)};
+  lastGem.players[1].score=0;lastGem.players[0].score=20;
+  const auto lastGemAction=chooseAiAction(lastGem,1);
+  assert(!lastGemAction.pass&&lastGemAction.cardId=="last-gem-action");
+}
+
 static void sourceMatchInitializationOrder() {
   std::vector<Card> playerDeck,opponentDeck;
   for(int i=0;i<12;++i) {
@@ -1380,4 +1414,4 @@ static void leaderAbilities() {
   for(int owner=0;owner<2;++owner)
     for(std::size_t i=0;i<untouchedDecks[owner].size();++i)assert(emptyCrach.players[owner].deck[i].id==untouchedDecks[owner][i]);
 }
-int main() { scoreRules(); duplicateWeatherIsDiscarded(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
+int main() { scoreRules(); duplicateWeatherIsDiscarded(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }

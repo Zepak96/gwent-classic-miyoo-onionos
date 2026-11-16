@@ -47,6 +47,11 @@ source behavior. A build or screenshot alone does not count as parity.
 - [ ] Source board maxima, board/grave card counts, per-card weights, weather,
   Scorch, Horn, Mardroeme, Medic, Berserker, Decoy and Agile choices.
 - [ ] Source leader weights/actions and exact target selection.
+- [x] Pass weighting: AI immediately passes when ahead after the opponent has
+  passed, also passes on a Nilfgaard tie, does not force-pass on another
+  faction's tie, and does not spend its final gem on an AI pass. Deterministic
+  engine regressions cover all four decisions and verify forced passes do not
+  consume RNG.
 - [x] Source AI redraw and discard ordering, including two sequential
   `ControllerAI.redraw()` calls that each recalculate discard order after
   drawing the replacement. Clear Weather joins typed weather cards in the
