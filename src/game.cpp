@@ -433,6 +433,27 @@ void beginMatchWithLeaders(Game& g, std::vector<Card> playerDeck, Card playerLea
                  &playerLeader,&opponentLeader,seed,firstPlayer);
 }
 
+// Shared replay path for graveyard units. Medic continuation choices are
+// added separately; callers retain responsibility for finishing the outer turn.
+void replayRevivedUnit(Game& g,int who,const Card& revived,int reviveRow) {
+  if(reviveRow<0||reviveRow>=3)return;
+  auto& p=g.players[who];
+
+          if(revived.spy) {
+            insertSourceBoardCard(g.players[1-who].board[reviveRow],revived);
+            for(int draw=0;draw<2&&!p.deck.empty();++draw) {
+              insertSourceHandCard(p,std::move(p.deck.front()),who);p.deck.erase(p.deck.begin());
+            }
+          } else insertSourceBoardCard(p.board[reviveRow],revived);
+          if(revived.muster)applyMuster(p,revived);
+          if(hasAbility(revived,"scorch_c"))scorchEnemyRow(g,who,0);
+          if(hasAbility(revived,"scorch_r"))scorchEnemyRow(g,who,1);
+          if(hasAbility(revived,"scorch_s"))scorchEnemyRow(g,who,2);
+          if(hasAbility(revived,"mardroeme"))p.mardroeme[reviveRow]=true;
+          for(int row=0;row<3;++row)if(p.mardroeme[row])transformBerserkers(p,row);
+        
+}
+
 bool playCard(Game& g, int who, const std::string& id, Row target, const std::string& selectedId) {
   if (who < 0 || who > 1 || who != g.currentPlayer || g.players[who].passed ||
       (g.phase != Phase::PlayerTurn && g.phase != Phase::OpponentTurn)) return false;
@@ -537,20 +558,7 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
         p.graveyard.erase(p.graveyard.begin()+medicIndex);
         int reviveRow = revived.agile ? medicReviveRow : rowIndex(revived.row);
         if (revived.agile && reviveRow < 0) reviveRow = 0;
-        if (reviveRow >= 0 && reviveRow < 3) {
-          if(revived.spy) {
-            insertSourceBoardCard(g.players[1-who].board[reviveRow],revived);
-            for(int draw=0;draw<2&&!p.deck.empty();++draw) {
-              insertSourceHandCard(p,std::move(p.deck.front()),who);p.deck.erase(p.deck.begin());
-            }
-          } else insertSourceBoardCard(p.board[reviveRow],revived);
-          if(revived.muster)applyMuster(p,revived);
-          if(hasAbility(revived,"scorch_c"))scorchEnemyRow(g,who,0);
-          if(hasAbility(revived,"scorch_r"))scorchEnemyRow(g,who,1);
-          if(hasAbility(revived,"scorch_s"))scorchEnemyRow(g,who,2);
-          if(hasAbility(revived,"mardroeme"))p.mardroeme[reviveRow]=true;
-          for(int row=0;row<3;++row)if(p.mardroeme[row])transformBerserkers(p,row);
-        }
+        replayRevivedUnit(g,who,revived,reviveRow);
       }
       if (hasAbility(c, "scorch_c")) scorchEnemyRow(g, who, 0);
       if (hasAbility(c, "scorch_r")) scorchEnemyRow(g, who, 1);
