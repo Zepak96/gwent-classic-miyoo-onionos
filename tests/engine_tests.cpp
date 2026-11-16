@@ -646,6 +646,30 @@ static void avengerCards() {
   assert(std::none_of(temporaryAvenger.players[1].graveyard.begin(),temporaryAvenger.players[1].graveyard.end(),
                       [](const Card& card){return card.id.rfind("summoned_",0)==0;}));
 }
+static void scorchSourceTargets() {
+  Game global;
+  Card scorch; scorch.id="source-global-scorch"; scorch.kind=Kind::Scorch;
+  global.players[0].hand.push_back(scorch);
+  auto immuneHero=unit("scorch-hero",20);immuneHero.hero=true;
+  global.players[0].board[0]={immuneHero,unit("global-tie-player",9)};
+  global.players[1].board[1]={unit("global-tie-opponent",9)};
+  global.players[1].board[2]={unit("global-weaker",8)};
+  assert(playCard(global,0,scorch.id));
+  assert(global.players[0].board[0].size()==1&&global.players[0].board[0][0].hero);
+  assert(global.players[1].board[1].empty());
+  assert(global.players[1].board[2].size()==1&&global.players[1].board[2][0].id=="global-weaker");
+  assert(std::any_of(global.players[0].graveyard.begin(),global.players[0].graveyard.end(),[](const Card& card){return card.id=="global-tie-player";}));
+  assert(std::any_of(global.players[1].graveyard.begin(),global.players[1].graveyard.end(),[](const Card& card){return card.id=="global-tie-opponent";}));
+
+  Game row;
+  auto rowScorch=unit("source-row-scorch",4);rowScorch.abilities={"scorch_c"};
+  row.players[0].hand.push_back(rowScorch);
+  auto highHero=unit("row-scorch-hero",15);highHero.hero=true;
+  row.players[1].board[0]={highHero,unit("row-scorch-target",1)};
+  assert(playCard(row,0,rowScorch.id));
+  assert(row.players[1].board[0].size()==1&&row.players[1].board[0][0].hero);
+  assert(row.players[1].graveyard.size()==1&&row.players[1].graveyard[0].id=="row-scorch-target");
+}
 static void leaderAbilities() {
   std::vector<Card> deck;
   for(int i=0;i<24;++i) deck.push_back(unit("leader-test-"+std::to_string(i),1));
@@ -828,4 +852,4 @@ static void leaderAbilities() {
   assert(crach.players[0].deck.size()==1 && crach.players[1].deck.size()==1);
   assert(crach.players[0].graveyard.empty() && crach.players[1].graveyard.empty());
 }
-int main() { scoreRules(); duplicateWeatherIsDiscarded(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); avengerCards(); leaderAbilities(); }
+int main() { scoreRules(); duplicateWeatherIsDiscarded(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
