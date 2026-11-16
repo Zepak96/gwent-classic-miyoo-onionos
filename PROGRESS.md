@@ -285,3 +285,8 @@ Pin `gwent.js` kończy inicjalizację przez `let dm = new DeckMaker()`, bez ekra
 - Użytkowniczka zgłosiła sekwencję: ekran ładowania, krótki czarny ekran, powrót do menu OnionOS. Przyczyna nie jest jeszcze potwierdzona na urządzeniu.
 - Launcher zapisuje stdout/stderr i komunikaty o błędzie `SDL_Init` oraz `SDL_CreateWindow` do `Saves/Ports/GwentClassic/last-run.log`.
 - Zdalne CI dla commita `317e6f0` zaliczyło build/test desktop frontend oraz cross-build ARM hard-float i test CRC paczki. To nie potwierdza uruchomienia na Miyoo; karta SD nie była podłączona podczas tej diagnostyki.
+
+## Instalacja builda diagnostycznego na SD — 16.11.2026
+
+- Po ponownym podłączeniu karty SD zainstalowano z paczki `317e6f0` launcher, binarkę ARM i bibliotekę SDL2. Wcześniejsze wersje plików zachowano w `.work/sd-backup-startup-diagnostic-20261116`.
+- Audyt SHA-256 wszystkich 603 plików `Roms/PORTS/Games/GwentClassic` wykazał zero różnic względem paczki. Test uruchomienia na fizycznym Miyoo i odczyt `Saves/Ports/GwentClassic/last-run.log` są następne.
