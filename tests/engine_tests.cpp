@@ -1138,6 +1138,29 @@ static void medicReplaysSpyPlacement() {
   assert(game.currentPlayer==1);
 }
 
+static void medicReplaysMusterAndScorch() {
+  auto medic=unit("effect-reviver",5);medic.medic=true;medic.abilities={"medic"};
+  Game muster;
+  muster.players[0].hand={medic,unit("spare",1)};
+  auto summoned=unit("muster-revived",4);summoned.name="Revived Pack - One";
+  summoned.muster=true;summoned.group="Revived Pack";summoned.abilities={"muster"};
+  auto companion=unit("muster-companion",4);companion.name="Revived Pack - Two";
+  muster.players[0].graveyard={summoned};muster.players[0].deck={companion};
+  assert(playCard(muster,0,medic.id,Row::None,summoned.id));
+  assert(muster.players[0].board[0].size()==3&&muster.players[0].deck.empty());
+  assert(muster.currentPlayer==1);
+
+  Game scorch;
+  scorch.players[0].hand={medic,unit("scorch-spare",1)};
+  auto destroyer=unit("revived-destroyer",6);destroyer.abilities={"scorch_c"};
+  scorch.players[0].graveyard={destroyer};
+  scorch.players[1].board[0]={unit("destroyed-enemy",10)};
+  assert(playCard(scorch,0,medic.id,Row::None,destroyer.id));
+  assert(scorch.players[1].board[0].empty());
+  assert(scorch.players[1].graveyard.size()==1&&scorch.players[1].graveyard[0].id=="destroyed-enemy");
+  assert(scorch.players[0].board[0].size()==2&&scorch.currentPlayer==1);
+}
+
 static void sourceAiAgileWeatherRows() {
   for(int weatherRow=0;weatherRow<2;++weatherRow) {
     for(unsigned seed=1;seed<40;++seed) {
@@ -1679,4 +1702,4 @@ static void leaderAbilities() {
   for(int owner=0;owner<2;++owner)
     for(std::size_t i=0;i<untouchedDecks[owner].size();++i)assert(emptyCrach.players[owner].deck[i].id==untouchedDecks[owner][i]);
 }
-int main() { scoreRules(); duplicateWeatherIsDiscarded(); allSourceWeatherTypesAndOwnership(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiFractionalHornTickets(); sourceAiAgileWeatherRows(); medicReplaysSpyPlacement(); sourceAiDefersRandomActionTargets(); sourceAiHeroMoraleWeight(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
+int main() { scoreRules(); duplicateWeatherIsDiscarded(); allSourceWeatherTypesAndOwnership(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiFractionalHornTickets(); sourceAiAgileWeatherRows(); medicReplaysSpyPlacement(); medicReplaysMusterAndScorch(); sourceAiDefersRandomActionTargets(); sourceAiHeroMoraleWeight(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
