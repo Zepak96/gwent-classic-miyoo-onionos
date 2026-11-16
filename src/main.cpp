@@ -955,6 +955,15 @@ std::vector<const gwent::Card*> pendingMedicChoices(const App& a) {
   for(const auto& c:a.game.players[0].graveyard)
     if(c.kind==gwent::Kind::Unit&&!c.hero&&(c.row!=gwent::Row::None||c.agile)&&
        (!a.game.randomRespawn||c.id==random))cards.push_back(&c);
+  const auto basePower=[](const gwent::Card* card) {
+    const auto& catalog=gwent::referenceCardCatalog();
+    const auto original=std::find_if(catalog.begin(),catalog.end(),[&](const auto& c){return c.referenceIndex==card->referenceIndex;});
+    return original==catalog.end()?card->power:original->power;
+  };
+  std::stable_sort(cards.begin(),cards.end(),[&](const auto* left,const auto* right) {
+    const int lp=basePower(left),rp=basePower(right);
+    return lp!=rp?lp<rp:left->name<right->name;
+  });
   return cards;
 }
 std::vector<std::string> legalCardTargets(const App& a,const gwent::Card& card) {
@@ -2262,8 +2271,13 @@ void handleMatchKey(App& a,SDL_Keycode key) {
     const auto choices=pendingMedicChoices(a);
     if(choices.empty())return;
     a.targetIndex=std::clamp(a.targetIndex,0,static_cast<int>(choices.size())-1);
-    if(key==SDLK_LEFT)a.targetIndex=(a.targetIndex+static_cast<int>(choices.size())-1)%static_cast<int>(choices.size());
-    else if(key==SDLK_RIGHT)a.targetIndex=(a.targetIndex+1)%static_cast<int>(choices.size());
+    if(key==SDLK_LEFT) {
+      const int old=a.targetIndex;a.targetIndex=std::max(0,a.targetIndex-1);
+      a.audio.play("ui_card");if(old!=a.targetIndex)noteCarouselMove(a,-1);
+    } else if(key==SDLK_RIGHT) {
+      const int old=a.targetIndex;a.targetIndex=std::min(static_cast<int>(choices.size())-1,a.targetIndex+1);
+      a.audio.play("ui_card");if(old!=a.targetIndex)noteCarouselMove(a,1);
+    }
     else if((key==SDLK_UP||key==SDLK_DOWN)&&choices[a.targetIndex]->agile)a.rowIndex=1-a.rowIndex;
     else if(key==SDLK_AC_BACK||key==SDLK_RETURN||key==SDLK_KP_ENTER) {
       const auto id=choices[a.targetIndex]->id;
