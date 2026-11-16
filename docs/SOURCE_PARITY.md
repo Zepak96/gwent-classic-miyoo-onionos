@@ -382,3 +382,14 @@ Young Vildkaarl retains the marker, so a later revival follows the normal
 placement-audio path. CTest passed 2/2, desktop CI and ARMHF packaging passed,
 and all 603 files on SD match the package. Physical audio/gameplay confirmation
 is still open.
+
+## AI tie ordering for Horn and Decoy — 16.11.2026
+
+The pinned source's `ControllerAI.horn()` visits melee, ranged, then siege and
+keeps the first row when gains tie. The native implementation used the reverse
+order; it now follows the source and a fixed-seed regression checks the melee
+choice. The source Decoy fallback prepends each row's candidate list while
+iterating melee to siege, yielding siege/ranged/melee target order. The native
+fallback now uses that order; a fixed-seed regression checks the siege target.
+These tests verify tie/fallback ordering only; the broader AI weighting and
+decision audit remains open.

@@ -348,3 +348,13 @@ rodzajami kart; pełny test na urządzeniu opisany wersją binarium i wynikiem.
   `1e09003cbaddb861992298b8efc4ff1afc096e02cf2a339f0a7aa89ce57eb4d4`.
   Poprzedni build zachowano jako `GwentClassic.previous-c472e24`. Fizyczne
   sprawdzenie audio i rozgrywki pozostaje otwarte.
+
+- [x] Commit `21b05e5` corrects two AI tie-order differences against the pinned
+  source: Horn retains the first equal-gain row in melee/ranged/siege order,
+  and Decoy's fallback target order is siege/ranged/melee. Fixed-seed engine
+  regressions cover both choices. Engine CTest passed 2/2, desktop CI passed,
+  and the ARMHF workflow completed successfully. Package SHA-256:
+  `cfe59836495e131c8b9a14a13f30898c6c433fa03fcf9f9bc04f25689daebf01`;
+  binary SHA-256: `80209b060cdfc30fce6990e4168da8527de990ae85574c59be550f5d10c0fe1f`.
+  Installed on SD and verified all 603 files against the package. Backup:
+  `GwentClassic.previous-21b05e5`. Physical match testing remains open.
