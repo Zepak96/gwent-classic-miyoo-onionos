@@ -2707,11 +2707,15 @@ int main(int argc,char** argv) {
       revived.row=gwent::Row::Melee;revived.power=6;revived.agile=true;
       chainProbe.game.players[0].hand={first};
       chainProbe.game.players[0].graveyard={second,revived};
-      okay=okay&&gwent::playCard(chainProbe.game,0,first.id,gwent::Row::None,second.id);
+      const bool chainStarted=gwent::playCard(chainProbe.game,0,first.id,gwent::Row::None,second.id);
+      std::cerr<<"Medic input probe: start="<<chainStarted<<" pending="<<chainProbe.game.pendingMedicPlayer<<"\n";
+      okay=okay&&chainStarted;
       okay=okay&&chainProbe.game.pendingMedicPlayer==0&&chainProbe.game.players[0].hand.empty();
       handleMatchKey(chainProbe,SDLK_DOWN);
+      std::cerr<<"Medic input probe: row="<<chainProbe.rowIndex<<"\n";
       okay=okay&&chainProbe.rowIndex==1;
       handleMatchKey(chainProbe,normalizeMiyooKey(chainProbe,SDLK_LALT));
+      std::cerr<<"Medic input probe: after B pending="<<chainProbe.game.pendingMedicPlayer<<" ranged="<<chainProbe.game.players[0].board[1].size()<<"\n";
       okay=okay&&chainProbe.game.pendingMedicPlayer==-1&&
         chainProbe.game.players[0].board[1].size()==1&&
         chainProbe.game.players[0].board[1][0].id==revived.id;
