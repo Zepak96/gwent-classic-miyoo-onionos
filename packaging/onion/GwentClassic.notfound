@@ -1,5 +1,5 @@
 #!/bin/sh
-# Standalone Ports Script Template for OnionOS Ports Collection.
+# Temporary startup diagnostics for Gwent Classic on OnionOS.
 GameName="Gwent Classic"
 GameDir="GwentClassic"
 GameExecutable="launch.sh"
@@ -7,4 +7,27 @@ GameDataFile="gwent"
 KillAudioserver=0
 PerformanceMode=0
 Arguments=""
+
+LOG_DIR="/mnt/SDCARD/Saves/Ports/GwentClassic"
+mkdir -p "$LOG_DIR" 2>/dev/null
+LOG_FILE="$LOG_DIR/shortcut.log"
+if ! : >> "$LOG_FILE" 2>/dev/null; then
+    LOG_FILE="/mnt/SDCARD/Roms/PORTS/Games/GwentClassic/shortcut.log"
+fi
+exec >> "$LOG_FILE" 2>&1 || :
+echo "=== Gwent Classic shortcut $(date 2>/dev/null) ==="
+echo "PWD=$PWD"
+echo "GameDir=$GameDir GameExecutable=$GameExecutable GameDataFile=$GameDataFile"
+if [ ! -x /mnt/SDCARD/Emu/PORTS/launch_standalone.sh ]; then
+    echo "ERROR: OnionOS launch_standalone.sh missing or not executable"
+    ls -l /mnt/SDCARD/Emu/PORTS/launch_standalone.sh 2>&1
+    exit 127
+fi
+if [ ! -f "/mnt/SDCARD/Roms/PORTS/Games/$GameDir/$GameDataFile" ]; then
+    echo "ERROR: game data file missing"
+    exit 127
+fi
 /mnt/SDCARD/Emu/PORTS/launch_standalone.sh "$GameName" "$GameDir" "$GameExecutable" "$Arguments" "$GameDataFile" "$KillAudioserver" "$PerformanceMode"
+rc=$?
+echo "launch_standalone exit=$rc"
+exit "$rc"

@@ -52,6 +52,8 @@ Wydanie korzysta z standalone launcher template OnionOS, `Roms/PORTS/Games/Gwent
 
 Launcher zapisuje stdout i stderr uruchomienia do `/mnt/SDCARD/Saves/Ports/GwentClassic/last-run.log`, a gdy ten folder nie jest zapisywalny, do `Roms/PORTS/Games/GwentClassic/last-run.log`. Niepowodzenie zapisu logu nie zatrzymuje uruchamiania gry. Plik zawiera punkty kontrolne inicjalizacji SDL, okna i renderera oraz komunikaty o błędach, które zgłosi proces lub dynamiczny loader.
 
+Skrót OnionOS zapisuje osobny log `shortcut.log` w tym samym katalogu Saves, z kopią awaryjną w katalogu gry. Rejestruje wejście do skrótu, obecność launchera i binarki oraz kod wyjścia launchera; ten log pozwala odróżnić problem importu/uruchomienia skrótu od błędu samej aplikacji.
+
 ## Odtwarzalność
 
 Audyt referencyjnych commitów i ograniczeń licencji znajduje się w `PROGRESS.md` i `LICENSES.md`. Pakiet zapisuje rewizję SDL, sumę SDK oraz SHA-256 artefaktu; końcowa QA urządzenia oraz wydanie GitHub Release pozostają do wykonania.
