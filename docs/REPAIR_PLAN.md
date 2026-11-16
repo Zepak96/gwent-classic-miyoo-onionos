@@ -340,3 +340,11 @@ rodzajami kart; pełny test na urządzeniu opisany wersją binarium i wynikiem.
   wgrano na SD i zweryfikowano SHA-256 wszystkich 603 plików. Zachowano kopię
   `GwentClassic.previous-450237d`. Fizyczny test partii z przemianą pozostaje
   otwarty.
+- [x] Commit `c472e24` usuwa tymczasowy znacznik `vildkarrl` po przemianie,
+  zgodnie z callbackiem źródłowym; regresja sprawdza obie odmiany Vildkaarla.
+  CTest (2/2), desktop CI i ARMHF build przeszły. Paczka ma SHA-256
+  `068432cd0187cadad9ca0c1bf24ca4a0f1123a3ca4c3f2c7549b65a78c2ad94e` i jest
+  wgrana na SD; wszystkie 603 pliki są zgodne. Binarka `gwent` ma hash
+  `1e09003cbaddb861992298b8efc4ff1afc096e02cf2a339f0a7aa89ce57eb4d4`.
+  Poprzedni build zachowano jako `GwentClassic.previous-c472e24`. Fizyczne
+  sprawdzenie audio i rozgrywki pozostaje otwarte.

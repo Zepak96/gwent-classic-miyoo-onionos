@@ -355,4 +355,11 @@ engine regression confirms the 14-strength Vildkaarl moves after a 9-strength
 unit. CTest passed 2/2, desktop CI passed for commit `450237d`, and the ARMHF
 OnionOS package was installed and SHA-256 verified on SD (603 files). The SD
 backup is `GwentClassic.previous-450237d`. Physical match behavior and the
-remaining Vildkaarl callback/audio lifecycle still require audit.
+one-shot Vildkaarl marker lifecycle still required audit at that commit.
+
+Commit `c472e24` now also removes the source's temporary `vildkarrl` tag as
+soon as transformation resolves. The regression confirms neither ordinary nor
+Young Vildkaarl retains the marker, so a later revival follows the normal
+placement-audio path. CTest passed 2/2, desktop CI and ARMHF packaging passed,
+and all 603 files on SD match the package. Physical audio/gameplay confirmation
+is still open.
