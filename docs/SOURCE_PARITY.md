@@ -487,3 +487,10 @@ native selector currently uses a continuous double ticket. These two differences
 must be fixed together and tested at odd Horn gains and fractional cumulative
 boundaries. Current SD revision bc33dcc still contains these differences; the
 full AI distribution must not be described as matching the source.
+
+The discrepancy above was corrected in 68a7a67: Horn weights remain double
+precision and the weighted ticket is floored like source randomInt(). A seeded
+regression evaluates 2,857 seeds with a three-point Horn gain (weight 1.5)
+and a one-point unit, checking both selection regions and final RNG state.
+Engine CI job 133347163861 passed, including this test. Frontend CI is still
+running; SD remains on bc33dcc until a new ARM package is validated.
