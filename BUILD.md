@@ -50,6 +50,8 @@ Skrypt kompiluje frontend z biblioteką SDL Miyoo, wymusza zgodność rewizji i 
 
 Wydanie korzysta z standalone launcher template OnionOS, `Roms/PORTS/Games/GwentClassic/`, `Roms/PORTS/Shortcuts/Cards/GwentClassic.notfound` i oficjalnego kroku `~Import ports`. Pakiet obejmuje SDL2, EGL/GLES, json-c oraz biblioteki GCC runtime wraz z licencjami. Sama poprawna kompilacja i instalacja na karcie nie potwierdzają jeszcze startu gry ani wejścia/audio na fizycznym Miyoo.
 
+Launcher zapisuje stdout i stderr uruchomienia do `/mnt/SDCARD/Saves/Ports/GwentClassic/last-run.log`. Jeśli gra zamknie się podczas startu, plik zawiera komunikat SDL lub dynamicznego loadera, o ile proces zdążył go zgłosić.
+
 ## Odtwarzalność
 
 Audyt referencyjnych commitów i ograniczeń licencji znajduje się w `PROGRESS.md` i `LICENSES.md`. Pakiet zapisuje rewizję SDL, sumę SDK oraz SHA-256 artefaktu; końcowa QA urządzenia oraz wydanie GitHub Release pozostają do wykonania.

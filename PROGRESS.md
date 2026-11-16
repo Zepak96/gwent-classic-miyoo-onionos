@@ -279,3 +279,9 @@ Pin `gwent.js` kończy inicjalizację przez `let dm = new DeckMaker()`, bez ekra
 - Waga Manekina używa własnych list AI Szpiegów, Medyków i Pożogi; przeciwnik nie zmienia tej wagi. Test 256 decyzji z tymi samymi ziarnami sprawdza równość wyników z i bez wrogiego Szpiega. Dodatkowo regresja weryfikuje wybór własnego Szpiega, kiedy po obu stronach leżą Szpiedzy.
 - Desktop CTest: 2/2 zaliczone; `--input-test` zaliczył sterowanie Miyoo, blokadę akcji, podgląd/lot kart, efekty zdolności, mulligan i Medyka; `--audio-test assets` zdekodował 35 efektów oraz oba utwory tła.
 - Zbudowano pakiet ARM hard-float dla Cortex-A7. ZIP przechodzi test CRC, zawiera 604 pliki razem ze skrótem OnionOS, a wszystkie 603 pliki gry na karcie SD odpowiadają paczce SHA-256. Miyoo Mini Plus nie uruchomiono fizycznie w tej walidacji.
+
+## Diagnostyka zamykania podczas startu na Miyoo — 16.11.2026
+
+- Użytkowniczka zgłosiła sekwencję: ekran ładowania, krótki czarny ekran, powrót do menu OnionOS. Przyczyna nie jest jeszcze potwierdzona na urządzeniu.
+- Launcher zapisuje stdout/stderr i komunikaty o błędzie `SDL_Init` oraz `SDL_CreateWindow` do `Saves/Ports/GwentClassic/last-run.log`.
+- Zdalne CI dla commita `317e6f0` zaliczyło build/test desktop frontend oraz cross-build ARM hard-float i test CRC paczki. To nie potwierdza uruchomienia na Miyoo; karta SD nie była podłączona podczas tej diagnostyki.
