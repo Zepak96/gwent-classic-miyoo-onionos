@@ -21,8 +21,10 @@ source behavior. A build or screenshot alone does not count as parity.
 - [x] An active Leader ability is available once per match and does not reset
   between rounds, matching the source `disableLeader()` lifecycle; an engine
   regression verifies it remains spent after round two starts.
-- [ ] White Flame cancels both active Leader abilities and suppresses passive
-  Leader effects at match setup; verify every passive and both player orders.
+- [x] White Flame cancels both active Leader abilities and suppresses Invader,
+  Treacherous, Daisy and King Bran passives at match setup. Engine regressions
+  run White Flame on both player sides against the active leader and each
+  passive leader.
 
 ## Card rules — `abilities.js`, `Row`, `Weather`, `Card`
 

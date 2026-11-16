@@ -1125,17 +1125,28 @@ static void leaderAbilities() {
   // weather exactly as the source's Math.floor(total / 2) does (1 -> 0).
   assert(calculateScore(passives.players[0],{true,false,false},{false,false,false})==1);
 
-  Game cancellation;
-  beginMatchWithLeaders(cancellation,deck,leader("foltest_lord"),deck,leader("emhyr_whiteflame"),0x4321,0);
-  assert(!cancellation.players[0].leaderAbilityAvailable && cancellation.players[0].leaderAbilityCancelled);
-  assert(!cancellation.players[1].leaderAbilityAvailable && cancellation.players[1].leaderAbilityCancelled);
-  for(const auto& passiveId:std::vector<std::string>{"emhyr_invader","eredin_treacherous","francesca_daisy","king_bran"}) {
-    Game suppressedPassive;
-    beginMatchWithLeaders(suppressedPassive,deck,leader("emhyr_whiteflame"),deck,leader(passiveId),0x432100+passiveId.size(),0);
-    assert(suppressedPassive.players[0].hand.size()==10&&suppressedPassive.players[1].hand.size()==10);
-    assert(!suppressedPassive.randomRespawn&&!suppressedPassive.players[0].doubleSpyPower&&
-           !suppressedPassive.players[1].doubleSpyPower&&!suppressedPassive.players[1].halfWeather);
-    assert(suppressedPassive.players[0].leaderAbilityCancelled&&suppressedPassive.players[1].leaderAbilityCancelled);
+  const std::vector<std::string> cancellablePassives={"emhyr_invader","eredin_treacherous","francesca_daisy","king_bran"};
+  for(int whiteOwner=0;whiteOwner<2;++whiteOwner) {
+    Card whiteFlame=leader("emhyr_whiteflame"),activeLeader=leader("foltest_lord");
+    Card playerLeader=whiteOwner==0?whiteFlame:activeLeader;
+    Card opponentLeader=whiteOwner==1?whiteFlame:activeLeader;
+    Game cancellation;
+    beginMatchWithLeaders(cancellation,deck,playerLeader,deck,opponentLeader,0x4321+whiteOwner,0);
+    assert(!cancellation.players[0].leaderAbilityAvailable&&cancellation.players[0].leaderAbilityCancelled);
+    assert(!cancellation.players[1].leaderAbilityAvailable&&cancellation.players[1].leaderAbilityCancelled);
+    for(std::size_t passiveIndex=0;passiveIndex<cancellablePassives.size();++passiveIndex) {
+      Card passive=leader(cancellablePassives[passiveIndex]);
+      playerLeader=whiteOwner==0?whiteFlame:passive;
+      opponentLeader=whiteOwner==1?whiteFlame:passive;
+      Game suppressedPassive;
+      beginMatchWithLeaders(suppressedPassive,deck,playerLeader,deck,opponentLeader,
+                            0x432100+passiveIndex*2+static_cast<std::size_t>(whiteOwner),0);
+      assert(suppressedPassive.players[0].hand.size()==10&&suppressedPassive.players[1].hand.size()==10);
+      assert(!suppressedPassive.randomRespawn&&!suppressedPassive.players[0].doubleSpyPower&&
+             !suppressedPassive.players[1].doubleSpyPower&&!suppressedPassive.players[0].halfWeather&&
+             !suppressedPassive.players[1].halfWeather);
+      assert(suppressedPassive.players[0].leaderAbilityCancelled&&suppressedPassive.players[1].leaderAbilityCancelled);
+    }
   }
 
   Game spies;
