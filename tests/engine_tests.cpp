@@ -1124,6 +1124,20 @@ static void sourceAiPassDecisions() {
   assert(!lastGemAction.pass&&lastGemAction.cardId=="last-gem-action");
 }
 
+static void medicReplaysSpyPlacement() {
+  Game game;
+  auto medic=unit("reviver",5);medic.medic=true;medic.abilities={"medic"};
+  auto spy=unit("revived-spy",4);spy.spy=true;spy.abilities={"spy"};
+  game.players[0].hand={medic,unit("spare",1)};
+  game.players[0].graveyard={spy};
+  game.players[0].deck={unit("draw-one",2),unit("draw-two",3)};
+  assert(playCard(game,0,medic.id,Row::None,spy.id));
+  assert(game.players[0].board[0].size()==1&&game.players[0].board[0][0].id==medic.id);
+  assert(game.players[1].board[0].size()==1&&game.players[1].board[0][0].id==spy.id);
+  assert(game.players[0].hand.size()==3&&game.players[0].deck.empty());
+  assert(game.currentPlayer==1);
+}
+
 static void sourceAiAgileWeatherRows() {
   for(int weatherRow=0;weatherRow<2;++weatherRow) {
     for(unsigned seed=1;seed<40;++seed) {
@@ -1665,4 +1679,4 @@ static void leaderAbilities() {
   for(int owner=0;owner<2;++owner)
     for(std::size_t i=0;i<untouchedDecks[owner].size();++i)assert(emptyCrach.players[owner].deck[i].id==untouchedDecks[owner][i]);
 }
-int main() { scoreRules(); duplicateWeatherIsDiscarded(); allSourceWeatherTypesAndOwnership(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiFractionalHornTickets(); sourceAiAgileWeatherRows(); sourceAiDefersRandomActionTargets(); sourceAiHeroMoraleWeight(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
+int main() { scoreRules(); duplicateWeatherIsDiscarded(); allSourceWeatherTypesAndOwnership(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiFractionalHornTickets(); sourceAiAgileWeatherRows(); medicReplaysSpyPlacement(); sourceAiDefersRandomActionTargets(); sourceAiHeroMoraleWeight(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
