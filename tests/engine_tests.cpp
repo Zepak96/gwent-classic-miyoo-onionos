@@ -1124,6 +1124,22 @@ static void sourceAiPassDecisions() {
   assert(!lastGemAction.pass&&lastGemAction.cardId=="last-gem-action");
 }
 
+static void graveLeadersReturnWithoutPlaying() {
+  for(const auto& ability:std::vector<std::string>{"emhyr_relentless","eredin_bringer_of_death"}) {
+    Game game;game.players[0].leader=leader(ability);game.players[0].leaderAbilityAvailable=true;
+    game.players[0].hand={unit("leader-return-spare",1)};
+    game.players[0].deck={unit("leader-return-undrawn",2)};
+    auto spy=unit("leader-return-spy",4);spy.spy=true;spy.abilities={"spy"};
+    const int graveOwner=ability=="emhyr_relentless"?1:0;
+    game.players[graveOwner].graveyard={spy};
+    assert(activateLeader(game,0,Row::None,{spy.id}));
+    assert(game.players[0].hand.size()==2&&game.players[0].deck.size()==1);
+    assert(game.players[graveOwner].graveyard.empty());
+    for(const auto& player:game.players)for(const auto& row:player.board)assert(row.empty());
+    assert(game.pendingMedicPlayer==-1&&!game.players[0].leaderAbilityAvailable);
+  }
+}
+
 static void randomNestedMedicKeepsTarget() {
   Game game;game.phase=Phase::OpponentTurn;game.currentPlayer=1;
   game.pendingMedicPlayer=1;game.randomRespawn=true;game.rngState=419;
@@ -1749,4 +1765,4 @@ static void leaderAbilities() {
   for(int owner=0;owner<2;++owner)
     for(std::size_t i=0;i<untouchedDecks[owner].size();++i)assert(emptyCrach.players[owner].deck[i].id==untouchedDecks[owner][i]);
 }
-int main() { scoreRules(); duplicateWeatherIsDiscarded(); allSourceWeatherTypesAndOwnership(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiFractionalHornTickets(); sourceAiAgileWeatherRows(); randomNestedMedicKeepsTarget(); nestedMedicWaitsForChoice(); medicReplaysSpyPlacement(); medicReplaysMusterAndScorch(); sourceAiDefersRandomActionTargets(); sourceAiHeroMoraleWeight(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
+int main() { scoreRules(); duplicateWeatherIsDiscarded(); allSourceWeatherTypesAndOwnership(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiFractionalHornTickets(); sourceAiAgileWeatherRows(); graveLeadersReturnWithoutPlaying(); randomNestedMedicKeepsTarget(); nestedMedicWaitsForChoice(); medicReplaysSpyPlacement(); medicReplaysMusterAndScorch(); sourceAiDefersRandomActionTargets(); sourceAiHeroMoraleWeight(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
