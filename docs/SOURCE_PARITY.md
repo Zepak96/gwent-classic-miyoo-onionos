@@ -58,7 +58,12 @@ source behavior. A build or screenshot alone does not count as parity.
 - [x] Muster pulls matching cards from hand and deck using the source name
   prefix. Regressions cover Arachas hand/deck copies and next-gen Geralt/Ciri
   summoning Roach while leaving the other hero in hand.
-- [ ] Berserker/Mardroeme transformations and Vildkaarl lifecycle.
+- [x] Berserker/Mardroeme transformations and Vildkaarl gameplay lifecycle.
+  Engine regressions cover both transformed card variants, Mardroeme and Ermion
+  triggers, Berserkers played after Mardroeme, row ordering, occupied special
+  slots, and Mardroeme reset at the next round. The source's one-shot Vildkaarl
+  audio marker is handled by the frontend; exact animation/audio timing remains
+  under the separate animation audit.
 - [x] Berserker/Mardroeme transformation ordering now re-sorts the transformed
   Vildkaarl by the source row comparator (base power, then name); engine
   regression covers the transformed card moving after a 9-strength unit. The
