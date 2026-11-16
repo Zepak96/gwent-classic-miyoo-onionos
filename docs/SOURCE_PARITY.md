@@ -170,6 +170,11 @@ items above:
 - After an action, a player with no cards and no available leader ability now
   auto-passes; round start also pre-passes players with no legal action, matching
   the source `Player.endTurn()` and `Game.startRound()` checks.
+- The zero-total AI fallback now considers Clear Weather in the same way as the
+  source's `card.row === "weather"` check. A regression builds equal, weathered
+  rows so Clear Weather has exactly zero raw value, then verifies the AI still
+  selects it rather than passing. This closes only this fallback case; full AI
+  weight and action distribution parity remains open.
 - An AI action rejected by the port is reported; it is not converted into a
   voluntary pass.
 - Source `Carousel` choices now use the five-card source geometry, source card

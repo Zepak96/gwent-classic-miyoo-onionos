@@ -589,6 +589,18 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
   // zero times because its (incorrect) weight was clipped to zero.
   assert(clearWeatherChoices>350&&clearWeatherChoices<510);
 
+  // Source's zero-total fallback still plays Clear Weather when its raw
+  // weather weight is exactly zero. Both sides gain the same amount here, so
+  // the ordinary weighted choice has no positive-weight action to select.
+  Game zeroWeightClear;
+  zeroWeightClear.phase=Phase::OpponentTurn;zeroWeightClear.currentPlayer=1;
+  zeroWeightClear.weather[0]=true;
+  zeroWeightClear.players[0].board[0].push_back(unit("equal-weathered-opponent",8));
+  zeroWeightClear.players[1].board[0].push_back(unit("equal-weathered-ai",8));
+  zeroWeightClear.players[1].hand={clear};
+  const auto zeroWeightChoice=chooseAiAction(zeroWeightClear,1);
+  assert(!zeroWeightChoice.pass&&zeroWeightChoice.cardId==clear.id);
+
   Game difficultyChoice;
   difficultyChoice.phase=Phase::OpponentTurn;difficultyChoice.currentPlayer=1;
   difficultyChoice.players[1].hand={unit("weak",1),unit("strong",10)};

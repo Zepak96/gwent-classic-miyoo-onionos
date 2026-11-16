@@ -485,7 +485,10 @@ AiAction chooseAiAction(Game& game,int who) {
   for(const auto& action:actions)total+=action.weight;
   if(total<=0) {
     for(const auto& card:player.hand)
-      if((card.kind==Kind::Weather && weightWeather(game,who,card)>-1) ||
+      // The source fallback checks card.row === "weather", which includes
+      // Clear Weather as well as the typed weather cards.
+      if(((card.kind==Kind::Weather || card.kind==Kind::ClearWeather) &&
+          weightWeather(game,who,card)>-1) ||
          has(card,"avenger") || has(card,"avenger_kambi"))
         return cardAction(game,who,card,data);
     return {true,{},{},{}};
