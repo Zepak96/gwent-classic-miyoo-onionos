@@ -19,21 +19,22 @@ końcowym wydaniem.
   dekoduje 35 SFX i oba utwory. Test audio z SDL dummy nie potwierdza głośnika
   fizycznego Miyoo.
 - Zmiany źródłowe i README są opublikowane na publicznej gałęzi; ostatnie
-  poprawki obejmują źródłowy AI mulligan, 100-meczową regresję oraz dźwięk
-  przemienionego Vildkaarla. Nowy ARM
+  poprawki obejmują źródłowy AI mulligan, 100-meczową regresję, dźwięk
+  przemienionego Vildkaarla i polskie statusy meczu. Nowy ARM
   hard-float build oraz paczka OnionOS przeszły lokalnie; paczkę zainstalowano
   na karcie `E:` w `Roms/PORTS/Games/GwentClassic`, ale nie uruchomiono jej
   jeszcze na urządzeniu.
 - Skrypt builda OnionOS jest uruchamialny z checkoutu Windows dzięki regule LF
   dla skryptów `.sh`. Paczka `GwentClassic-OnionOS.zip` zawiera 618 wpisów,
-  SHA-256 `d627df61a6cf23be02e9e6ad59038ed965851f614b4cd85ae1b119e109912c42`;
+  SHA-256 `52cfe7b8fe18b196c8df6b516ee6eb98b4929405c6aed373856b7bd7f278045e`;
   `readelf` potwierdził ELF32 ARM i hard-float ABI. Lokalna paczka leży w
-  `.work/miyoo-b04f2d0-final/` i nie jest jeszcze wydaniem GitHub Release.
+  `.work/miyoo-b9a67e8/` i nie jest jeszcze wydaniem GitHub Release.
 - Po instalacji zweryfikowano 602/602 plików gry porównaniem SHA-256;
   skrót binarki na SD to
-  `38f36429aa62529dc87a60557db2b3f3561b864b601b73a398ed2f64fb34cdcd`.
+  `9b87b32b9c05d52fa6feafffe1b1d7cbad68ab8d23bf0668a09c7c37031b2a12`.
   Kopie poprzednich katalogów gry zachowano w
-  `.work/sd-backup-7fca1da/GwentClassic` i `.work/sd-backup-b04f2d0/GwentClassic`;
+  `.work/sd-backup-7fca1da/GwentClassic`, `.work/sd-backup-b04f2d0/GwentClassic`
+  i `.work/sd-backup-b9a67e8/GwentClassic`;
   istniejący skrót `.port` OnionOS
   nie był zmieniany.
 - Poprawiono błąd mulliganu AI: źródłowe `ControllerAI.redraw()` podejmuje dwie
