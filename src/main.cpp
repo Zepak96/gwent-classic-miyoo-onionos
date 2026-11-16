@@ -2691,22 +2691,26 @@ int main(int argc,char** argv) {
     }),app.scheduledSounds.end());
     updateWeatherTransitions(app);
     updateRowLayouts(app,now);
-    const auto previousPhase=observedPhase;
-    if(app.screen==Screen::Match&&app.game.phase!=observedPhase) {
-      if(app.game.phase==gwent::Phase::RoundResult||app.game.phase==gwent::Phase::MatchResult)
-        app.endScreenStartedAt=now;
-      if(app.game.phase==gwent::Phase::Mulligan)app.audio.play("redraw");
-      else if(app.game.phase==gwent::Phase::PlayerTurn)app.audio.play("turn_me");
-      else if(app.game.phase==gwent::Phase::OpponentTurn)app.audio.play("turn_op");
-      else if(app.game.phase==gwent::Phase::RoundResult)app.audio.play(app.game.players[0].score>=app.game.players[1].score?"round_win":"round_lose");
-      else if(app.game.phase==gwent::Phase::MatchResult)app.audio.play(app.game.matchWinner==0?"game_win":"game_lose");
-      observedPhase=app.game.phase;
+    // Keep phase snapshots unchanged while card effects are running so the
+    // turn SFX and notifications enter after the source action sequence.
+    if(!actionAnimationLocked(app,now)) {
+      const auto previousPhase=observedPhase;
+      if(app.screen==Screen::Match&&app.game.phase!=observedPhase) {
+        if(app.game.phase==gwent::Phase::RoundResult||app.game.phase==gwent::Phase::MatchResult)
+          app.endScreenStartedAt=now;
+        if(app.game.phase==gwent::Phase::Mulligan)app.audio.play("redraw");
+        else if(app.game.phase==gwent::Phase::PlayerTurn)app.audio.play("turn_me");
+        else if(app.game.phase==gwent::Phase::OpponentTurn)app.audio.play("turn_op");
+        else if(app.game.phase==gwent::Phase::RoundResult)app.audio.play(app.game.players[0].score>=app.game.players[1].score?"round_win":"round_lose");
+        else if(app.game.phase==gwent::Phase::MatchResult)app.audio.play(app.game.matchWinner==0?"game_win":"game_lose");
+        observedPhase=app.game.phase;
+      }
+      queueGameplayNotifications(app,previousPhase,observedRound,observedCurrentPlayer,
+                                 observedPassed,observedRoundWins);
+      observedRound=app.game.round;observedCurrentPlayer=app.game.currentPlayer;
+      observedPassed={app.game.players[0].passed,app.game.players[1].passed};
+      observedRoundWins={app.game.players[0].roundWins,app.game.players[1].roundWins};
     }
-    queueGameplayNotifications(app,previousPhase,observedRound,observedCurrentPlayer,
-                               observedPassed,observedRoundWins);
-    observedRound=app.game.round;observedCurrentPlayer=app.game.currentPlayer;
-    observedPassed={app.game.players[0].passed,app.game.players[1].passed};
-    observedRoundWins={app.game.players[0].roundWins,app.game.players[1].roundWins};
     updateNotification(app,now);
     if(app.screen==Screen::Match&&app.activeNotification.empty()&&
        !app.leaderSelectionMode&&!app.leaderRevealOpen&&!app.pauseOpen&&!app.passConfirmationOpen&&

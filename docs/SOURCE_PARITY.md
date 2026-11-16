@@ -164,8 +164,10 @@ items above:
   held until the queued source-timed flight/effect sequence and row placement
   wait finish. The SDL input regression checks the 1000 ms preview, 499 ms
   flight, row placement cue, delayed ability overlay and locked-input deadline.
-  Rule state still changes immediately at action selection, and device timing
-  needs physical confirmation.
+  Turn sounds and gameplay notifications are also held until that lock expires,
+  so they no longer begin over the played card's effects. Rule state still
+  changes immediately at action selection, and device timing needs physical
+  confirmation.
 - Large card displays now crop original artwork at its printed gold divider
   and draw localized names and rules as native text. This applies to the card
   inspector, hand preview, target carousel, and deck collection; 640×480 smoke
