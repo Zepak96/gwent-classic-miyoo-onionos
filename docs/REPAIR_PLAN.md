@@ -270,5 +270,10 @@ rodzajami kart; pełny test na urządzeniu opisany wersją binarium i wynikiem.
   została zainstalowana na SD; wszystkie 603 pliki i launcher `.port` zgodne
   są z artefaktem SHA-256. Poprzedni build zachowano jako
   `GwentClassic.previous-d035158`. Fizyczny test na Miyoo pozostaje otwarty.
+- [x] Build `13075d6` dodający blokadę akcji po wyborze celu przeszedł CI
+  silnika i frontendu oraz build ARM. Wszystkie 603 pliki i launcher na karcie
+  SD mają zgodne SHA-256 z paczką (`ff347c261ff6c5f55cdaa1cbd298163bc198f3e3c0b61c2af1db37de3f84d37a`);
+  poprzedni katalog zachowano jako `GwentClassic.previous-13075d6`.
+  Rzeczywisty test na Miyoo pozostaje otwarty.
 - [ ] Dokończyć poprawki i testy opisane w etapach 1–5.
 - [ ] Potwierdzić uruchomienie, sterowanie i pełny mecz na fizycznym Miyoo.
