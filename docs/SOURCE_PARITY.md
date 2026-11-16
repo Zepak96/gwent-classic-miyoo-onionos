@@ -536,3 +536,17 @@ makeReferenceOpponentDeck, which chooses a source premade recipe then a Leader
 filtered by that recipe's faction. Source constructOpponentDeck follows those
 two selection stages. Existing 500-seed tests validate deck legality, Leader
 faction and repeatability; they do not compare the JavaScript PRNG sequence.
+
+## Release-blocking Medic replay gap found in code review
+
+Source abilities.js medic calls res.autoplay(grave) for non-Agile targets,
+which replays their placement abilities. Native playCard currently removes the
+chosen target from graveyard and inserts it into the owner's row directly.
+It therefore skips revived Spy opponent placement/draws, Muster summons,
+Scorch and nested Medic effects. The existing checked Medic item above covers
+target validation and Agile row choice only and is insufficient for full parity.
+Required repair: shared placement resolution with pending human choices for
+nested Medic targets, preserving one outer turn and ability ordering; regressions
+must include revived Spy, Muster, Scorch, Medic chain and save/resume of pending
+choices. Current SD 19963ba still has this gap. Do not describe its full Medic
+mechanic as source-complete.
