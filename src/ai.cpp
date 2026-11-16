@@ -303,12 +303,12 @@ int rowForTag(const std::string& tag) {
   if(tag=="scorch_s")return 2;
   return -1;
 }
-int weightCard(const Game& game,int who,const Card& card,const BoardData& data) {
+double weightCard(const Game& game,int who,const Card& card,const BoardData& data) {
   if(card.kind==Kind::Decoy || has(card,"decoy"))return weightDecoy(data);
   if(card.kind==Kind::Scorch || has(card,"scorch"))return weightGlobalScorch(data);
   if(card.kind==Kind::CommanderHorn) {
     int best=0;for(int row=0;row<3;++row)best=std::max(best,weightHornRow(game,who,row));
-    return best/2;
+    return best/2.0;
   }
   if(card.kind==Kind::Mardroeme || has(card,"mardroeme"))
     return std::max(weightMardroemeRow(game,who,card,1),weightMardroemeRow(game,who,card,0));
@@ -338,7 +338,7 @@ int weightWeatherFromDeck(const Game& game,int who,const std::string& weatherTag
   const auto& deck=game.players[who].deck;
   if(std::none_of(deck.begin(),deck.end(),[&](const Card& c){return has(c,weatherTag);}))return 0;
   Card virtualWeather;virtualWeather.kind=Kind::Weather;virtualWeather.name="Weather";virtualWeather.abilities={weatherTag};
-  return weightCard(game,who,virtualWeather,collectBoardData(game,who));
+  return static_cast<int>(weightCard(game,who,virtualWeather,collectBoardData(game,who)));
 }
 int weightLeader(Game& game,int who,const BoardData& data,const std::string& id) {
   if(id=="foltest_king")return weightWeatherFromDeck(game,who,"fog");
@@ -491,7 +491,7 @@ AiAction chooseAiAction(Game& game,int who) {
   std::vector<WeightedAction> actions;
   actions.reserve(player.hand.size()+2);
   for(const auto& card:player.hand) {
-    const int weight=std::max(0,weightCard(game,who,card,data));
+    const double weight=std::max(0.0,weightCard(game,who,card,data));
     // ControllerAI first computes every weight, then rolls once to choose an
     // action, and only then resolves random targets (Decoy/Medic/Leader).
     // Check legality against a throwaway state so candidate evaluation cannot
@@ -534,7 +534,7 @@ AiAction chooseAiAction(Game& game,int who) {
       }
     return {true,{},{},{}};
   }
-  const double ticket=(static_cast<double>(roll(game))/4294967296.0)*total;
+  const double ticket=std::floor((static_cast<double>(roll(game))/4294967296.0)*total);
   double passed=0;
   for(const auto& action:actions) {
     passed+=action.weight;

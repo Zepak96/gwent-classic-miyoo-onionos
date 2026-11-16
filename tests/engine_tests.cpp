@@ -1,3 +1,4 @@
+#include <cmath>
 #include "gwent/game.hpp"
 #include "gwent/catalog.hpp"
 #include "gwent/ai.hpp"
@@ -1123,6 +1124,30 @@ static void sourceAiPassDecisions() {
   assert(!lastGemAction.pass&&lastGemAction.cardId=="last-gem-action");
 }
 
+static void sourceAiFractionalHornTickets() {
+  // Source Horn weight is 3/2, followed by a unit weighted 1. randomInt(2.5)
+  // yields integer tickets 0,1,2: the first two select Horn, the last the unit.
+  // Sweep seeds to cover both sides of the fractional cumulative boundary.
+  bool sawHorn=false,sawUnit=false;
+  for (unsigned seed=1;seed<20000;seed+=7) {
+    Game game;game.phase=Phase::OpponentTurn;game.currentPlayer=1;game.rngState=seed;
+    game.players[1].roundLosses=1;
+    game.players[1].board[0]={unit("fractional-board",3)};
+    Card horn;horn.id="fractional-horn";horn.name="Commander's Horn";
+    horn.kind=Kind::CommanderHorn;horn.abilities={"horn"};
+    game.players[1].hand={horn,unit("fractional-unit",1)};
+    auto state=game.rngState;
+    const auto random=expectedRandom(state);
+    const double ticket=std::floor((static_cast<double>(random)/4294967296.0)*2.5);
+    const auto action=chooseAiAction(game,1);
+    const bool expectHorn=ticket<1.5;
+    assert(!action.pass&&action.cardId==(expectHorn?horn.id:"fractional-unit"));
+    assert(game.rngState==state);
+    sawHorn|=expectHorn;sawUnit|=!expectHorn;
+  }
+  assert(sawHorn&&sawUnit);
+}
+
 static void sourceAiDefersRandomActionTargets() {
   // Source ControllerAI consumes one random draw for weighted action
   // selection, then resolves a random target only if that action was chosen.
@@ -1611,4 +1636,4 @@ static void leaderAbilities() {
   for(int owner=0;owner<2;++owner)
     for(std::size_t i=0;i<untouchedDecks[owner].size();++i)assert(emptyCrach.players[owner].deck[i].id==untouchedDecks[owner][i]);
 }
-int main() { scoreRules(); duplicateWeatherIsDiscarded(); allSourceWeatherTypesAndOwnership(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiDefersRandomActionTargets(); sourceAiHeroMoraleWeight(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
+int main() { scoreRules(); duplicateWeatherIsDiscarded(); allSourceWeatherTypesAndOwnership(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiFractionalHornTickets(); sourceAiDefersRandomActionTargets(); sourceAiHeroMoraleWeight(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
