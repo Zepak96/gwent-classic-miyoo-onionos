@@ -21,21 +21,20 @@ nie zastępuje odczytu `event0` na konkretnej wersji firmware.
 |---|---|---|
 | D-pad | strzałki | Nawigacja kart/rzędów/menu |
 | A | Left Ctrl | Zatwierdź / zagraj; podczas mulliganu zaznacza kartę |
-| B | Left Alt | Wróć / anuluj |
+| B | Left Alt | W edytorze: usuń kopię w panelu talii albo wróć do wyboru talii w panelu banku; w meczu wróć do wyboru talii po zapisaniu meczu |
 | X | Left Shift | Podgląd karty; w menu talii otwiera edytor |
 | Y | Space | Zdolność lidera; podczas mulliganu zatwierdza/pomija; język w menu talii |
-| L | Tab | Zmiana fokusu w meczu |
-| R | Backspace | Zmiana fokusu w meczu; nawigacja w edytorze |
+| L | Tab | Poprzedni rząd w meczu; wybór lidera w edytorze |
+| R | Backspace | Następny rząd w meczu; nawigacja w edytorze |
 | L2 / R2 | PageDown / PageUp | Przewijanie stron/ręki |
-| Start | Enter | Pauza podczas meczu; zatwierdza/pomija mulligan |
+| Start | Enter | Rozpocznij mecz w edytorze/wyborze talii; pauza podczas meczu; zatwierdza/pomija mulligan |
 | Select | Escape | Pasowanie po dodatkowym potwierdzeniu; zapis talii w edytorze; zatwierdza mulligan |
 | MENU | `KEY_HOME` → `SDLK_HOME` przez lokalną poprawkę SDL | Zapisuje mecz i zamyka grę, aby OnionOS odzyskał kontrolę |
 
 Klawisz Select nie pasuje automatycznie: najpierw otwiera pytanie, A zatwierdza,
 a B anuluje. Na ekranie mulliganu lewo/prawo wybiera kartę, A ją zaznacza, a
-Start, Y lub krótkie Select zatwierdza wybór albo pomija wymianę, gdy nic nie
-zaznaczono. X otwiera powiększony opis karty. Przytrzymanie Select przez 500 ms nadal otwiera inspektor karty w
-meczu i edytorze. Wbudowany smoke `--input-test` sprawdza translację klawiszy
+Start, Y lub Select zatwierdza wybór albo pomija wymianę, gdy nic nie
+zaznaczono. X otwiera tekstowy inspektor karty. Wbudowany smoke `--input-test` sprawdza translację klawiszy
 Mini SDL, pauzę, bezpieczne potwierdzanie pasowania oraz ochronę wyboru celu.
 
 ## Status weryfikacji
