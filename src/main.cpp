@@ -1187,15 +1187,20 @@ void drawCardTile(SDL_Renderer* r,const App& app,int x,int y,int w,int h,const g
   if(card.spy) text(r,x+w-10,y+4,"S",blue,1);
   if(card.medic) text(r,x+w-10,y+4,"M",green,1);
 }
-void drawMiniRowLabel(SDL_Renderer* r,const App& a,int x,int y,const char* rowIcon) {
-  // At 11 px the original weapon sprites collapse into ambiguous marks. A
-  // short localized row tag stays crisp on Miyoo and cannot be mistaken for a
-  // different class icon; the full card retains the original weapon artwork.
-  const bool polish=a.language==Language::Polish;
-  const char* label=std::strcmp(rowIcon,"close")==0?(polish?"WR":"CL"):
-    std::strcmp(rowIcon,"ranged")==0?(polish?"DY":"RA"):
-    std::strcmp(rowIcon,"siege")==0?(polish?"OB":"SI"):(polish?"ZW":"AG");
-  centeredTextInBox(r,x,y,13,13,label,Color{255,231,174,255},1);
+void drawMiniRowLabel(SDL_Renderer* r,const App&,int x,int y,const char* rowIcon) {
+  const Color ink{255,231,174,255};
+  auto mark=[&](int dx,int dy,int w,int h){box(r,x+dx,y+dy,w,h,ink);};
+  if(std::strcmp(rowIcon,"siege")==0) {
+    mark(2,9,9,2);mark(2,11,3,2);mark(8,11,3,2);
+    mark(5,5,2,5);mark(3,3,2,3);mark(2,2,3,2);mark(7,5,3,2);mark(9,3,2,3);
+  } else if(std::strcmp(rowIcon,"ranged")==0) {
+    mark(2,1,2,2);mark(4,2,2,2);mark(6,4,2,5);mark(4,9,2,2);mark(2,11,2,2);
+    mark(2,2,1,10);mark(1,6,10,2);mark(9,4,2,2);mark(9,8,2,2);
+  } else if(std::strcmp(rowIcon,"agile")==0) {
+    mark(1,5,11,3);mark(1,3,2,2);mark(1,8,2,2);mark(10,3,2,2);mark(10,8,2,2);
+  } else {
+    mark(5,1,3,7);mark(3,7,7,2);mark(5,9,3,3);mark(6,0,1,1);
+  }
 }
 void drawSourceCard(SDL_Renderer* r,const App& a,int x,int y,const gwent::Card& card,bool selected=false,int displayPower=-1) {
   constexpr int w=28,h=43;
@@ -1205,7 +1210,7 @@ void drawSourceCard(SDL_Renderer* r,const App& a,int x,int y,const gwent::Card& 
   else if(!card.abilities.empty()&&(card.kind==gwent::Kind::Weather||card.kind==gwent::Kind::ClearWeather||card.kind==gwent::Kind::Scorch||card.kind==gwent::Kind::CommanderHorn||card.kind==gwent::Kind::Mardroeme||card.kind==gwent::Kind::Decoy))powerIcon=card.abilities.front();
   if(powerIcon.rfind("scorch",0)==0)powerIcon="scorch";
   const std::string powerPath="img/icons/power_"+powerIcon+".png";
-  if(powerIcon=="hero")drawImage(r,a,powerPath,x-1,y-2,24,25);
+  if(powerIcon=="hero")drawImageRegion(r,a,powerPath,0,0,144,144,x-1,y-2,24,25);
   else {
     // The source power PNGs have a 215x215 canvas, but the visible medallion
     // only occupies pixels 15..124. Scaling the whole canvas made the badge
@@ -1225,6 +1230,7 @@ void drawSourceCard(SDL_Renderer* r,const App& a,int x,int y,const gwent::Card& 
     drawMiniRowLabel(r,a,x+15,y+30,rowIcon);
   }
   std::string ability=card.abilities.empty()?std::string{}:card.abilities.back();
+  if(ability=="hero")ability.clear(); // Hero is represented by its power medal, not an ability sprite.
   if(ability=="cerys")ability="muster";
   if(ability.rfind("avenger",0)==0)ability="avenger";
   if(ability.rfind("scorch",0)==0)ability="scorch";
@@ -1586,7 +1592,8 @@ void drawChoiceCarousel(SDL_Renderer* r,const App& a,const std::vector<const gwe
   std::string ability;
   if(!selectedCard.abilities.empty()) {
     ability=selectedCard.abilities.back();
-    if(ability=="cerys")ability="muster";
+    if(ability=="hero")ability.clear(); // Hero is represented by its power medal, not an ability sprite.
+  if(ability=="cerys")ability="muster";
     if(ability.rfind("avenger",0)==0)ability="avenger";
     if(ability.rfind("scorch",0)==0)ability="scorch";
   } else if(selectedCard.agile)ability="agile";
