@@ -1738,12 +1738,26 @@ void drawMainMenu(SDL_Renderer* r,const App& a) {
   for(int i=0;i<3;++i) {
     const bool selected=a.menuIndex==i;
     const int x=48+i*186,y=selected?104:118,w=172,h=selected?272:248;
-    box(r,x-4,y-4,w+8,h+8,selected?Color{27,139,151,200}:Color{10,9,7,230});
+    if(selected) {
+      for(int spread=18;spread>=1;--spread)
+        frame(r,x-spread,y-spread,w+spread*2,h+spread*2,
+          Color{224,157,54,static_cast<Uint8>(3+(18-spread)*2)});
+    }
+    box(r,x-3,y-3,w+6,h+6,Color{32,22,13,245});
     const auto& catalog=gwent::referenceCardCatalog();
     const auto card=std::find_if(catalog.begin(),catalog.end(),[&](const auto& c){return c.name==names[i];});
-    if(card!=catalog.end())drawCardPortrait(r,a,"img/lg/"+gwent::referenceCardImage(card->referenceIndex),x,y,w,h-44);
+    if(card!=catalog.end()) {
+      // Menu illustration only: exclude the entire source card's icon rail,
+      // power medal and printed caption. Gameplay card rendering is separate.
+      if(auto* portrait=textureFor(r,a,"img/lg/"+gwent::referenceCardImage(card->referenceIndex))) {
+        int tw=0,th=0;SDL_QueryTexture(portrait,nullptr,nullptr,&tw,&th);
+        SDL_Rect source{static_cast<int>(tw*0.30),static_cast<int>(th*0.06),static_cast<int>(tw*0.70),std::min(static_cast<int>(th*0.68),static_cast<int>(tw*0.70)*(h-44)/w)};
+        SDL_Rect destination{x,y,w,h-44};SDL_RenderCopy(r,portrait,&source,&destination);
+      }
+    }
     box(r,x,y+h-44,w,44,Color{13,10,8,245});
-    frame(r,x,y,w,h,selected?Color{107,243,244,255}:gold);
+    frame(r,x,y,w,h,selected?Color{235,191,105,255}:Color{120,88,45,255});
+    frame(r,x+1,y+1,w-2,h-2,Color{57,35,17,200});
     centeredTextInBox(r,x+4,y+h-38,w-8,31,pl?labelsPL[i]:labelsEN[i],paper,2);
   }
   box(r,22,402,W-44,57,Color{0,0,0,180});
