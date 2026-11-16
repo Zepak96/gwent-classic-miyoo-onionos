@@ -439,18 +439,18 @@ void replayRevivedUnit(Game& g,int who,const Card& revived,int reviveRow) {
   if(reviveRow<0||reviveRow>=3)return;
   auto& p=g.players[who];
 
-          if(revived.spy) {
-            insertSourceBoardCard(g.players[1-who].board[reviveRow],revived);
-            for(int draw=0;draw<2&&!p.deck.empty();++draw) {
-              insertSourceHandCard(p,std::move(p.deck.front()),who);p.deck.erase(p.deck.begin());
-            }
-          } else insertSourceBoardCard(p.board[reviveRow],revived);
-          if(revived.muster)applyMuster(p,revived);
-          if(hasAbility(revived,"scorch_c"))scorchEnemyRow(g,who,0);
-          if(hasAbility(revived,"scorch_r"))scorchEnemyRow(g,who,1);
-          if(hasAbility(revived,"scorch_s"))scorchEnemyRow(g,who,2);
-          if(hasAbility(revived,"mardroeme"))p.mardroeme[reviveRow]=true;
-          for(int row=0;row<3;++row)if(p.mardroeme[row])transformBerserkers(p,row);
+  if(revived.spy) {
+    insertSourceBoardCard(g.players[1-who].board[reviveRow],revived);
+    for(int draw=0;draw<2&&!p.deck.empty();++draw) {
+      insertSourceHandCard(p,std::move(p.deck.front()),who);p.deck.erase(p.deck.begin());
+    }
+  } else insertSourceBoardCard(p.board[reviveRow],revived);
+  if(revived.muster)applyMuster(p,revived);
+  if(hasAbility(revived,"scorch_c"))scorchEnemyRow(g,who,0);
+  if(hasAbility(revived,"scorch_r"))scorchEnemyRow(g,who,1);
+  if(hasAbility(revived,"scorch_s"))scorchEnemyRow(g,who,2);
+  if(hasAbility(revived,"mardroeme"))p.mardroeme[reviveRow]=true;
+  for(int row=0;row<3;++row)if(p.mardroeme[row])transformBerserkers(p,row);
   if(revived.medic&&std::any_of(p.graveyard.begin(),p.graveyard.end(),isCombatUnit))
     g.pendingMedicPlayer=who;
 }

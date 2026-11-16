@@ -1135,6 +1135,15 @@ static void nestedMedicWaitsForChoice() {
   assert(game.pendingMedicPlayer==0&&game.currentPlayer==0);
   assert(!pass(game,0)&&!playCard(game,0,"nested-spare"));
   assert(!chooseMedicRevive(game,0,"missing"));
+  const auto path=(std::filesystem::temp_directory_path()/"gwent-pending-medic-test.sav").string();
+  std::string error;Game restored;
+  assert(saveGame(path,game,&error)&&loadGame(path,restored,&error));
+  std::filesystem::remove(path);
+  assert(restored.pendingMedicPlayer==0&&restored.currentPlayer==0);
+  assert(restored.players[0].graveyard.size()==1);
+  assert(chooseMedicRevive(restored,0,revived.id));
+  assert(restored.pendingMedicPlayer==-1&&restored.currentPlayer==1);
+  assert(restored.players[0].board[0].size()==3);
   assert(chooseMedicRevive(game,0,revived.id));
   assert(game.pendingMedicPlayer==-1&&game.currentPlayer==1);
   assert(game.players[0].board[0].size()==3&&game.players[0].graveyard.empty());
