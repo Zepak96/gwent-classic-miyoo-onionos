@@ -509,3 +509,12 @@ is not fixed by fractional-ticket commit 68a7a67.
 
 Desktop workflow 43881175307 passed in full for 68a7a67. ARM workflow
 43881332283 remains in progress; SD is still bc33dcc.
+
+## Agile row correction — 19963ba
+
+Ordinary Agile AI targets now compare full score deltas, including the placed
+card's own power, as in determineAgileRow. Engine job in desktop run
+43881580573 passed: 78 seeded cases cover Frost versus clear ranged and Fog
+versus clear melee, actual placement and absence of tie-break RNG consumption
+when the row gains differ. This coverage does not establish parity for every
+Agile interaction; frontend checks and a new ARM package are pending.
