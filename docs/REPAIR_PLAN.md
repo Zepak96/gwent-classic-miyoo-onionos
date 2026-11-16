@@ -205,5 +205,10 @@ rodzajami kart; pełny test na urządzeniu opisany wersją binarium i wynikiem.
   strzałki służą wyłącznie do przechodzenia między liderami.
 - [x] Poprawiono nazwę skrótu w paczce OnionOS z `.notfound` na `.port` i
   dodano kontrolę tej ścieżki do walidacji archiwum.
+- [x] Desktop CI dla silnika i frontendu przeszło: testy reguł, testy wejścia,
+  smoke testy ekranów, audio i kompozycji programowej.
+- [x] Build ARM hard-float i walidacja archiwum OnionOS przeszły. Pakiet jest
+  wgrany na kartę SD; wszystkie 603 pliki katalogu gry mają zgodne rozmiary i
+  sumy SHA-256 z artefaktem.
 - [ ] Dokończyć poprawki i testy opisane w etapach 1–5.
-- [ ] Ponowić test fizyczny na Miyoo po udostępnieniu karty SD/urządzenia.
+- [ ] Potwierdzić uruchomienie, sterowanie i pełny mecz na fizycznym Miyoo.
