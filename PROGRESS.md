@@ -19,13 +19,20 @@ nadal nie spełnia kryterium 1:1 i nie jest wydaniem do instalacji.
   fizycznego Miyoo.
 - Zmiany źródłowe i README są opublikowane na publicznej gałęzi; ta aktualizacja
   zawiera poprawkę źródłowego AI mulliganu i 100-meczową regresję. Nowy ARM
-  hard-float build oraz paczka OnionOS przeszły lokalnie; paczka nie została
-  jeszcze uruchomiona na Miyoo ani skopiowana na kartę SD.
+  hard-float build oraz paczka OnionOS przeszły lokalnie; paczkę zainstalowano
+  na karcie `E:` w `Roms/PORTS/Games/GwentClassic`, ale nie uruchomiono jej
+  jeszcze na urządzeniu.
 - Skrypt builda OnionOS jest uruchamialny z checkoutu Windows dzięki regule LF
   dla skryptów `.sh`. Paczka `GwentClassic-OnionOS.zip` zawiera 618 wpisów,
   SHA-256 `d7dcdcf96659f7f6471b39941e36d284bfc9b8129cef0a255e4ae8055cc9e9ee`;
   `readelf` potwierdził ELF32 ARM i hard-float ABI. Lokalna paczka leży w
   `.work/miyoo-7fca1da/` i nie jest jeszcze wydaniem GitHub Release.
+- Po instalacji zweryfikowano 602/602 plików gry porównaniem SHA-256;
+  skrót binarki na SD to
+  `bd39bce6cea109319359d78d5b2eac9b4650a194d60338486662ee9cee5a2332`.
+  Poprzedni katalog gry zachowano jako kopię
+  `.work/sd-backup-7fca1da/GwentClassic`; istniejący skrót `.port` OnionOS
+  nie był zmieniany.
 - Poprawiono błąd mulliganu AI: źródłowe `ControllerAI.redraw()` podejmuje dwie
   kolejne decyzje, każdorazowo po natychmiastowej wymianie z wierzchem talii;
   wcześniej druga decyzja mogła wskazywać kartę już dobraną. Teraz port wykonuje
