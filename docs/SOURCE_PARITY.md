@@ -120,6 +120,8 @@ items above:
   Invader, and Francesca Queen/Beautiful/Pureblood/Hope in addition to the
   previously covered leaders. This does not yet cover every leader's effects
   and selection flows.
+- Eredin Commander now has a direct close-row leader Horn regression, including
+  rejection when that row's special slot is already occupied.
 - Emhyr White Flame's source initialization suppresses both players' leader
   initialization when either side uses it, including passive Invader,
   Treacherous, Daisy, and King Bran effects; each passive suppression case now

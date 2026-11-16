@@ -718,6 +718,17 @@ static void leaderAbilities() {
   assert(activateLeader(horn,0));
   assert(horn.players[0].score==10 && !horn.players[0].leaderAbilityAvailable);
 
+  Game closeHorn;
+  closeHorn.players[0].leader=leader("eredin_commander");closeHorn.players[0].leaderAbilityAvailable=true;
+  closeHorn.players[0].board[0].push_back(unit("close-horn",5,Row::Melee));
+  assert(activateLeader(closeHorn,0));
+  assert(closeHorn.players[0].score==10&&closeHorn.players[0].specialOccupied[0]);
+  Game occupiedCloseHorn;
+  occupiedCloseHorn.players[0].leader=leader("eredin_commander");occupiedCloseHorn.players[0].leaderAbilityAvailable=true;
+  occupiedCloseHorn.players[0].specialOccupied[0]=true;
+  assert(!activateLeader(occupiedCloseHorn,0));
+  assert(occupiedCloseHorn.players[0].leaderAbilityAvailable&&!occupiedCloseHorn.horn[0][0]);
+
   Game rowScorch;
   rowScorch.players[0].leader=leader("foltest_steelforged"); rowScorch.players[0].leaderAbilityAvailable=true;
   rowScorch.players[1].board[2]={unit("siege-6",6,Row::Siege),unit("siege-4",4,Row::Siege)};

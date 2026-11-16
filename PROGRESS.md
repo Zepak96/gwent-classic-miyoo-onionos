@@ -62,6 +62,8 @@ końcowym wydaniem.
   pogody, Torrential Rain, ranged/melee Scorch, Biting Frost, Ranged Horn,
   Hope of the Aen Seidhe i Invader of the North. Pełne pokrycie wszystkich
   zdolności i wyborów lidera pozostaje otwarte.
+- Dodano regresję aktywacji Eredina Dowódcy w rzędzie wręczowym oraz odrzucenia
+  aktywacji, gdy slot specjalny jest już zajęty.
 - Zweryfikowano też szczególną inicjalizację źródłowego Emhyra Białego Płomienia:
   wyłącza ona pasywne zdolności obu liderów, w tym dodatkową kartę Franceski,
   połowę pogody Brana, losowe wskrzeszanie Invadera i podwójne punkty szpiegów
