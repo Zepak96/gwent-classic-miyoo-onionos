@@ -827,7 +827,16 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
         const auto candidate=std::find_if(simulation.players[owner].graveyard.begin(),simulation.players[owner].graveyard.end(),[&](const Card& card){
           return std::find(simulation.skelligeAgileReviveIds.begin(),simulation.skelligeAgileReviveIds.end(),card.id)!=simulation.skelligeAgileReviveIds.end();
         });
-        assert(candidate!=simulation.players[owner].graveyard.end());
+        if(candidate==simulation.players[owner].graveyard.end()) {
+          std::cerr<<"Skellige revive candidate missing at seed "<<seed<<" owner "<<owner
+                   <<" queued="<<simulation.skelligeRevivesRemaining<<" ids=";
+          for(const auto& id:simulation.skelligeAgileReviveIds)std::cerr<<id<<",";
+          std::cerr<<" grave=";
+          for(const auto& card:simulation.players[owner].graveyard)
+            std::cerr<<card.name<<"["<<card.id<<", agile="<<card.agile<<"],";
+          std::cerr<<"\n";
+          assert(false);
+        }
         const Row row=candidate->agile?Row::Melee:Row::None;
         assert(chooseSkelligeRevive(simulation,owner,candidate->id,row));
         continue;
