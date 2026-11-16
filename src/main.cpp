@@ -2770,6 +2770,8 @@ int main(int argc,char** argv) {
         if(app.selectDownAt&&!app.selectLongPressed&&!actionAnimationLocked(app,SDL_GetTicks())) {
           if(app.cardDetailsOpen)handleKey(app,SDLK_BACKSPACE,running);
           else if(app.screen==Screen::Match&&app.game.phase==gwent::Phase::PlayerTurn)app.passConfirmationOpen=true;
+          else if(app.screen==Screen::Match&&app.game.phase==gwent::Phase::Mulligan)handleMatchKey(app,SDLK_RETURN);
+          else if(app.screen==Screen::Match&&app.game.phase==gwent::Phase::RoundSetup)handleMatchKey(app,SDLK_x);
           else if(app.screen==Screen::Match&&app.game.phase==gwent::Phase::RoundResult)handleMatchKey(app,SDLK_RETURN);
           else if(app.screen==Screen::Match&&app.game.phase==gwent::Phase::MatchResult)app.screen=Screen::DeckBuilder;
           else if(app.screen==Screen::DeckBuilder)handleKey(app,SDLK_s,running);
