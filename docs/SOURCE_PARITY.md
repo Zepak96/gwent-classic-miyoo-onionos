@@ -9,7 +9,10 @@ source behavior. A build or screenshot alone does not count as parity.
 
 - [ ] New game, random faction premade opponent, random legal faction leader.
 - [x] Ten-card initial hands; source redraw order and at most two redraws.
-- [ ] First-player coin toss and Scoia'tael's first-player choice.
+- [x] First-player coin toss and Scoia'tael's first-player choice. Engine
+  regressions cover random first player, player choice, opponent-Scoia random
+  choice, and the source behavior when both factions are Scoia'tael. The SDL
+  input test now drives the player's left/right choice and confirms it.
 - [ ] One action per turn; automatic pass when no cards/leader action remain.
 - [ ] Voluntary pass; passed player stays out while the other keeps playing.
 - [ ] Round result, gems/health, ties, Nilfgaard tie-break, match result/rematch.

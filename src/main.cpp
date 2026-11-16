@@ -2284,6 +2284,14 @@ int main(int argc,char** argv) {
     deckKeyProbe.cardDetailsOpen=true;
     okay=okay&&normalizeMiyooKey(deckKeyProbe,SDLK_LALT)==SDLK_ESCAPE&&
          normalizeMiyooKey(deckKeyProbe,SDLK_ESCAPE)==SDLK_ESCAPE;
+    App scoiataelProbe;scoiataelProbe.miyooControls=true;
+    scoiataelProbe.game.phase=gwent::Phase::Mulligan;
+    scoiataelProbe.game.scoiataelChoicePending=true;
+    scoiataelProbe.game.firstPlayer=0;
+    handleMatchKey(scoiataelProbe,SDLK_RIGHT);
+    okay=okay&&scoiataelProbe.game.scoiataelChoicePending&&scoiataelProbe.game.firstPlayer==1;
+    handleMatchKey(scoiataelProbe,normalizeMiyooKey(scoiataelProbe,SDLK_RETURN));
+    okay=okay&&!scoiataelProbe.game.scoiataelChoicePending&&scoiataelProbe.game.firstPlayer==1;
     SDL_ControllerButtonEvent controllerButton{};
     controllerButton.button=SDL_CONTROLLER_BUTTON_DPAD_UP;
     okay=okay&&controllerKey(controllerButton,deckKeyProbe)==SDLK_UP;
