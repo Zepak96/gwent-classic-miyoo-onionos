@@ -18,8 +18,8 @@ source behavior. A build or screenshot alone does not count as parity.
   exhausted starts, exhausted final action, and Leader as a remaining action.
 - [x] Voluntary pass marks the player passed and leaves the opponent acting
   until they pass; native engine regressions cover both passes ending a round.
-  Miyoo X hold opens a confirmation and A confirms; SDL input probes cover hold,
-  confirm, and short press behavior.
+  Miyoo X hold passes directly after 600 ms; SDL input probes cover hold,
+  threshold, and short press behavior.
 - [x] Round results, gem losses, score ties, Nilfgaard tie-break, and match
   victory/defeat/draw. Engine regressions cover round wins/losses, a draw on the
   last gem, and a match draw. SDL result-screen checks cover round win/loss/draw,
