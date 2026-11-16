@@ -1225,7 +1225,7 @@ void drawSourceCard(SDL_Renderer* r,const App& a,int x,int y,const gwent::Card& 
   else if(!card.abilities.empty()&&(card.kind==gwent::Kind::Weather||card.kind==gwent::Kind::ClearWeather||card.kind==gwent::Kind::Scorch||card.kind==gwent::Kind::CommanderHorn||card.kind==gwent::Kind::Mardroeme||card.kind==gwent::Kind::Decoy))powerIcon=card.abilities.front();
   if(powerIcon.rfind("scorch",0)==0)powerIcon="scorch";
   const std::string powerPath="img/icons/power_"+powerIcon+".png";
-  if(powerIcon=="hero")drawImageRegion(r,a,powerPath,0,0,144,144,x-1,y-2,24,25);
+  if(powerIcon=="hero")drawImageRegion(r,a,powerPath,12,12,116,116,x-1,y-2,24,25);
   else {
     // The source power PNGs have a 215x215 canvas, but the visible medallion
     // only occupies pixels 15..124. Scaling the whole canvas made the badge
