@@ -72,6 +72,10 @@ końcowym wydaniem.
   wykonać kolejną akcję, dlatego silnik rozstrzyga sprzątanie atomowo. Regresja
   Cow → Bovine Defense Force → Scorch potwierdza, że token nie może zostać
   wskrzeszony przez Medyka. CTest przechodzi 2/2.
+- Porównanie wag Mardroeme AI z `ControllerAI.weightMardroemeRow()` nie
+  wykazało błędu w istniejącym wzorze. Dodano deterministyczny test, który przy
+  dwóch Berserkerach w wręcz i dwóch Młodych Berserkerach w dystansowym wybiera
+  dystansowy zgodnie z wagami `10*n` oraz `8*n²-2*n`; CTest przechodzi 2/2.
 - Aktualny commit `bd1e346` zbudowano jako ELF32 ARM hard-float; archiwum OnionOS
   ma 618 wpisów i SHA-256
   `6a55d9a0a2e58206f91ae01ec1797bb711f36585954cc66be49365493000af49`.

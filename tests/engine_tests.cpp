@@ -500,6 +500,22 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
   assert(action.pass || action.activateLeader ||
          playCard(preview,1,action.cardId,action.target,action.selectedCardId));
 
+  Game mardroemeAi;
+  mardroemeAi.phase=Phase::OpponentTurn;mardroemeAi.currentPlayer=1;
+  for(int i=0;i<2;++i) {
+    auto close=unit("ai-close-berserker-"+std::to_string(i),5,Row::Melee);
+    close.name="Berserker";close.berserker=true;close.abilities={"berserker"};
+    auto ranged=unit("ai-ranged-berserker-"+std::to_string(i),5,Row::Ranged);
+    ranged.name="Young Berserker";ranged.berserker=true;ranged.abilities={"berserker"};
+    mardroemeAi.players[1].board[0].push_back(close);
+    mardroemeAi.players[1].board[1].push_back(ranged);
+  }
+  Card aiMardroeme;aiMardroeme.id="ai-mardroeme";aiMardroeme.name="Mardroeme";
+  aiMardroeme.kind=Kind::Mardroeme;aiMardroeme.abilities={"mardroeme"};
+  mardroemeAi.players[1].hand.push_back(aiMardroeme);
+  const auto mardroemeChoice=chooseAiAction(mardroemeAi,1);
+  assert(!mardroemeChoice.pass&&mardroemeChoice.cardId==aiMardroeme.id&&mardroemeChoice.target==Row::Ranged);
+
   Game roachMulligan;roachMulligan.phase=Phase::Mulligan;
   roachMulligan.players[1].hand={referenceCard("Roach"),referenceCard("Geralt of Rivia"),unit("low-priority",2)};
   roachMulligan.players[1].deck={unit("replacement-a",4),unit("replacement-b",5)};

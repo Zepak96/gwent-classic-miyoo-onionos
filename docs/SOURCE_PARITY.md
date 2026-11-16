@@ -96,6 +96,10 @@ items above:
   occupancy, Ermion activation, Berserker transformation on later plays and
   Muster summons, round reset, and save/load state.
 - Decoy fallback considers each own row's maximum units as `ControllerAI` does.
+- Source AI Mardroeme row weights have a deterministic target-selection
+  regression: two close Berserkers versus two ranged Young Berserkers selects
+  ranged using the source `10*n` / `8*n²-2*n` weights. This checks one case and
+  does not establish parity for the complete AI heuristic set.
 - Generated Avenger tokens use `summoned_` IDs and are omitted from the
   persistent graveyard when destroyed. The reference removes Bovine Defense
   Force/Hemdall from the graveyard 1001 ms later, before another turn can use

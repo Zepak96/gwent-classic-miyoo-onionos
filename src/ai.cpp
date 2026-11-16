@@ -164,6 +164,9 @@ int weightMardroemeRow(const Game& game,int who,const Card& card,int row) {
   const std::string target=row==1?"Young Berserker":"Berserker";
   int count=0;
   for(const auto& card:game.players[who].board[row])if(card.name==target)++count;
+  // Source board indexes put close combat at 2 and ranged at 1; native Row
+  // uses melee at 0 and ranged at 1. Preserve the source's corresponding
+  // weights: close Berserkers use 10*n, ranged Young Berserkers use 8*n²-2*n.
   return std::max(1,row==0?10*count:8*count*count-2*count);
 }
 bool hasInHand(const Player& player,const std::string& ability) {
