@@ -861,8 +861,13 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
   Card fallback;fallback.id="fallback-decoy";fallback.name="Decoy";fallback.kind=Kind::Decoy;
   fallbackDecoy.players[1].hand={fallback};
   for(int row=0;row<3;++row)fallbackDecoy.players[1].board[row].push_back(unit("decoy-row-"+std::to_string(row),5,static_cast<Row>(row)));
+  auto expectedFallbackRng=fallbackDecoy.rngState;
+  expectedRandom(expectedFallbackRng); // The weighted action ticket comes first.
+  const auto fallbackTargetRoll=expectedRandom(expectedFallbackRng);
   const auto fallbackChoice=chooseAiAction(fallbackDecoy,1);
-  assert(fallbackChoice.cardId==fallback.id&&fallbackChoice.selectedCardId=="decoy-row-2");
+  assert(fallbackChoice.cardId==fallback.id&&
+         fallbackChoice.selectedCardId=="decoy-row-"+std::to_string(2-(fallbackTargetRoll%3))&&
+         fallbackDecoy.rngState==expectedFallbackRng);
 
   Game mardroemeAi;
   mardroemeAi.phase=Phase::OpponentTurn;mardroemeAi.currentPlayer=1;

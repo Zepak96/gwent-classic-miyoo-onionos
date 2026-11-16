@@ -2649,11 +2649,15 @@ int main(int argc,char** argv) {
     okay=okay&&controllerKey(controllerButton,deckKeyProbe)==SDLK_TAB;
     controllerButton.button=SDL_CONTROLLER_BUTTON_RIGHTSHOULDER;
     okay=okay&&controllerKey(controllerButton,deckKeyProbe)==SDLK_DOWN;
+    const auto inputTestUnit=[](const std::string& id) {
+      gwent::Card card;card.id=id;card.name=id;card.kind=gwent::Kind::Unit;
+      card.row=gwent::Row::Melee;card.power=1;return card;
+    };
     App buttonBProbe;buttonBProbe.miyooControls=true;buttonBProbe.screen=Screen::Match;
     buttonBProbe.game.phase=gwent::Phase::PlayerTurn;gwent::Card bTestCard;
     bTestCard.id="button-b-must-not-play";bTestCard.kind=gwent::Kind::Unit;bTestCard.row=gwent::Row::Melee;
     buttonBProbe.game.players[0].hand.push_back(bTestCard);
-    buttonBProbe.game.players[1].hand.push_back(unit("button-b-opponent-action",1));
+    buttonBProbe.game.players[1].hand.push_back(inputTestUnit("button-b-opponent-action"));
     handleMatchKey(buttonBProbe,normalizeMiyooKey(buttonBProbe,SDLK_LALT));
     okay=okay&&buttonBProbe.cardPlayConfirmOpen&&buttonBProbe.game.players[0].hand.size()==1&&
          buttonBProbe.game.players[0].board[0].empty();
@@ -2662,7 +2666,7 @@ int main(int argc,char** argv) {
          buttonBProbe.game.players[0].board[0].size()==1&&buttonBProbe.game.players[0].board[0][0].id==bTestCard.id;
     App rowConfirmProbe;rowConfirmProbe.miyooControls=true;rowConfirmProbe.screen=Screen::Match;
     rowConfirmProbe.game.phase=gwent::Phase::PlayerTurn;rowConfirmProbe.game.currentPlayer=0;
-    rowConfirmProbe.game.players[1].hand.push_back(unit("row-confirm-opponent",1));
+    rowConfirmProbe.game.players[1].hand.push_back(inputTestUnit("row-confirm-opponent"));
     gwent::Card hornConfirm;hornConfirm.id="row-confirm-horn";hornConfirm.kind=gwent::Kind::CommanderHorn;
     rowConfirmProbe.game.players[0].hand={hornConfirm};
     handleMatchKey(rowConfirmProbe,normalizeMiyooKey(rowConfirmProbe,SDLK_LALT));
@@ -2676,7 +2680,7 @@ int main(int argc,char** argv) {
     leaderConfirmProbe.game.players[0].leader.kind=gwent::Kind::Leader;
     leaderConfirmProbe.game.players[0].leader.abilities={"foltest_lord"};
     leaderConfirmProbe.game.players[0].leaderAbilityAvailable=true;
-    leaderConfirmProbe.game.players[1].hand.push_back(unit("leader-confirm-opponent",1));
+    leaderConfirmProbe.game.players[1].hand.push_back(inputTestUnit("leader-confirm-opponent"));
     beginLeaderChoice(leaderConfirmProbe);
     okay=okay&&leaderConfirmProbe.leaderConfirmOpen&&leaderConfirmProbe.game.players[0].leaderAbilityAvailable;
     handleMatchKey(leaderConfirmProbe,SDLK_x);
