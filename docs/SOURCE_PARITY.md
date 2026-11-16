@@ -153,8 +153,13 @@ items above:
 - Match actions now create concurrent 499 ms card flights from before/after
   zone diffs. This covers multi-card Muster summons and Scorch removals, Medic
   revivals, Spy draws, Decoy swaps, and weather cards sent to the grave; a UI
-  regression checks multi-card Muster and Scorch queues. Full source preview,
-  all action-specific waits, and physical Miyoo animation review remain open.
+  regression checks multi-card Muster and Scorch queues. The played-card
+  preview now remains pinned to the selected card for the source 1000 ms preview,
+  then the 499 ms flight begins. Placement audio and ability overlays are
+  scheduled at their source sequence offsets; Medic/Muster, Spy and Scorch
+  follow-on flights wait for their animation chains. The state engine still
+  resolves immediately instead of awaiting the visual chain, and physical Miyoo
+  animation review remains open.
 - Large card displays now crop original artwork at its printed gold divider
   and draw localized names and rules as native text. This applies to the card
   inspector, hand preview, target carousel, and deck collection; 640×480 smoke
@@ -172,8 +177,10 @@ it does not verify audible output on physical hardware. The card inspector,
 deck builder, and target carousel were visually reviewed at 640×480 in
 `artifacts/qa/card-details-polish.png`,
 `artifacts/qa/deck-builder-card-preview.png`, and
-`artifacts/qa/target-carousel.png`. Physical-device input/audio/gameplay still
-need confirmation.
+`artifacts/qa/target-carousel.png`. A new card-flight frame is recorded at
+`artifacts/qa/source-timed-played-card-preview.png`. Its visual state and source
+timing offsets are checked by `gwent --input-test`. Physical-device
+input/audio/gameplay still need confirmation.
 
 AI mulligan regression: `ControllerAI.redraw()` performs two independent
 discard-order decisions, with each discarded card returned to the deck bottom
