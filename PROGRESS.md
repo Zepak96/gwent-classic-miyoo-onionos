@@ -266,3 +266,9 @@ Pin `gwent.js` kończy inicjalizację przez `let dm = new DeckMaker()`, bez ekra
 - Nakładka `anim_medic` pojawia się raz na wskrzeszanej karcie w cmentarzu; usunięto błędną drugą nakładkę z zagrywanej karty Medyka.
 - Lot cmentarz → rząd zaczyna się dokładnie po sekwencji `Card.animate()` trwającej 1650 ms. Test SDL sprawdza pozycję w cmentarzu, jeden efekt oraz granicę nakładka/lot.
 - CTest (2/2) i `--input-test` przechodzą. Inne animacje źródłowe i test sprzętowy pozostają otwarte.
+
+## Boardowe liczenie kart przez AI — 16.11.2026
+
+- `ControllerAI.getBoardData()` zlicza Szpiegów, Medyków i karty Pożogi ze wszystkich sześciu rzędów. Natywne AI uwzględniało tylko swoje rzędy, co zmieniało wagę Manekina, gdy na planszy przeciwnika leżał Szpieg, Medyk lub Pożoga.
+- Wagi obejmują teraz obie strony; wybór celu Manekina nadal wskazuje legalną kartę po stronie AI. Test 256 deterministycznych decyzji potwierdza wzrost prawdopodobieństwa zagrania Manekina przy wrogim Szpiegu.
+- CTest (2/2) przechodzi. Pełny rozkład wag i fizyczny test urządzenia pozostają otwarte.

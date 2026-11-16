@@ -589,6 +589,22 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
   // zero times because its (incorrect) weight was clipped to zero.
   assert(clearWeatherChoices>350&&clearWeatherChoices<510);
 
+  Game enemyBoardSpyDecoy;
+  enemyBoardSpyDecoy.phase=Phase::OpponentTurn;enemyBoardSpyDecoy.currentPlayer=1;
+  Card enemySpy=unit("enemy-board-spy",4);enemySpy.spy=true;enemySpy.abilities={"spy"};
+  enemyBoardSpyDecoy.players[0].board[0].push_back(enemySpy);
+  enemyBoardSpyDecoy.players[1].board[0].push_back(unit("ai-decoy-target",2));
+  Card boardSpyDecoy;boardSpyDecoy.id="board-spy-decoy";boardSpyDecoy.name="Decoy";boardSpyDecoy.kind=Kind::Decoy;
+  enemyBoardSpyDecoy.players[1].hand={boardSpyDecoy,unit("board-spy-decoy-alternative",1,Row::Siege)};
+  int boardSpyDecoyChoices=0;
+  for(std::uint64_t seed=1;seed<=256;++seed) {
+    auto sample=enemyBoardSpyDecoy;sample.rngState=seed*0xc2b2ae35u;
+    if(chooseAiAction(sample,1).cardId==boardSpyDecoy.id)++boardSpyDecoyChoices;
+  }
+  // getBoardData() traverses all six rows: an opponent-side Spy raises the
+  // source Decoy weight while the selected return target remains on the AI side.
+  assert(boardSpyDecoyChoices>230);
+
   // Source's zero-total fallback still plays Clear Weather when its raw
   // weather weight is exactly zero. Both sides gain the same amount here, so
   // the ordinary weighted choice has no positive-weight action to select.

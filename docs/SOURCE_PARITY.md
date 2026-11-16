@@ -263,3 +263,7 @@ The source leader ability opens a non-cancellable hand carousel for up to two ca
 ## Animacja wskrzeszenia Medyka — 16.11.2026
 
 Źródłowy handler `Medic` animuje wybraną kartę, gdy nadal leży w cmentarzu, a dopiero po 1650 ms rozpoczyna jej 499 ms lot do rzędu. SDL nakładał efekt drugi raz również na zagrany egzemplarz Medyka i rysował pierwszą nakładkę w miejscu docelowym. Renderer pokazuje teraz pojedynczy efekt na karcie w cmentarzu, a lot startuje na końcu sekwencji animacji. Regresja wejścia SDL sprawdza liczbę i pozycję nakładki, punkt startu lotu i dokładną granicę czasową. CTest (2/2) i `--input-test` przechodzą; pozostałe efekty i fizyczny test Miyoo pozostają otwarte.
+
+## Board-wide card counts in source AI — 16.11.2026
+
+`ControllerAI.getBoardData()` traverses every row in `board.row`, including both players' sides. Native AI previously gathered on-board Spy, Medic, and row-Scorch cards only from its own three rows, changing Decoy's source weight when the opponent had those units in play. Board-wide ability counts now feed source action weights; a separate own-side candidate list keeps native Decoy selections legal. A seeded 256-decision regression verifies that an opponent-side Spy increases Decoy's weighted selection rate while the AI still returns a card from its own side. Engine CTest passes.

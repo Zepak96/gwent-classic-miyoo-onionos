@@ -15,6 +15,7 @@ namespace {
 struct WeightedAction { AiAction action; double weight{0.0}; bool legal{false}; };
 struct BoardData {
   std::vector<const Card*> spies, medics, scorches;
+  std::vector<const Card*> ownSpies, ownMedics, ownScorches;
   std::vector<const Card*> decoyFallbackOwnRowMaxima;
   std::array<std::vector<const Card*>,2> graveSpies, graveMedics, graveScorches;
   std::array<std::vector<const Card*>,3> strongestOwn, strongestEnemy;
@@ -52,20 +53,29 @@ int currentRowScore(const Game& game,int owner,int row) {
   return scoreRow(game,owner,row,game.players[owner].board[row],
                   game.weather[row],game.horn[owner][row]);
 }
-void collectCards(const std::vector<Card>& cards,int owner,BoardData& data,bool grave=false) {
+void collectCards(const std::vector<Card>& cards,int owner,BoardData& data,bool grave=false,bool ownBoard=false) {
   for(const auto& card:cards) {
     if(!isUnit(card)) continue;
-    if(card.spy) { if(!grave)data.spies.push_back(&card); else data.graveSpies[owner].push_back(&card); }
-    if(card.medic) { if(!grave)data.medics.push_back(&card); else data.graveMedics[owner].push_back(&card); }
-    if(hasScorch(card)) { if(!grave)data.scorches.push_back(&card); else data.graveScorches[owner].push_back(&card); }
+    if(card.spy) {
+      if(grave)data.graveSpies[owner].push_back(&card);
+      else {data.spies.push_back(&card);if(ownBoard)data.ownSpies.push_back(&card);}
+    }
+    if(card.medic) {
+      if(grave)data.graveMedics[owner].push_back(&card);
+      else {data.medics.push_back(&card);if(ownBoard)data.ownMedics.push_back(&card);}
+    }
+    if(hasScorch(card)) {
+      if(grave)data.graveScorches[owner].push_back(&card);
+      else {data.scorches.push_back(&card);if(ownBoard)data.ownScorches.push_back(&card);}
+    }
   }
 }
 BoardData collectBoardData(const Game& game,int who) {
   BoardData data;
   for(int owner=0;owner<2;++owner) {
-    // ControllerAI.getBoardData() counts abilities on its own three rows;
-    // maximum-power calculations are collected separately for both sides.
-    if(owner==who)for(const auto& row:game.players[owner].board) collectCards(row,owner,data);
+    // ControllerAI.getBoardData() counts abilities across all six board rows.
+    // Keep own-side candidates separately for legal Decoy target selection.
+    for(const auto& row:game.players[owner].board)collectCards(row,owner,data,false,owner==who);
     collectCards(game.players[owner].graveyard,owner,data,true);
     int best=-1;
     std::array<int,3> rowMaximum{{-1,-1,-1}};
@@ -413,9 +423,9 @@ AiAction cardAction(Game& game,int who,const Card& card,const BoardData& data) {
       if(cards.empty())return nullptr;
       return *std::min_element(cards.begin(),cards.end(),[](const Card* a,const Card* b){return a->power<b->power;});
     };
-    target=lowest(data.spies);
-    if(!target && !data.medics.empty())target=data.medics[roll(game)%data.medics.size()];
-    if(!target && !data.scorches.empty())target=data.scorches[roll(game)%data.scorches.size()];
+    target=lowest(data.ownSpies);
+    if(!target && !data.ownMedics.empty())target=data.ownMedics[roll(game)%data.ownMedics.size()];
+    if(!target && !data.ownScorches.empty())target=data.ownScorches[roll(game)%data.ownScorches.size()];
     if(!target&&!data.decoyFallbackOwnRowMaxima.empty())
       target=data.decoyFallbackOwnRowMaxima[roll(game)%data.decoyFallbackOwnRowMaxima.size()];
     if(target)action.selectedCardId=target->id;
