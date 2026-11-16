@@ -101,16 +101,16 @@ items above:
 - Decoy now returns the specifically selected unit, restores its source base
   power, runs Avenger removal effects, inserts the returned card using the
   correct human/AI hand rules, and leaves Decoy in the chosen combat row in its
-  source-sorted position. The AI fallback now considers every unit in its
-  globally strongest row(s), matching `max.me`, rather than only the strongest
-  units within those rows. Regressions cover exact target identity, row order,
-  hand order, and seeded AI fallback choices.
+  source-sorted position. The AI fallback targets one of the maximum-power
+  units from any of its own rows, matching `max.rmax`; this target pool differs
+  from the global `max.me` set used to calculate Decoy's action weight.
+  Regressions cover exact target identity, row order, hand order, and seeded AI
+  fallback choices.
 - Agile Medic target plus melee/ranged revive row, including Miyoo-style SDL
   directional input and rejection of an incomplete choice.
 - Mardroeme's persistent row effect, its distinction from special-slot
   occupancy, Ermion activation, Berserker transformation on later plays and
   Muster summons, round reset, and save/load state.
-- Decoy fallback considers each own row's maximum units as `ControllerAI` does.
 - Source AI Mardroeme row weights have a deterministic target-selection
   regression: two close Berserkers versus two ranged Young Berserkers selects
   ranged using the source `10*n` / `8*n²-2*n` weights. This checks one case and

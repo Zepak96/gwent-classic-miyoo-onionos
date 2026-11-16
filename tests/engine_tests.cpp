@@ -649,17 +649,16 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
   decoyAi.players[1].board[0]={unit("ai-decoy-strong-a",10),unit("ai-decoy-weaker-a",5)};
   decoyAi.players[1].board[1]={unit("ai-decoy-strong-b",10),unit("ai-decoy-weaker-b",3)};
   decoyAi.players[1].board[2]={unit("ai-decoy-outside-max-row",9)};
-  bool selectedWeakerSourceCandidate=false;
+  bool selectedOtherRowMaximum=false;
   for(std::uint64_t seed=1;seed<=64;++seed) {
     auto sample=decoyAi;sample.rngState=seed;
     const auto choice=chooseAiAction(sample,1);
     assert(!choice.pass&&choice.cardId==aiDecoy.id);
-    assert(choice.selectedCardId=="ai-decoy-strong-a"||choice.selectedCardId=="ai-decoy-weaker-a"||
-           choice.selectedCardId=="ai-decoy-strong-b"||choice.selectedCardId=="ai-decoy-weaker-b");
-    selectedWeakerSourceCandidate=selectedWeakerSourceCandidate||
-      choice.selectedCardId=="ai-decoy-weaker-a"||choice.selectedCardId=="ai-decoy-weaker-b";
+    assert(choice.selectedCardId=="ai-decoy-strong-a"||choice.selectedCardId=="ai-decoy-strong-b"||
+           choice.selectedCardId=="ai-decoy-outside-max-row");
+    selectedOtherRowMaximum=selectedOtherRowMaximum||choice.selectedCardId=="ai-decoy-outside-max-row";
   }
-  assert(selectedWeakerSourceCandidate); // source max.me includes every unit in globally strongest rows.
+  assert(selectedOtherRowMaximum); // source decoy() targets a row maximum from any own row, not max.me.
 
   Game roachMulligan;roachMulligan.phase=Phase::Mulligan;
   roachMulligan.players[1].hand={referenceCard("Roach"),referenceCard("Geralt of Rivia"),unit("low-priority",2)};

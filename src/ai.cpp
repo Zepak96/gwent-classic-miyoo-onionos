@@ -15,7 +15,7 @@ namespace {
 struct WeightedAction { AiAction action; double weight{0.0}; bool legal{false}; };
 struct BoardData {
   std::vector<const Card*> spies, medics, scorches;
-  std::vector<const Card*> decoyFallbackOwn;
+  std::vector<const Card*> decoyFallbackOwnRowMaxima;
   std::array<std::vector<const Card*>,2> graveSpies, graveMedics, graveScorches;
   std::array<std::vector<const Card*>,3> strongestOwn, strongestEnemy;
   int ownMax{-1}, enemyMax{-1};
@@ -77,8 +77,9 @@ BoardData collectBoardData(const Game& game,int who) {
       best=std::max(best,rowMaximum[row]);
     }
     if(owner==who)for(int row=0;row<3;++row)
-      if(rowMaximum[row]>=0&&rowMaximum[row]==best)
-        for(const auto& card:game.players[owner].board[row])if(isUnit(card))data.decoyFallbackOwn.push_back(&card);
+      if(rowMaximum[row]>=0)
+        for(const auto& card:game.players[owner].board[row])
+          if(isUnit(card)&&card.power==rowMaximum[row])data.decoyFallbackOwnRowMaxima.push_back(&card);
     for(int row=0;row<3;++row) for(const auto& card:game.players[owner].board[row])
       if(isUnit(card) && card.power==best)
         (owner==who?data.strongestOwn[row]:data.strongestEnemy[row]).push_back(&card);
@@ -406,8 +407,8 @@ AiAction cardAction(Game& game,int who,const Card& card,const BoardData& data) {
     target=lowest(data.spies);
     if(!target && !data.medics.empty())target=data.medics[roll(game)%data.medics.size()];
     if(!target && !data.scorches.empty())target=data.scorches[roll(game)%data.scorches.size()];
-    if(!target&&!data.decoyFallbackOwn.empty())
-      target=data.decoyFallbackOwn[roll(game)%data.decoyFallbackOwn.size()];
+    if(!target&&!data.decoyFallbackOwnRowMaxima.empty())
+      target=data.decoyFallbackOwnRowMaxima[roll(game)%data.decoyFallbackOwnRowMaxima.size()];
     if(target)action.selectedCardId=target->id;
   } else if(card.kind==Kind::Unit && card.medic) {
     const auto* target=chooseMedicTarget(game,game.players[who].graveyard);
