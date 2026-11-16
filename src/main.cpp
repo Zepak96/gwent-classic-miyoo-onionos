@@ -2216,7 +2216,7 @@ int main(int argc,char** argv) {
   frame(renderer,18,18,W-36,H-36,Color{133,101,48});
   centeredTextInBox(renderer,20,145,W-40,34,"GWENT CLASSIC",paper,2);
   centeredTextInBox(renderer,20,187,W-40,22,"LADOWANIE...",Color{197,169,111},1);
-  SDL_RenderPresent(presentationRenderer);
+  presentFrame();
   App app; bool running=true;
   app.miyooControls=(presentationInfo.name&&std::string(presentationInfo.name)=="Miyoo Mini");
   if(const char* mimic=SDL_getenv("GWENT_MIMIC_MIYOO_INPUT"))app.miyooControls=app.miyooControls||std::string(mimic)=="1";
