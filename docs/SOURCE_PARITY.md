@@ -573,3 +573,29 @@ and row Scorch and confirm a single outer turn. Nested Medic selection,
 shared placement resolution, Leader revival paths and pending-choice save/load
 remain unresolved; the Medic parity gate stays open. These repairs postdate
 the 7270ad9 miniature package and are not included in that archive.
+
+## Medic continuation implementation and validation — 1a3f98b
+
+Nested Medic replay now holds the outer turn pending a legal graveyard choice.
+The engine blocks hand plays, passing and Leader activation during that choice.
+AI resolves the continuation before weighted actions; the player uses a carousel
+with B confirmation and Agile row selection. Random continuation targets are
+chosen once and retained through Agile tie-breaking and save/load; ordinary
+random revivals auto-resolve. Save format 7 retains the target, reads older
+versions and rejects dangling target references without overwriting the live game.
+
+Tests cover revived Spy placement/draw, Muster, row Scorch, a nested Medic,
+outer turn ownership, save/resume, frozen random Agile targets, invalid saved
+target rejection, and graveyard Leaders returning cards to hand without replay.
+Desktop workflow 43887759025 passed for 1a3f98b. Local SDL dummy --input-test
+also passed after the B interception fix (b80a9cd). This simulates SDL keys;
+it does not prove physical-device input or audiovisual timing.
+ARM workflow 43887803540 builds 1a3f98b and remains pending at this entry.
+
+## SD miniature package installation record
+
+7270ad9 archive SHA-256:
+d3d0ca530950eb6cd1a82419d5d31abf26e2b69bb7428928acd2bd634d31d2d4.
+All 604 archive files were SHA-256 verified on E: MIYOO MINI, FAT32.
+Backup: artifacts/qa/package-7270ad9/sd-backup-20261116-152218.
+This SD revision predates the Medic repair described above.
