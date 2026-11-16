@@ -65,6 +65,7 @@ struct Game {
   std::vector<ActiveWeather> weatherCards;
   bool randomRespawn{false};
   int pendingMedicPlayer{-1};
+  std::string pendingRandomMedicId;
   bool scoiataelChoicePending{false};
   int skelligeRevivesRemaining{0};
   int skelligeRevivePlayer{-1};
