@@ -244,7 +244,7 @@ std::vector<Card> discardOrder(Game& game,int who) {
     return a.name<b.name;
   };
   for(auto& group:groups) {
-    std::sort(group.begin(),group.end(),compare);
+    std::stable_sort(group.begin(),group.end(),compare);
     if(!group.empty())group.pop_back();
     cards.insert(cards.end(),group.begin(),group.end());
   }
@@ -259,7 +259,7 @@ std::vector<Card> discardOrder(Game& game,int who) {
   }
   std::vector<Card> normal;
   for(const auto& card:player.hand)if(card.abilities.empty())normal.push_back(card);
-  std::sort(normal.begin(),normal.end(),compare);
+  std::stable_sort(normal.begin(),normal.end(),compare);
   cards.insert(cards.end(),normal.begin(),normal.end());
   return cards;
 }

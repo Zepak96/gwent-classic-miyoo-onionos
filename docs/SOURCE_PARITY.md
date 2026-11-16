@@ -43,7 +43,9 @@ source behavior. A build or screenshot alone does not count as parity.
   `ControllerAI.redraw()` calls that each recalculate discard order after
   drawing the replacement. Clear Weather joins typed weather cards in the
   source's multi-weather discard pool; a deterministic mulligan regression
-  checks the Clear Weather/Biting Frost case.
+  checks the Clear Weather/Biting Frost case. Muster groups and normal cards
+  use stable sorting, preserving source order for tied `Card.compare` values;
+  an equal-priority regression checks the first two AI discards.
 - [ ] No illegal action may be silently converted into a pass.
 - [ ] Repeatable simulations cover every premade deck and every leader action.
   Current regression coverage completes 100 seeded matches using source

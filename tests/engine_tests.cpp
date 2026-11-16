@@ -685,6 +685,31 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
   assert(std::count_if(clearWeatherRedraw.players[1].hand.begin(),clearWeatherRedraw.players[1].hand.end(),
       [](const Card& card){return card.kind==Kind::Weather||card.kind==Kind::ClearWeather;})==1);
 
+  Game stableAiDiscard;stableAiDiscard.phase=Phase::Mulligan;
+  for(std::uint64_t seed=1;;++seed) {
+    auto state=seed;
+    const auto first=expectedRandom(state),second=expectedRandom(state);
+    if(first%3==2&&second%3!=0){stableAiDiscard.rngState=seed;break;}
+  }
+  for(int i=0;i<20;++i) {
+    auto equalPriority=unit("equal-priority-"+std::to_string(i),1);
+    equalPriority.name="Equal Priority Unit";
+    stableAiDiscard.players[1].hand.push_back(equalPriority);
+  }
+  for(int i=0;i<2;++i) {
+    auto protectedReplacement=unit("stable-replacement-"+std::to_string(i),4);
+    protectedReplacement.hero=true;protectedReplacement.abilities={"hero"};
+    stableAiDiscard.players[1].deck.push_back(protectedReplacement);
+  }
+  assert(performAiMulligan(stableAiDiscard,1));
+  for(int i=0;i<2;++i) {
+    const auto id="equal-priority-"+std::to_string(i);
+    assert(std::any_of(stableAiDiscard.players[1].deck.begin(),stableAiDiscard.players[1].deck.end(),
+        [&](const Card& card){return card.id==id;}));
+    assert(std::none_of(stableAiDiscard.players[1].hand.begin(),stableAiDiscard.players[1].hand.end(),
+        [&](const Card& card){return card.id==id;}));
+  }
+
   Game leaderChoice;
   leaderChoice.players[0].leader.id="foltest_siegemaster";
   leaderChoice.players[0].leader.kind=Kind::Leader;
