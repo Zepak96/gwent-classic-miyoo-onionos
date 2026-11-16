@@ -1124,6 +1124,28 @@ static void sourceAiPassDecisions() {
   assert(!lastGemAction.pass&&lastGemAction.cardId=="last-gem-action");
 }
 
+static void randomNestedMedicKeepsTarget() {
+  Game game;game.phase=Phase::OpponentTurn;game.currentPlayer=1;
+  game.pendingMedicPlayer=1;game.randomRespawn=true;game.rngState=419;
+  auto agile=unit("locked-random-agile",6);agile.agile=true;
+  game.players[1].graveyard={agile,unit("other-random-target",9)};
+  game.pendingRandomMedicId=agile.id;
+  const auto path=(std::filesystem::temp_directory_path()/"gwent-random-medic-test.sav").string();
+  std::string error;Game restored;
+  assert(saveGame(path,game,&error)&&loadGame(path,restored,&error));std::filesystem::remove(path);
+  assert(restored.pendingRandomMedicId==agile.id);
+  const auto state=restored.rngState;
+  const auto action=chooseAiAction(restored,1);
+  assert(action.resolveMedic&&action.selectedCardId==agile.id);
+  assert(restored.rngState!=state); // equal rows require the source tie-break
+  const auto afterTie=restored.rngState;
+  assert(chooseMedicRevive(restored,1,action.selectedCardId,action.target));
+  assert(restored.rngState==afterTie); // resolving must not select a new target
+  assert(restored.pendingMedicPlayer==-1&&restored.pendingRandomMedicId.empty());
+  assert(restored.players[1].graveyard.size()==1&&restored.players[1].graveyard[0].id=="other-random-target");
+  assert(restored.players[1].board[static_cast<int>(action.target)][0].id==agile.id);
+}
+
 static void nestedMedicWaitsForChoice() {
   Game game;
   auto first=unit("first-medic",5);first.medic=true;first.abilities={"medic"};
@@ -1727,4 +1749,4 @@ static void leaderAbilities() {
   for(int owner=0;owner<2;++owner)
     for(std::size_t i=0;i<untouchedDecks[owner].size();++i)assert(emptyCrach.players[owner].deck[i].id==untouchedDecks[owner][i]);
 }
-int main() { scoreRules(); duplicateWeatherIsDiscarded(); allSourceWeatherTypesAndOwnership(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiFractionalHornTickets(); sourceAiAgileWeatherRows(); nestedMedicWaitsForChoice(); medicReplaysSpyPlacement(); medicReplaysMusterAndScorch(); sourceAiDefersRandomActionTargets(); sourceAiHeroMoraleWeight(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
+int main() { scoreRules(); duplicateWeatherIsDiscarded(); allSourceWeatherTypesAndOwnership(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiFractionalHornTickets(); sourceAiAgileWeatherRows(); randomNestedMedicKeepsTarget(); nestedMedicWaitsForChoice(); medicReplaysSpyPlacement(); medicReplaysMusterAndScorch(); sourceAiDefersRandomActionTargets(); sourceAiHeroMoraleWeight(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }

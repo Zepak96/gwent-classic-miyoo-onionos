@@ -3480,6 +3480,12 @@ int main(int argc,char** argv) {
       observedRoundWins={app.game.players[0].roundWins,app.game.players[1].roundWins};
     }
     updateNotification(app,now);
+    if(app.screen==Screen::Match&&!app.pauseOpen&&app.game.pendingMedicPlayer==0&&
+       app.game.randomRespawn&&!actionAnimationLocked(app,now)) {
+      const auto choices=pendingMedicChoices(app);
+      if(choices.size()==1&&!choices.front()->agile)
+        handleMatchKey(app,SDLK_AC_BACK);
+    }
     if(app.screen==Screen::Match&&app.activeNotification.empty()&&
        !app.leaderSelectionMode&&!app.leaderRevealOpen&&!app.pauseOpen&&!app.passConfirmationOpen&&
        app.game.phase==gwent::Phase::OpponentTurn&&!actionAnimationLocked(app,now)&&SDL_GetTicks()>=app.aiAt)performAi(app);
