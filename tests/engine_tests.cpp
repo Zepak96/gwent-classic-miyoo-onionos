@@ -414,6 +414,16 @@ static void abilitiesAndValidation() {
   assert(!playCard(decoyRejectsNonCombat,0,"decoy-noncombat",Row::None,nonCombat.id));
   assert(decoyRejectsNonCombat.players[0].hand.size()==1&&decoyRejectsNonCombat.players[0].board[0].size()==1);
 
+  Game decoyRejectsOpponentCard;
+  auto opponentOnly=unit("opponent-decoy-target",7);
+  decoyRejectsOpponentCard.players[0].hand.push_back(referenceCard("Decoy"));
+  decoyRejectsOpponentCard.players[1].board[1].push_back(opponentOnly);
+  assert(!playCard(decoyRejectsOpponentCard,0,decoyRejectsOpponentCard.players[0].hand[0].id,
+                   Row::None,opponentOnly.id));
+  assert(decoyRejectsOpponentCard.players[0].hand.size()==1&&
+         decoyRejectsOpponentCard.players[1].board[1].size()==1&&
+         decoyRejectsOpponentCard.players[1].board[1][0].id==opponentOnly.id);
+
   Game medic; auto m=unit("medic",2); m.medic=true; medic.players[0].hand.push_back(m);
   medic.players[0].graveyard.push_back(unit("revive",6));
   assert(!playCard(medic,0,"medic")); // A valid target must be selected before committing the play.

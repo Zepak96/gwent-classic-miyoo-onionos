@@ -326,3 +326,6 @@ rodzajami kart; pełny test na urządzeniu opisany wersją binarium i wynikiem.
   nadal odejmuje ich siłę z `row.calcCardScore()`. Port zaniżał przez to wagę
   Isengrimowi i Kayranowi; regresja z Isengrimem sprawdza przedział losowania,
   w którym zgodny helper wybiera właśnie tę kartę.
+- [x] Manekin przyjmuje wyłącznie jawnie wskazaną własną jednostkę bojową
+  niebędącą Bohaterem. Test sprawdza zwrot tej samej karty, miejsce Manekina,
+  Avengera Krowy oraz odrzucenie celu z planszy przeciwnika.

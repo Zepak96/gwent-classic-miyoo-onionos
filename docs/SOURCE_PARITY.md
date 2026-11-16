@@ -31,7 +31,10 @@ source behavior. A build or screenshot alone does not count as parity.
 - [ ] Base score, Hero immunity, weather floor/half-weather, horn and Dandelion.
 - [ ] Tight Bond by printed name; Morale boosts other row units.
 - [ ] Spy placement and up-to-two draws; Medic selection and Agile row choice.
-- [ ] Decoy target selection, returned card, replacement slot and ownership.
+- [x] Decoy uses the specifically selected own non-Hero combat unit, returns
+  that same card, and leaves the Decoy in the selected row. Engine regressions
+  cover exact target identity, returned hand card, row replacement, and rejection
+  of noncombat or opponent-owned targets; Cow removal also exercises Avenger.
 - [ ] Muster from hand/deck; next-gen Geralt/Ciri muster and Roach Avenger.
 - [ ] Berserker/Mardroeme transformations and Vildkaarl lifecycle.
 - [ ] Global Scorch and each row Scorch threshold/targets.
