@@ -2160,7 +2160,7 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
       auto found=std::find_if(leaders.begin(),leaders.end(),[&](const gwent::Card* card){return card->referenceIndex==a.editDeck.leaderReferenceIndex;});
       int index=found==leaders.end()?0:static_cast<int>(found-leaders.begin());
       if(key==SDLK_LEFT||key==SDLK_a)index=(index+static_cast<int>(leaders.size())-1)%static_cast<int>(leaders.size());
-      else if(key==SDLK_RIGHT||key==SDLK_d||key==SDLK_x)index=(index+1)%static_cast<int>(leaders.size());
+      else if(key==SDLK_RIGHT||key==SDLK_d)index=(index+1)%static_cast<int>(leaders.size());
       else if(key==SDLK_x||key==SDLK_RETURN||key==SDLK_KP_ENTER) { a.editingLeader=false;a.userDeckSelected=true;return; }
       else if(key==SDLK_ESCAPE||key==SDLK_BACKSPACE||key==SDLK_AC_BACK) {
         a.editDeck.leaderReferenceIndex=a.leaderSelectionOriginalReference;

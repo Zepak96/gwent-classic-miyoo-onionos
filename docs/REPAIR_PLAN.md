@@ -196,5 +196,7 @@ rodzajami kart; pełny test na urządzeniu opisany wersją binarium i wynikiem.
   wspólnego bitmapowego renderera z centrowaniem według szerokości liczby.
 - [x] Odtworzono i naprawiono błąd czyszczenia rundy po efekcie Avengera,
   który zostawiał kartę na planszy oraz rozjeżdżał kolejkę odrodzenia Skellige.
+- [x] Naprawiono zatwierdzanie lidera: Miyoo A (`SDLK_x`) kończy wybór, a
+  strzałki służą wyłącznie do przechodzenia między liderami.
 - [ ] Dokończyć poprawki i testy opisane w etapach 1–5.
 - [ ] Ponowić test fizyczny na Miyoo po udostępnieniu karty SD/urządzenia.
