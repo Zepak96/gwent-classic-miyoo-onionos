@@ -48,9 +48,11 @@ source behavior. A build or screenshot alone does not count as parity.
   the number of Bond-bearing copies, and Morale boosts other row units.
   Regressions cover one and three copies, same name across different metadata
   groups, different names sharing metadata, and non-Bond same-name cards.
-- [x] Spy placement and up-to-two draws; Medic selection, random Emhyr revive,
+- [ ] Spy placement and up-to-two draws; Medic selection, random Emhyr revive,
   Hero/noncombat rejection and Agile row choice. Engine tests cover explicit
   targets and RNG-preserving target preview; SDL tests cover Agile selection.
+  Full Medic parity is NOT achieved: revived-card placement abilities are
+  skipped (see release-blocking Medic replay gap below).
 - [x] Decoy uses the specifically selected own non-Hero combat unit, returns
   that same card, and leaves the Decoy in the selected row. Engine regressions
   cover exact target identity, returned hand card, row replacement, and rejection
