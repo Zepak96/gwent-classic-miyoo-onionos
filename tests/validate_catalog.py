@@ -37,6 +37,8 @@ assert all(item["name"] for item in ability_text.values())
 assert all("description" in item for item in ability_text.values())
 assert {card["name"].strip() for card in cards} <= set(card_names_pl)
 assert all(card_names_pl[card["name"].strip()].strip() for card in cards)
+assert card_names_pl["Cirilla Fiona Elen Riannon"] == "Cirilla"
+assert card_names_pl["Eredin Bréacc Glas - The Treacherous"] == "Eredin Breacc Glas — Zdrajca"
 assert set(ability_text) == set(ability_text_pl)
 assert all(item["name"].strip() and item["description"].strip() for item in ability_text_pl.values())
 asset_root = root.parent / "assets" / "gwent-classic" / "img"

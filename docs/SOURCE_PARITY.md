@@ -133,6 +133,10 @@ items above:
   Clear Weather receives the expected 7:1 weighted choice over a one-point
   fallback when it restores seven points to the AI's row. Other weather AI
   weights and the full source decision distribution remain open.
+- Card-name localization now shows Cirilla's Polish in-game card title instead
+  of the full English name and resolves the accented source key for Eredin
+  Bréacc Glas's Treacherous card. Catalog validation locks both mappings;
+  full Polish title/ability/UI review is still open.
 - Emhyr White Flame's source initialization suppresses both players' leader
   initialization when either side uses it, including passive Invader,
   Treacherous, Daisy, and King Bran effects; each passive suppression case now
