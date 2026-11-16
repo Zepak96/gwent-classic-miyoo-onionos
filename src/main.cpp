@@ -579,6 +579,7 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="defeat")return pl?"PRZEGRANA":"DEFEAT";
   if(key=="victory")return pl?"ZWYCIESTWO":"VICTORY";
   if(key=="target")return pl?"WYBIERZ KARTĘ":"CHOOSE A CARD";
+  if(key=="random_medic_target")return pl?"WYBIERZ RZĄD DLA LOSOWEJ KARTY":"CHOOSE ROW FOR RANDOM CARD";
   if(key=="deck_invalid")return pl?"TALIA NIEPOPRAWNA":"DECK IS INVALID";
   if(key=="deck_saved")return pl?"ZAPISANO TALIE":"DECK SAVED";
   if(key=="deck_save_error")return pl?"NIE UDAŁO SIĘ ZAPISAĆ TALII":"FAILED TO SAVE DECK";
@@ -898,6 +899,16 @@ std::vector<std::string> legalCardTargets(const App& a,const gwent::Card& card) 
     for(const auto& row:p.board) for(const auto& target:row)
       if(target.kind==gwent::Kind::Unit && !target.hero && (target.row!=gwent::Row::None||target.agile)) ids.push_back(target.id);
   } else if(card.kind==gwent::Kind::Unit && card.medic) {
+    if(a.game.randomRespawn) {
+      const auto preview=gwent::previewRandomMedicTargetId(a.game,0);
+      if(!preview.empty()) {
+        const auto it=std::find_if(p.graveyard.begin(),p.graveyard.end(),[&](const gwent::Card& item){return item.id==preview;});
+        // The source chooses randomRespawn targets automatically. Only pause
+        // for the second choice the source asks the player to make: Agile row.
+        if(it!=p.graveyard.end()&&it->agile)ids.push_back(preview);
+      }
+      return ids;
+    }
     for(const auto& target:p.graveyard) if(target.kind==gwent::Kind::Unit && !target.hero && (target.row!=gwent::Row::None||target.agile)) ids.push_back(target.id);
     const auto graveCard=[&](const std::string& id)->const gwent::Card* {
       const auto it=std::find_if(p.graveyard.begin(),p.graveyard.end(),[&](const gwent::Card& item){return item.id==id;});
@@ -1017,7 +1028,8 @@ void doHumanPlay(App& a) {
   const auto targets=legalCardTargets(a,card);
   if(card.kind==gwent::Kind::Decoy && targets.empty()) { a.status=tr(a,"decoy_needs_unit"); return; }
   if(!targets.empty()) {
-    a.targetMode=true; a.selectedTargets=targets; a.targetIndex=0; a.reviveRowIndex=0; a.audio.play("open");a.status=tr(a,"target"); return;
+    a.targetMode=true; a.selectedTargets=targets; a.targetIndex=0; a.reviveRowIndex=0; a.audio.play("open");
+    a.status=tr(a,a.game.randomRespawn&&card.medic?"random_medic_target":"target");return;
   }
   const int handSizeBefore=static_cast<int>(hand.size());
   const auto before=a.game;
@@ -1812,7 +1824,7 @@ void drawMatch(SDL_Renderer* r,const App& a) {
   for(const auto& flight:a.triggeredCardFlights)drawCardFlight(r,a,flight);
   drawCardEffect(r,a);
   // The full-screen inspector is drawn after the 16:9 viewport is removed.
-  if(a.targetMode&&a.handIndex>=0&&a.handIndex<static_cast<int>(me.hand.size())&&
+  if(a.targetMode&&!a.game.randomRespawn&&a.handIndex>=0&&a.handIndex<static_cast<int>(me.hand.size())&&
      me.hand[static_cast<std::size_t>(a.handIndex)].medic&&a.targetIndex>=0&&a.targetIndex<static_cast<int>(a.selectedTargets.size())) {
     const auto revived=std::find_if(me.graveyard.begin(),me.graveyard.end(),[&](const gwent::Card& c){return c.id==a.selectedTargets[static_cast<std::size_t>(a.targetIndex)];});
     if(revived!=me.graveyard.end()&&revived->agile) {
@@ -1845,10 +1857,23 @@ void drawMatch(SDL_Renderer* r,const App& a) {
   if(a.targetMode) {
     std::vector<const gwent::Card*> choices;
     for(const auto& id:a.selectedTargets)if(const auto* card=findTargetCard(a.game,id))choices.push_back(card);
-    std::string controls=a.language==Language::Polish?
-      "LEWO/PRAWO: KARTA   A: WYBIERZ   B: ANULUJ":
-      "LEFT/RIGHT: CARD   A: SELECT   B: CANCEL";
-    drawChoiceCarousel(r,a,choices,a.targetIndex,tr(a,"target"),controls);
+    const bool randomMedic=a.game.randomRespawn&&a.handIndex>=0&&a.handIndex<static_cast<int>(me.hand.size())&&
+      me.hand[static_cast<std::size_t>(a.handIndex)].medic;
+    const bool randomAgile=randomMedic&&a.targetIndex>=0&&a.targetIndex<static_cast<int>(a.selectedTargets.size())&&
+      std::any_of(me.graveyard.begin(),me.graveyard.end(),[&](const gwent::Card& card) {
+        return card.id==a.selectedTargets[static_cast<std::size_t>(a.targetIndex)]&&card.agile;
+      });
+    const std::string controls=randomMedic?
+      (a.language==Language::Polish?(randomAgile?"GORA/DOL: RZAD   A: POTWIERDZ   B: ANULUJ":"A: POTWIERDZ   B: ANULUJ"):
+                                     (randomAgile?"UP/DOWN: ROW   A: CONFIRM   B: CANCEL":"A: CONFIRM   B: CANCEL")):
+      (a.language==Language::Polish?"LEWO/PRAWO: KARTA   A: WYBIERZ   B: ANULUJ":"LEFT/RIGHT: CARD   A: SELECT   B: CANCEL");
+    if(randomMedic&&randomAgile) {
+      // The source has already selected this random Medic target; the only
+      // remaining player input is its melee/ranged placement.
+      box(r,148,240,344,39,Color{10,9,8,238});frame(r,148,240,344,39,gold);
+      centeredTextInBox(r,154,244,332,12,tr(a,"random_medic_target"),paper,1);
+      centeredTextInBox(r,154,260,332,13,(a.reviveRowIndex==0?tr(a,"melee"):tr(a,"ranged"))+"  -  UP/DOWN  -  A/X",gold,1);
+    } else drawChoiceCarousel(r,a,choices,a.targetIndex,tr(a,"target"),controls);
   }
   if(a.leaderRevealOpen) {
     box(r,0,0,W,STAGE_H,Color{0,0,0,242});
@@ -2767,6 +2792,27 @@ int main(int argc,char** argv) {
     okay=okay&&app.game.players[0].board[1].size()==1&&
          std::any_of(app.game.players[0].board[1].begin(),app.game.players[0].board[1].end(),[](const gwent::Card& card){return card.id=="agile-input";})&&
          std::none_of(app.game.players[0].board[0].begin(),app.game.players[0].board[0].end(),[](const gwent::Card& card){return card.id=="agile-input";});
+    app.game=gwent::Game{};app.game.phase=gwent::Phase::PlayerTurn;app.game.currentPlayer=0;
+    app.game.randomRespawn=true;app.game.rngState=0x2468;
+    medic.id="random-medic-input";agile.id="random-agile-input";
+    app.game.players[0].hand={medic};app.game.players[0].graveyard={agile};
+    app.handIndex=0;app.targetMode=false;app.selectedTargets.clear();app.reviveRowIndex=0;
+    handleMatchKey(app,SDLK_x);
+    okay=okay&&app.targetMode&&app.selectedTargets.size()==1&&app.selectedTargets.front()==agile.id;
+    handleMatchKey(app,SDLK_DOWN);
+    okay=okay&&app.reviveRowIndex==1;
+    handleMatchKey(app,SDLK_x);
+    okay=okay&&!app.targetMode&&std::any_of(app.game.players[0].board[1].begin(),app.game.players[0].board[1].end(),
+      [&](const gwent::Card& card){return card.id==agile.id;});
+    app.game=gwent::Game{};app.game.phase=gwent::Phase::PlayerTurn;app.game.currentPlayer=0;
+    app.game.randomRespawn=true;app.game.rngState=0x2468;
+    auto ordinaryRevive=gwent::Card{};ordinaryRevive.id="random-ordinary-input";ordinaryRevive.kind=gwent::Kind::Unit;
+    ordinaryRevive.row=gwent::Row::Melee;ordinaryRevive.power=5;
+    app.game.players[0].hand={medic};app.game.players[0].graveyard={ordinaryRevive};
+    app.handIndex=0;app.targetMode=false;app.selectedTargets.clear();
+    handleMatchKey(app,SDLK_x);
+    okay=okay&&!app.targetMode&&std::any_of(app.game.players[0].board[0].begin(),app.game.players[0].board[0].end(),
+      [&](const gwent::Card& card){return card.id==ordinaryRevive.id;});
     app.game=gwent::Game{};app.screen=Screen::Match;app.miyooControls=true;
     app.game.phase=gwent::Phase::PlayerTurn;app.game.currentPlayer=0;
     app.game.players[0].leader=inputTestLeaderFor("eredin_destroyer");app.game.players[0].leaderAbilityAvailable=true;

@@ -395,6 +395,23 @@ static void abilitiesAndValidation() {
   assert(std::none_of(agileMedic.players[0].board[0].begin(),agileMedic.players[0].board[0].end(),
                       [](const Card& card){return card.id=="agile-revive";}));
 
+  Game randomMedic;randomMedic.randomRespawn=true;randomMedic.rngState=0x2468;
+  auto randomMedicCard=unit("random-medic",3);randomMedicCard.medic=true;
+  randomMedic.players[0].hand={randomMedicCard};
+  auto randomPlain=unit("random-plain",4);auto randomAgile=unit("random-agile",5,Row::None);randomAgile.agile=true;
+  randomMedic.players[0].graveyard={randomPlain,randomAgile};
+  const auto rngBeforePreview=randomMedic.rngState;
+  const auto previewId=previewRandomMedicTargetId(randomMedic,0);
+  assert(!previewId.empty()&&randomMedic.rngState==rngBeforePreview);
+  const auto preview=std::find_if(randomMedic.players[0].graveyard.begin(),randomMedic.players[0].graveyard.end(),
+                                 [&](const Card& card){return card.id==previewId;});
+  assert(preview!=randomMedic.players[0].graveyard.end());
+  const Row randomAgileRow=preview->agile?Row::Ranged:Row::None;
+  const int randomExpectedRow=preview->agile?1:0;
+  assert(playCard(randomMedic,0,"random-medic",randomAgileRow,previewId));
+  assert(std::any_of(randomMedic.players[0].board[randomExpectedRow].begin(),randomMedic.players[0].board[randomExpectedRow].end(),
+                     [&](const Card& card){return card.id==previewId;}));
+
   Game medicHero; auto mh=unit("medic-hero",2); mh.medic=true; medicHero.players[0].hand.push_back(mh);
   auto forbiddenHero=unit("forbidden-hero",10); forbiddenHero.hero=true;
   medicHero.players[0].graveyard.push_back(forbiddenHero);

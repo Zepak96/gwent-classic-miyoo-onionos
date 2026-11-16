@@ -118,11 +118,13 @@ objawy, dopóki nie da się ich odtworzyć w kodzie lub logu.
     znikało z animacji. Dodano osobne karty slotów, zapis v5 z odczytem starszych
     zapisów, lot i rysowanie do pola specjalnego oraz przeniesienie karty do
     cmentarza przy końcu rundy. Testy sprawdzają tożsamość, Crach i cleanup.
-19. **Losowe wskrzeszanie nie może udawać wyboru Medyka.** Przy Emhyrze
-    Najeźdźcy silnik losuje jednostkę z cmentarza, ale picker nadal pokazuje
-    konkretne cele. Dla losowego Agile dodatkowo potrzebna jest zgodna ścieżka
-    wyboru rzędu po ujawnieniu wylosowanej karty. Wymaga etapowego testu UI i
-    silnika.
+19. **Losowe wskrzeszanie nie może udawać wyboru Medyka — naprawione w kodzie.**
+    Przy Emhyrze Najeźdźcy źródło samo losuje jednostkę z cmentarza; port
+    wcześniej wyświetlał picker i czekał na wybór gracza, choć silnik go
+    ignorował. Teraz podgląd powtarza następne losowanie bez zmiany RNG.
+    Zwykła jednostka wraca automatycznie, a dla wylosowanej karty Agile gracz
+    wybiera już tylko rząd. Test wejścia obejmuje oba przypadki. Nadal trzeba
+    potwierdzić zachowanie na Miyoo.
 
 ## Kolejność naprawy i kryteria odbioru
 
@@ -238,6 +240,9 @@ rodzajami kart; pełny test na urządzeniu opisany wersją binarium i wynikiem.
   pobrać aktywnego Rogu.
 - [x] Dźwięk stałych kart z rzędów wybiera się z ich faktycznego rzędu; czwarta
   karta pogody nie jest już ukrywana przez limit rysowania.
+- [x] Medyk przy Emhyrze Najeźdźcy nie pokazuje fałszywego wyboru karty: zwykła
+  karta wraca z losowania automatycznie, a wylosowana Agile pokazuje wyłącznie
+  wybór rzędu. Test SDL pokrywa oba przebiegi; test urządzenia pozostaje otwarty.
 - [x] Pakiet ARM z tą zmianą zainstalowano na wykrytej karcie SD; 603 pliki
   gry mają identyczne sumy SHA-256 jak zweryfikowany artefakt. Poprzedni folder
   gry i launcher zachowano jako kopie `.previous-9e74bb8`. Test na samym Miyoo

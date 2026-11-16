@@ -138,6 +138,10 @@ items above:
   fallback choices.
 - Agile Medic target plus melee/ranged revive row, including Miyoo-style SDL
   directional input and rejection of an incomplete choice.
+- Emhyr Invader's random Medic target: ordinary units are revived immediately
+  as in the source; if the random result is Agile, the player chooses only its
+  row. The preview uses a copied RNG state so it does not consume or alter the
+  match's next random result. Engine and SDL regressions cover both outcomes.
 - Mardroeme's persistent row effect, its distinction from special-slot
   occupancy, Ermion activation, Berserker transformation on later plays and
   Muster summons, round reset, and save/load state.

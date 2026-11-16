@@ -538,6 +538,15 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
   return true;
 }
 
+std::string previewRandomMedicTargetId(const Game& g,int who) {
+  if(who<0||who>1||!g.randomRespawn)return {};
+  std::vector<const Card*> units;
+  for(const auto& card:g.players[who].graveyard)if(isCombatUnit(card))units.push_back(&card);
+  if(units.empty())return {};
+  Game preview=g;
+  return units[nextRandom(preview)%static_cast<std::uint32_t>(units.size())]->id;
+}
+
 bool pass(Game& g, int who) {
   if (who < 0 || who > 1 || who != g.currentPlayer ||
       (g.phase != Phase::PlayerTurn && g.phase != Phase::OpponentTurn) || g.players[who].passed) return false;
