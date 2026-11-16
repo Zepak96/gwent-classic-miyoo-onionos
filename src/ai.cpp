@@ -457,7 +457,14 @@ AiAction cardAction(Game& game,int who,const Card& card,const BoardData& data) {
     const int ranged=weightMardroemeRow(game,who,card,1),close=weightMardroemeRow(game,who,card,0);
     action.target=close>ranged?Row::Melee:Row::Ranged;
   } else if(card.agile) {
-    const int close=weightRowChange(game,who,0,card),ranged=weightRowChange(game,who,1,card);
+    // determineAgileRow compares the full gain, including this card's own
+    // weather-adjusted power; weightRowChange intentionally excludes it.
+    auto gain=[&](int row) {
+      auto cards=game.players[who].board[row];cards.push_back(card);
+      return scoreRow(game,who,row,cards,game.weather[row],game.horn[who][row])-
+             currentRowScore(game,who,row);
+    };
+    const int close=gain(0),ranged=gain(1);
     action.target=static_cast<Row>(ranged>close?1:close>ranged?0:(roll(game)%2));
   }
   return action;

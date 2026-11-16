@@ -1124,6 +1124,24 @@ static void sourceAiPassDecisions() {
   assert(!lastGemAction.pass&&lastGemAction.cardId=="last-gem-action");
 }
 
+static void sourceAiAgileWeatherRows() {
+  for(int weatherRow=0;weatherRow<2;++weatherRow) {
+    for(unsigned seed=1;seed<40;++seed) {
+      Game game;game.phase=Phase::OpponentTurn;game.currentPlayer=1;game.rngState=seed;
+      game.players[1].roundLosses=1;
+      auto agile=unit("agile-weather",6);agile.agile=true;
+      game.players[1].hand={agile};game.weather[weatherRow]=true;
+      auto state=game.rngState;expectedRandom(state); // action ticket only
+      const auto action=chooseAiAction(game,1);
+      assert(!action.pass&&action.cardId==agile.id);
+      assert(action.target==(weatherRow==0?Row::Ranged:Row::Melee));
+      assert(game.rngState==state); // unequal gains must not roll a tie-break
+      assert(playCard(game,1,action.cardId,action.target));
+      assert(game.players[1].board[1-weatherRow].size()==1);
+    }
+  }
+}
+
 static void sourceAiFractionalHornTickets() {
   // Source Horn weight is 3/2, followed by a unit weighted 1. randomInt(2.5)
   // yields integer tickets 0,1,2: the first two select Horn, the last the unit.
@@ -1636,4 +1654,4 @@ static void leaderAbilities() {
   for(int owner=0;owner<2;++owner)
     for(std::size_t i=0;i<untouchedDecks[owner].size();++i)assert(emptyCrach.players[owner].deck[i].id==untouchedDecks[owner][i]);
 }
-int main() { scoreRules(); duplicateWeatherIsDiscarded(); allSourceWeatherTypesAndOwnership(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiFractionalHornTickets(); sourceAiDefersRandomActionTargets(); sourceAiHeroMoraleWeight(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
+int main() { scoreRules(); duplicateWeatherIsDiscarded(); allSourceWeatherTypesAndOwnership(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiFractionalHornTickets(); sourceAiAgileWeatherRows(); sourceAiDefersRandomActionTargets(); sourceAiHeroMoraleWeight(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
