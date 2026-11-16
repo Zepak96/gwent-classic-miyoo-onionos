@@ -457,12 +457,12 @@ static void abilitiesAndValidation() {
 
   Game specialCrach;auto activeHorn=referenceCard("Commander's Horn");activeHorn.id="active-horn";
   specialCrach.players[0].hand={activeHorn};specialCrach.players[0].graveyard={unit("old-grave-unit",3)};
-  assert(playCard(specialCrach,0,activeHorn.id,Row::Melee));
-  assert(specialCrach.players[0].specialCards[0].id==activeHorn.id&&specialCrach.players[0].graveyard.size()==1);
-  specialCrach.currentPlayer=0;specialCrach.phase=Phase::PlayerTurn;
   Card crachLeader;crachLeader.id="crach_an_craite";crachLeader.kind=Kind::Leader;
   crachLeader.abilities={"crach_an_craite"};
   specialCrach.players[0].leader=crachLeader;specialCrach.players[0].leaderAbilityAvailable=true;
+  assert(playCard(specialCrach,0,activeHorn.id,Row::Melee));
+  assert(specialCrach.players[0].specialCards[0].id==activeHorn.id&&specialCrach.players[0].graveyard.size()==1);
+  specialCrach.currentPlayer=0;specialCrach.phase=Phase::PlayerTurn;
   assert(activateLeader(specialCrach,0));
   assert(specialCrach.players[0].deck.size()==1&&specialCrach.players[0].deck[0].id=="old-grave-unit");
   assert(specialCrach.players[0].specialCards[0].id==activeHorn.id);
