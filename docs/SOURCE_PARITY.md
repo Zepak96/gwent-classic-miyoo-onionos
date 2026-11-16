@@ -126,6 +126,13 @@ items above:
   both sides and rows, Hero immunity, and row-Scorch's 10-point threshold (Hero
   strength counts toward the threshold but Heroes are not destroyed). This is
   targeted coverage; the full Scorch/leader/AI interaction matrix remains open.
+- `ControllerAI.weightWeather()` uses own-side gain minus opponent-side gain.
+  The native AI weather weight had the sign reversed, which favored harmful
+  weather effects on the AI itself and suppressed beneficial Clear Weather.
+  The sign now matches the source, and a seeded 512-sample regression confirms
+  Clear Weather receives the expected 7:1 weighted choice over a one-point
+  fallback when it restores seven points to the AI's row. Other weather AI
+  weights and the full source decision distribution remain open.
 - Emhyr White Flame's source initialization suppresses both players' leader
   initialization when either side uses it, including passive Invader,
   Treacherous, Daisy, and King Bran effects; each passive suppression case now

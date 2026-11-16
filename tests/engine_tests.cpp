@@ -492,6 +492,23 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
   assert(choiceA.pass==choiceB.pass && choiceA.cardId==choiceB.cardId && choiceA.target==choiceB.target &&
          choiceA.activateLeader==choiceB.activateLeader && choiceA.leaderSelection==choiceB.leaderSelection);
 
+  Game clearWeatherAi;
+  clearWeatherAi.phase=Phase::OpponentTurn;clearWeatherAi.currentPlayer=1;
+  clearWeatherAi.weather[0]=true;
+  clearWeatherAi.players[1].board[0].push_back(unit("weathered-ai-unit",8));
+  Card clear;clear.id="ai-clear-weather";clear.name="Clear Weather";clear.kind=Kind::ClearWeather;
+  clearWeatherAi.players[1].hand={clear,unit("ai-alternative",1,Row::Siege)};
+  int clearWeatherChoices=0;
+  for(std::uint64_t seed=1;seed<=512;++seed) {
+    auto sample=clearWeatherAi;sample.rngState=seed*0x9e3779b9u;
+    const auto choice=chooseAiAction(sample,1);
+    if(choice.cardId==clear.id)++clearWeatherChoices;
+  }
+  // Clear Weather benefits the AI's own weathered unit by seven points and
+  // must outweigh the one-point fallback. The old reversed delta chose it
+  // zero times because its (incorrect) weight was clipped to zero.
+  assert(clearWeatherChoices>350&&clearWeatherChoices<510);
+
   Game difficultyChoice;
   difficultyChoice.phase=Phase::OpponentTurn;difficultyChoice.currentPlayer=1;
   difficultyChoice.players[1].hand={unit("weak",1),unit("strong",10)};

@@ -136,7 +136,10 @@ int weightWeather(const Game& game,int who,const Card& card) {
     const int enemyBefore=currentRowScore(game,1-who,row);
     const int ownAfter=scoreRow(game,who,row,game.players[who].board[row],next,game.horn[who][row]);
     const int enemyAfter=scoreRow(game,1-who,row,game.players[1-who].board[row],next,game.horn[1-who][row]);
-    value+=(enemyAfter-enemyBefore)-(ownAfter-ownBefore);
+    // ControllerAI.calcRowPower() measures before-minus-after, then returns
+    // opponentDiff-minus-ownDiff. That is the AI's own gain minus the
+    // opponent's gain; reversing it makes weather help the wrong side.
+    value+=(ownAfter-ownBefore)-(enemyAfter-enemyBefore);
   }
   return value;
 }
