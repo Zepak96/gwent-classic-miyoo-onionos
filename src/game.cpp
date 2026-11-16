@@ -433,6 +433,17 @@ void beginMatchWithLeaders(Game& g, std::vector<Card> playerDeck, Card playerLea
                  &playerLeader,&opponentLeader,seed,firstPlayer);
 }
 
+void beginPendingMedic(Game& g,int who) {
+  auto& grave=g.players[who].graveyard;
+  if(!std::any_of(grave.begin(),grave.end(),isCombatUnit))return;
+  g.pendingMedicPlayer=who;g.pendingMedicAgileId.clear();g.pendingRandomMedicId.clear();
+  if(g.randomRespawn) {
+    std::vector<const Card*> units;
+    for(const auto& card:grave)if(isCombatUnit(card))units.push_back(&card);
+    g.pendingRandomMedicId=units[nextRandom(g)%units.size()]->id;
+  }
+}
+
 // Shared replay path for graveyard units. Medic continuation choices are
 // added separately; callers retain responsibility for finishing the outer turn.
 void replayRevivedUnit(Game& g,int who,const Card& revived,int reviveRow) {
@@ -451,14 +462,7 @@ void replayRevivedUnit(Game& g,int who,const Card& revived,int reviveRow) {
   if(hasAbility(revived,"scorch_s"))scorchEnemyRow(g,who,2);
   if(hasAbility(revived,"mardroeme"))p.mardroeme[reviveRow]=true;
   for(int row=0;row<3;++row)if(p.mardroeme[row])transformBerserkers(p,row);
-  if(revived.medic&&std::any_of(p.graveyard.begin(),p.graveyard.end(),isCombatUnit)) {
-    g.pendingMedicPlayer=who;
-    if(g.randomRespawn) {
-      std::vector<const Card*> units;
-      for(const auto& card:p.graveyard)if(isCombatUnit(card))units.push_back(&card);
-      g.pendingRandomMedicId=units[nextRandom(g)%units.size()]->id;
-    }
-  }
+  if(revived.medic)beginPendingMedic(g,who);
 }
 
 bool chooseMedicRevive(Game& g,int who,const std::string& id,Row target) {
@@ -469,12 +473,25 @@ bool chooseMedicRevive(Game& g,int who,const std::string& id,Row target) {
   if(g.randomRespawn)selected=previewRandomMedicTargetId(g,who);
   const auto found=findCard(grave,selected);
   if(found==grave.end()||!isCombatUnit(*found))return false;
+  if(!g.pendingMedicAgileId.empty()&&selected!=g.pendingMedicAgileId)return false;
+  if(found->agile&&target==Row::None) {
+    g.pendingMedicAgileId=selected;
+    return true;
+  }
   const int row=found->agile?rowIndex(target):rowIndex(found->row);
   if(row<0||row>=3||(found->agile&&target==Row::Siege))return false;
   if(g.randomRespawn&&g.pendingRandomMedicId.empty())nextRandom(g);
-  const Card revived=*found;grave.erase(found);g.pendingMedicPlayer=-1;g.pendingRandomMedicId.clear();
+  const Card revived=*found;grave.erase(found);g.pendingMedicPlayer=-1;g.pendingRandomMedicId.clear();g.pendingMedicAgileId.clear();
   replayRevivedUnit(g,who,revived,row);
   if(g.pendingMedicPlayer<0)finishActionTurn(g);else recompute(g);
+  return true;
+}
+
+bool cancelMedicRevive(Game& g,int who) {
+  if(who<0||who>1||g.pendingMedicPlayer!=who||g.currentPlayer!=who||g.pendingMedicAgileId.empty())return false;
+  if(g.phase!=Phase::PlayerTurn&&g.phase!=Phase::OpponentTurn)return false;
+  g.pendingMedicPlayer=-1;g.pendingRandomMedicId.clear();g.pendingMedicAgileId.clear();
+  finishActionTurn(g);
   return true;
 }
 
@@ -508,7 +525,8 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
   int medicIndex = -1;
   int medicReviveRow = -1;
   auto medicRngAfterValidation=g.rngState;
-  if (c.kind == Kind::Unit && c.medic) {
+  const bool deferMedicChoice=c.kind==Kind::Unit&&c.medic&&selectedId.empty();
+  if (c.kind == Kind::Unit && c.medic && !deferMedicChoice) {
     if (g.randomRespawn) {
       std::vector<int> units;
       for (int i=0;i<static_cast<int>(p.graveyard.size());++i)
@@ -584,6 +602,7 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
         applyMuster(p, c);
         for(int row=0;row<3;++row)if(p.mardroeme[row])transformBerserkers(p,row);
       }
+      if(deferMedicChoice)beginPendingMedic(g,who);
       if (medicIndex >= 0) {
         const Card revived = p.graveyard[medicIndex];
         p.graveyard.erase(p.graveyard.begin()+medicIndex);

@@ -469,8 +469,9 @@ static void abilitiesAndValidation() {
 
   Game medic; auto m=unit("medic",2); m.medic=true; medic.players[0].hand.push_back(m);
   medic.players[0].graveyard.push_back(unit("revive",6));
-  assert(!playCard(medic,0,"medic")); // A valid target must be selected before committing the play.
-  assert(playCard(medic,0,"medic",Row::None,"revive"));
+  assert(playCard(medic,0,"medic")); // Source places the Medic before choosing its target.
+  assert(medic.pendingMedicPlayer==0&&medic.players[0].board[0].size()==1);
+  assert(chooseMedicRevive(medic,0,"revive"));
   assert(medic.players[0].board[0].size()==2 && medic.players[0].graveyard.empty());
 
   Game agileMedic;auto am=unit("agile-medic",3);am.medic=true;agileMedic.players[0].hand.push_back(am);
@@ -1159,11 +1160,31 @@ static void rejectedRandomMedicPreservesRng() {
   auto agile=unit("invalid-row-random-agile",6,Row::None);agile.agile=true;
   game.players[0].hand={medic};game.players[0].graveyard={agile};
   const auto state=game.rngState;
-  assert(!playCard(game,0,medic.id,Row::None));
-  assert(!playCard(game,0,medic.id,Row::Siege));
+  assert(!playCard(game,0,medic.id,Row::None,agile.id));
+  assert(!playCard(game,0,medic.id,Row::Siege,agile.id));
   assert(game.rngState==state&&game.players[0].hand.size()==1&&game.players[0].graveyard.size()==1);
-  assert(playCard(game,0,medic.id,Row::Ranged));
+  assert(playCard(game,0,medic.id,Row::Ranged,agile.id));
   assert(game.rngState!=state&&game.players[0].board[1].size()==1);
+}
+
+static void firstMedicCommitsBeforeChoiceAndAgileCancel() {
+  Game game;auto medic=unit("commit-first-medic",5);medic.medic=true;
+  auto agile=unit("cancel-agile-revive",6,Row::None);agile.agile=true;
+  game.players[0].hand={medic};game.players[0].graveyard={agile};
+  assert(playCard(game,0,medic.id));
+  assert(game.players[0].hand.empty()&&game.players[0].board[0].size()==1);
+  assert(game.pendingMedicPlayer==0&&game.currentPlayer==0);
+  assert(!cancelMedicRevive(game,0)); // source carousel itself cannot be quit
+  assert(chooseMedicRevive(game,0,agile.id));
+  assert(game.pendingMedicAgileId==agile.id&&game.players[0].graveyard.size()==1);
+  const auto path=(std::filesystem::temp_directory_path()/"gwent-medic-agile-row-test.sav").string();
+  Game restored;std::string error;
+  assert(saveGame(path,game,&error)&&loadGame(path,restored,&error));std::filesystem::remove(path);
+  assert(restored.pendingMedicAgileId==agile.id);
+  assert(cancelMedicRevive(restored,0));
+  assert(restored.pendingMedicPlayer==-1&&restored.pendingMedicAgileId.empty());
+  assert(restored.players[0].board[0].size()==1&&restored.players[0].graveyard.size()==1);
+  assert(restored.currentPlayer==1);
 }
 
 static void randomNestedMedicKeepsTarget() {
@@ -1801,4 +1822,4 @@ static void leaderAbilities() {
   for(int owner=0;owner<2;++owner)
     for(std::size_t i=0;i<untouchedDecks[owner].size();++i)assert(emptyCrach.players[owner].deck[i].id==untouchedDecks[owner][i]);
 }
-int main() { scoreRules(); duplicateWeatherIsDiscarded(); allSourceWeatherTypesAndOwnership(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiFractionalHornTickets(); sourceAiAgileWeatherRows(); graveLeadersReturnWithoutPlaying(); skelligeChoiceAcceptsGraveyardIdReference(); rejectedRandomMedicPreservesRng(); randomNestedMedicKeepsTarget(); nestedMedicWaitsForChoice(); medicReplaysSpyPlacement(); medicReplaysMusterAndScorch(); sourceAiDefersRandomActionTargets(); sourceAiHeroMoraleWeight(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
+int main() { scoreRules(); duplicateWeatherIsDiscarded(); allSourceWeatherTypesAndOwnership(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiFractionalHornTickets(); sourceAiAgileWeatherRows(); graveLeadersReturnWithoutPlaying(); skelligeChoiceAcceptsGraveyardIdReference(); rejectedRandomMedicPreservesRng(); firstMedicCommitsBeforeChoiceAndAgileCancel(); randomNestedMedicKeepsTarget(); nestedMedicWaitsForChoice(); medicReplaysSpyPlacement(); medicReplaysMusterAndScorch(); sourceAiDefersRandomActionTargets(); sourceAiHeroMoraleWeight(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }

@@ -66,6 +66,7 @@ struct Game {
   bool randomRespawn{false};
   int pendingMedicPlayer{-1};
   std::string pendingRandomMedicId;
+  std::string pendingMedicAgileId;
   bool scoiataelChoicePending{false};
   int skelligeRevivesRemaining{0};
   int skelligeRevivePlayer{-1};
@@ -83,6 +84,7 @@ int calculateCardPower(const Card&, const std::vector<Card>& row, bool weather, 
 bool playCard(Game&, int playerIndex, const std::string& cardId, Row target = Row::None,
               const std::string& selectedCardId = {});
 bool chooseMedicRevive(Game&, int playerIndex, const std::string& cardId, Row target = Row::None);
+bool cancelMedicRevive(Game&, int playerIndex);
 // Preview the random unit a Medic will revive without advancing match RNG.
 std::string previewRandomMedicTargetId(const Game&, int playerIndex);
 void beginMatch(Game&, std::vector<Card> playerDeck, Faction playerFaction,

@@ -15,7 +15,7 @@
 namespace gwent {
 namespace {
 constexpr std::array<std::uint8_t,8> kMagic{{'G','W','N','T','M','Y','S','V'}};
-constexpr std::uint32_t kVersion=7;
+constexpr std::uint32_t kVersion=8;
 constexpr std::size_t kMaxSaveBytes=4*1024*1024;
 constexpr std::uint32_t kMaxItems=4096;
 constexpr std::uint32_t kMaxString=8192;
@@ -93,7 +93,7 @@ void encodeGame(Writer& w,const Game& g){
   for(bool x:g.weather)w.boolean(x);for(const auto& side:g.horn)for(bool x:side)w.boolean(x);
   w.u32(static_cast<std::uint32_t>(g.weatherCards.size()));for(const auto& x:g.weatherCards){writeCard(w,x.card);w.i32(x.owner);}
   w.boolean(g.randomRespawn);w.boolean(g.scoiataelChoicePending);w.i32(g.skelligeRevivesRemaining);w.i32(g.skelligeRevivePlayer);w.u32(static_cast<std::uint32_t>(g.skelligeAgileReviveIds.size()));for(const auto& id:g.skelligeAgileReviveIds)w.string(id);w.boolean(g.factionAbilitiesInitialized);
-  for(const auto& cards:g.revealedCards)writeCards(w,cards);w.u64(g.rngState);w.string(g.lastError);w.i32(g.pendingMedicPlayer);w.string(g.pendingRandomMedicId);
+  for(const auto& cards:g.revealedCards)writeCards(w,cards);w.u64(g.rngState);w.string(g.lastError);w.i32(g.pendingMedicPlayer);w.string(g.pendingRandomMedicId);w.string(g.pendingMedicAgileId);
 }
 bool decodeGame(Reader& r,Game& g,std::uint32_t version){
   for(auto& p:g.players)if(!readPlayer(r,p,version))return false;
@@ -102,15 +102,17 @@ bool decodeGame(Reader& r,Game& g,std::uint32_t version){
   const auto n=r.u32();if(n>128){r.good=false;return false;}g.weatherCards.clear();g.weatherCards.reserve(n);
   for(std::uint32_t i=0;i<n;++i){ActiveWeather x;if(!readCard(r,x.card))return false;x.owner=r.i32();if(x.owner<0||x.owner>1)r.good=false;g.weatherCards.push_back(std::move(x));}
   g.randomRespawn=r.boolean();g.scoiataelChoicePending=r.boolean();g.skelligeRevivesRemaining=r.i32();g.skelligeRevivePlayer=r.i32();const auto reviveIds=r.u32();if(reviveIds>2){r.good=false;return false;}g.skelligeAgileReviveIds.clear();for(std::uint32_t i=0;i<reviveIds;++i)g.skelligeAgileReviveIds.push_back(r.string());g.factionAbilitiesInitialized=r.boolean();
-  for(auto& cards:g.revealedCards)if(!readCards(r,cards))return false;g.rngState=r.u64();g.lastError=r.string();g.pendingMedicPlayer=version>=6?r.i32():-1;g.pendingRandomMedicId=version>=7?r.string():std::string{};
+  for(auto& cards:g.revealedCards)if(!readCards(r,cards))return false;g.rngState=r.u64();g.lastError=r.string();g.pendingMedicPlayer=version>=6?r.i32():-1;g.pendingRandomMedicId=version>=7?r.string():std::string{};g.pendingMedicAgileId=version>=8?r.string():std::string{};
   if(g.pendingMedicPlayer>=0&&g.pendingMedicPlayer<2) {
     if(g.players[g.pendingMedicPlayer].passed)return false;
     const auto& grave=g.players[g.pendingMedicPlayer].graveyard;
     const auto eligible=[](const Card& c){return c.kind==Kind::Unit&&!c.hero&&(c.row!=Row::None||c.agile);};
     if(std::none_of(grave.begin(),grave.end(),eligible))return false;
+    if(!g.pendingRandomMedicId.empty()&&!g.pendingMedicAgileId.empty()&&g.pendingRandomMedicId!=g.pendingMedicAgileId)return false;
+    if(!g.pendingMedicAgileId.empty()&&std::none_of(grave.begin(),grave.end(),[&](const Card& c){return eligible(c)&&c.agile&&c.id==g.pendingMedicAgileId;}))return false;
     if(!g.pendingRandomMedicId.empty()&&(!g.randomRespawn||
        std::none_of(grave.begin(),grave.end(),[&](const Card& c){return eligible(c)&&c.id==g.pendingRandomMedicId;})))return false;
-  } else if(!g.pendingRandomMedicId.empty())return false;
+  } else if(!g.pendingRandomMedicId.empty()||!g.pendingMedicAgileId.empty())return false;
   return r.good&&g.pendingMedicPlayer>=-1&&g.pendingMedicPlayer<=1&&
     (g.pendingMedicPlayer<0||(g.pendingMedicPlayer==g.currentPlayer&&(g.phase==Phase::PlayerTurn||g.phase==Phase::OpponentTurn)))&&g.currentPlayer>=0&&g.currentPlayer<2&&g.firstPlayer>=0&&g.firstPlayer<2&&g.matchWinner>=-1&&g.matchWinner<=2&&g.round>=1&&g.round<=3&&
     g.skelligeRevivesRemaining>=0&&g.skelligeRevivesRemaining<=2&&g.skelligeRevivePlayer>=-1&&g.skelligeRevivePlayer<2&&
