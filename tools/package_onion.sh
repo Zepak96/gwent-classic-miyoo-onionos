@@ -28,7 +28,7 @@ mkdir -p "$game_dir" "$shortcut_dir"
 mkdir -p "$game_dir/assets/gwent-classic" "$game_dir/docs"
 install -m 755 "$build_dir/gwent" "$game_dir/gwent"
 install -m 755 "$(dirname "$0")/../packaging/onion/launch.sh" "$game_dir/launch.sh"
-install -m 755 "$(dirname "$0")/../packaging/onion/GwentClassic.notfound" "$shortcut_dir/GwentClassic.notfound"
+install -m 755 "$(dirname "$0")/../packaging/onion/GwentClassic.port" "$shortcut_dir/GwentClassic.port"
 cp -a assets/gwent-classic/img assets/gwent-classic/sfx assets/gwent-classic/svg assets/gwent-classic/music "$game_dir/assets/gwent-classic/"
 
 copy_shared() {
@@ -77,7 +77,7 @@ fi
 # Normalize mode bits so archive metadata is stable across build hosts.
 find "$stage/Roms" -type d -exec chmod 755 {} +
 find "$stage/Roms" -type f -exec chmod 644 {} +
-chmod 755 "$game_dir/gwent" "$game_dir/launch.sh" "$shortcut_dir/GwentClassic.notfound"
+chmod 755 "$game_dir/gwent" "$game_dir/launch.sh" "$shortcut_dir/GwentClassic.port"
 
 archive="$output_dir/GwentClassic-OnionOS.zip"
 rm -f "$archive"

@@ -90,6 +90,11 @@ objawy, dopóki nie da się ich odtworzyć w kodzie lub logu.
     rundy ma najpierw odłączyć stare karty od rzędów, a potem rozpatrzyć ich
     usunięcia i efekty Avengera; regresja sprawdza brak starego Olafa na planszy
     i zgodność identyfikatorów kolejki z cmentarzem.
+14. **Skrót OnionOS był pakowany pod błędnym rozszerzeniem.** Paczka tworzyła
+    `GwentClassic.notfound`, choć OnionOS uruchamia port przez
+    `GwentClassic.port`. To mogło sprawić, że aktualizacja nie pojawiała się
+    jako poprawny port w menu; nazwa źródła i walidacja archiwum zostały
+    poprawione.
 
 ## Kolejność naprawy i kryteria odbioru
 
@@ -198,5 +203,7 @@ rodzajami kart; pełny test na urządzeniu opisany wersją binarium i wynikiem.
   który zostawiał kartę na planszy oraz rozjeżdżał kolejkę odrodzenia Skellige.
 - [x] Naprawiono zatwierdzanie lidera: Miyoo A (`SDLK_x`) kończy wybór, a
   strzałki służą wyłącznie do przechodzenia między liderami.
+- [x] Poprawiono nazwę skrótu w paczce OnionOS z `.notfound` na `.port` i
+  dodano kontrolę tej ścieżki do walidacji archiwum.
 - [ ] Dokończyć poprawki i testy opisane w etapach 1–5.
 - [ ] Ponowić test fizyczny na Miyoo po udostępnieniu karty SD/urządzenia.
