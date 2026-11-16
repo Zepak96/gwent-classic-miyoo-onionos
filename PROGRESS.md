@@ -295,3 +295,8 @@ Pin `gwent.js` kończy inicjalizację przez `let dm = new DeckMaker()`, bez ekra
 
 - Po dwóch próbach użytkowniczki na karcie nie znaleziono `last-run.log`. Pierwsza wersja launchera traktowała brak zapisu logu jako błąd krytyczny; poprawiono to, aby nie blokować startu gry.
 - Log ma teraz awaryjny zapis obok `gwent`, a binarka zapisuje punkty kontrolne po inicjalizacji SDL, okna i renderera. Składnia launchera sprawdzona przez `bash -n`; nowy ARM build oraz kolejny test Miyoo są w toku.
+
+## Wdrożenie poprawionego launchera diagnostycznego — 16.11.2026
+
+- Build `7f2b466` przeszedł desktop CI oraz ARM hard-float build/CRC. Zaktualizowano launcher i binarkę na karcie; wszystkie 603 pliki gry ponownie zgodne z paczką SHA-256.
+- Po wcześniejszych dwóch startach nie było logu. Test urządzenia po poprawce i kontrola punktów inicjalizacji SDL/okna/renderera nadal oczekują na wynik z Miyoo.
