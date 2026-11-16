@@ -481,6 +481,23 @@ static void abilitiesAndValidation() {
   const auto& sortedRow=sortedMuster.players[0].board[0];
   assert(sortedRow.size()==3&&sortedRow[0].id=="weavess"&&sortedRow[1].id=="brewess"&&sortedRow[2].id=="whispess");
 
+  const auto arachasCopies=std::count_if(referenceCardCatalog().begin(),referenceCardCatalog().end(),
+      [](const Card& card){return card.name=="Arachas"&&card.muster;});
+  assert(arachasCopies==3);
+  Game arachasMuster;
+  const auto behemoth=referenceCard("Arachas- Behemoth");
+  assert(behemoth.group=="Arachas");
+  arachasMuster.players[0].hand={behemoth,referenceCard("Arachas")};
+  arachasMuster.players[0].deck={referenceCard("Arachas"),referenceCard("Arachas")};
+  arachasMuster.players[0].hand[1].id="arachas-hand-copy";
+  arachasMuster.players[0].deck[0].id="arachas-deck-copy-a";
+  arachasMuster.players[0].deck[1].id="arachas-deck-copy-b";
+  assert(playCard(arachasMuster,0,behemoth.id));
+  assert(arachasMuster.players[0].hand.empty()&&arachasMuster.players[0].deck.empty());
+  assert(arachasMuster.players[0].board[0].size()==3&&arachasMuster.players[0].board[2].size()==1);
+  assert(std::all_of(arachasMuster.players[0].board[0].begin(),arachasMuster.players[0].board[0].end(),
+                     [](const Card& card){return card.name=="Arachas";}));
+
   Game roachMuster;
   Card geralt = referenceCard("Geralt of Rivia");
   Card ciri = referenceCard("Cirilla Fiona Elen Riannon");

@@ -327,3 +327,9 @@ Francesca Hope's exhaustive Agile assignment uses the same sorted row insertion
 as the pinned source's `Row.addCard()` / `CardContainer.addCardSorted()` path.
 Engine regression checks that both combat rows remain sorted after activating
 the Leader.
+
+Arachas- Behemoth's default Muster prefix now follows the source
+`name.indexOf('-')` behavior, including hyphens with no surrounding space.
+The prior catalog generator split only on `" - "`, so it failed to summon
+Arachas copies from hand/deck. An engine regression verifies all three copies
+move and both source zones empty.

@@ -87,7 +87,9 @@ for index, item in enumerate(records):
     if "bond" in ability:
         group = name
     elif "muster" in ability:
-        group = item.get("muster") or name.split(" - ", 1)[0]
+        # abilities.js splits the default Muster name at the first hyphen,
+        # whether or not it has spaces around it (e.g. "Arachas- Behemoth").
+        group = item.get("muster") or name.split("-", 1)[0]
     instances = max(copies, 1)
     for copy_no in range(1, instances + 1):
         card_id = f"ref_{index}_{slug(name)}_{copy_no}"

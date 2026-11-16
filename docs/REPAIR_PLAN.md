@@ -329,3 +329,7 @@ rodzajami kart; pełny test na urządzeniu opisany wersją binarium i wynikiem.
 - [x] Manekin przyjmuje wyłącznie jawnie wskazaną własną jednostkę bojową
   niebędącą Bohaterem. Test sprawdza zwrot tej samej karty, miejsce Manekina,
   Avengera Krowy oraz odrzucenie celu z planszy przeciwnika.
+- [x] Generator kart wyznacza domyślną grupę Muster przez podział przy
+  pierwszym myślniku, jak źródłowe `abilities.js`. Poprzedni separator `" - "`
+  pomijał „Arachas- Behemoth”; regresja potwierdza przywołanie Arachas z ręki
+  i talii.
