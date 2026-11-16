@@ -32,6 +32,8 @@ jobs:
         run: SDL_VIDEODRIVER=dummy ./build-sdl/gwent --smoke-test frontend-smoke.bmp deck-builder-smoke.bmp card-details-smoke.bmp card-flight-smoke.bmp deck-builder-settings-smoke.bmp deck-builder-back-smoke.bmp leader-choice-smoke.bmp leader-reveal-smoke.bmp pause-smoke.bmp mulligan-smoke.bmp
       - name: Miyoo physical-key mapping
         run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./build-sdl/gwent --input-test
+      - name: Round and match result screens
+        run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./build-sdl/gwent --result-smoke-test round-result-win.bmp round-result-loss.bmp round-result-draw.bmp round-result-nilfgaard-tiebreak.bmp match-result-draw.bmp
       - name: Miyoo software-composition smoke test
         run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy GWENT_SOFTWARE_COMPOSITE=1 ./build-sdl/gwent --smoke-test composite-frontend-smoke.bmp composite-deck-builder-smoke.bmp composite-card-details-smoke.bmp composite-card-flight-smoke.bmp composite-deck-builder-settings-smoke.bmp composite-deck-builder-back-smoke.bmp composite-leader-choice-smoke.bmp composite-leader-reveal-smoke.bmp composite-pause-smoke.bmp composite-mulligan-smoke.bmp
       - name: Upload frontend smoke frames
@@ -49,6 +51,11 @@ jobs:
             leader-reveal-smoke.bmp
             pause-smoke.bmp
             mulligan-smoke.bmp
+            round-result-win.bmp
+            round-result-loss.bmp
+            round-result-draw.bmp
+            round-result-nilfgaard-tiebreak.bmp
+            match-result-draw.bmp
             composite-frontend-smoke.bmp
             composite-deck-builder-smoke.bmp
             composite-card-details-smoke.bmp

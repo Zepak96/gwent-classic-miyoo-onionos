@@ -214,6 +214,18 @@ static void turnsAndRounds() {
   assert(playCard(nilfgaard,0,"na")); assert(playCard(nilfgaard,1,"nb"));
   assert(pass(nilfgaard,0)); assert(pass(nilfgaard,1));
   assert(nilfgaard.players[0].roundWins==1 && nilfgaard.players[1].roundLosses==1);
+
+  Game finalGemLoss;
+  finalGemLoss.players[0].roundLosses=1;
+  assert(pass(finalGemLoss,0)&&pass(finalGemLoss,1));
+  assert(finalGemLoss.phase==Phase::MatchResult&&finalGemLoss.matchWinner==1);
+  assert(!startNextRound(finalGemLoss));
+
+  Game finalGemDraw;
+  finalGemDraw.players[0].roundLosses=1;finalGemDraw.players[1].roundLosses=1;
+  assert(pass(finalGemDraw,0)&&pass(finalGemDraw,1));
+  assert(finalGemDraw.phase==Phase::MatchResult&&finalGemDraw.matchWinner==2);
+  assert(!startNextRound(finalGemDraw));
 }
 static void sourceAutomaticPassing() {
   Game exhausted;

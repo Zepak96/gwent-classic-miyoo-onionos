@@ -590,6 +590,7 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="continue")return pl?"ENTER - DALEJ":"ENTER - CONTINUE";
   if(key=="defeat")return pl?"PRZEGRANA":"DEFEAT";
   if(key=="victory")return pl?"ZWYCIESTWO":"VICTORY";
+  if(key=="draw")return pl?"REMIS":"DRAW";
   if(key=="target")return pl?"WYBIERZ KARTĘ":"CHOOSE A CARD";
   if(key=="random_medic_target")return pl?"WYBIERZ RZĄD DLA LOSOWEJ KARTY":"CHOOSE ROW FOR RANDOM CARD";
   if(key=="deck_invalid")return pl?"TALIA NIEPOPRAWNA":"DECK IS INVALID";
@@ -647,6 +648,21 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="mulligan_error")return pl?"NIE MOŻNA WYMIENIĆ TYCH KART":"MULLIGAN ERROR";
   if(key=="ai_action_error")return pl?"BŁĄD RUCHU PRZECIWNIKA - ZGŁOŚ TEN PRZYPADEK":"AI ACTION ERROR - REPORT THIS CASE";
   return key;
+}
+enum class ResultSide { Victory, Defeat, Draw };
+ResultSide resultSide(const gwent::Game& game) {
+  if(game.phase==gwent::Phase::MatchResult) {
+    if(game.matchWinner==0)return ResultSide::Victory;
+    if(game.matchWinner==1)return ResultSide::Defeat;
+    return ResultSide::Draw;
+  }
+  if(game.players[0].score>game.players[1].score)return ResultSide::Victory;
+  if(game.players[0].score<game.players[1].score)return ResultSide::Defeat;
+  const bool playerNilfgaard=game.players[0].faction==gwent::Faction::Nilfgaard;
+  const bool opponentNilfgaard=game.players[1].faction==gwent::Faction::Nilfgaard;
+  if(playerNilfgaard!=opponentNilfgaard)
+    return playerNilfgaard?ResultSide::Victory:ResultSide::Defeat;
+  return ResultSide::Draw;
 }
 std::string displayCardName(const App& a,const gwent::Card& card) {
   if(card.referenceIndex>=0) {
@@ -1819,9 +1835,12 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     const Uint8 alpha=endScreenAlpha(SDL_GetTicks()-a.endScreenStartedAt);
     box(r,0,0,W,STAGE_H,Color{10,10,10,static_cast<Uint8>(242u*alpha/255)});
     const bool done=a.game.phase==gwent::Phase::MatchResult;
-    const bool won=a.game.matchWinner==0;
-    drawImageAlpha(r,a,std::string("img/icons/end_")+(done?(won?"win":"lose"):(won?"win":"lose"))+".png",210,21,220,102,alpha);
-    text(r,213,139,done?tr(a,won?"victory":"defeat"):tr(a,"round_complete"),Color{gold.r,gold.g,gold.b,alpha},2);
+    const auto outcome=resultSide(a.game);
+    const std::string image=outcome==ResultSide::Victory?"win":outcome==ResultSide::Defeat?"lose":"draw";
+    drawImageAlpha(r,a,"img/icons/end_"+image+".png",210,21,220,102,alpha);
+    const std::string title=done?tr(a,outcome==ResultSide::Victory?"victory":outcome==ResultSide::Defeat?"defeat":"draw"):
+                                 tr(a,"round_complete");
+    text(r,213,139,title,Color{gold.r,gold.g,gold.b,alpha},2);
     text(r,220,174,tr(a,"player_short")+" "+std::to_string(me.score)+"  -  "+std::to_string(op.score)+" "+tr(a,"opponent_short"),Color{paper.r,paper.g,paper.b,alpha},1);
     text(r,265,217,tr(a,"continue"),Color{muted.r,muted.g,muted.b,alpha},1);
   }
@@ -2445,6 +2464,22 @@ int main(int argc,char** argv) {
     powerBadgeProbe.game.horn[0][0]=true;
     bool okay=boardCardPower(powerBadgeProbe.game,0,0,powerEight)==16&&
               rowScore(powerBadgeProbe.game,0,0)==16;
+    gwent::Game resultProbe;resultProbe.phase=gwent::Phase::RoundResult;
+    resultProbe.players[0].score=12;resultProbe.players[1].score=9;
+    okay=okay&&resultSide(resultProbe)==ResultSide::Victory;
+    resultProbe.players[0].score=9;resultProbe.players[1].score=12;
+    okay=okay&&resultSide(resultProbe)==ResultSide::Defeat;
+    resultProbe.players[0].score=resultProbe.players[1].score=12;
+    okay=okay&&resultSide(resultProbe)==ResultSide::Draw;
+    resultProbe.players[0].faction=gwent::Faction::Nilfgaard;
+    okay=okay&&resultSide(resultProbe)==ResultSide::Victory;
+    resultProbe.players[0].faction=gwent::Faction::NorthernRealms;
+    resultProbe.players[1].faction=gwent::Faction::Nilfgaard;
+    okay=okay&&resultSide(resultProbe)==ResultSide::Defeat;
+    resultProbe.phase=gwent::Phase::MatchResult;resultProbe.matchWinner=2;
+    okay=okay&&resultSide(resultProbe)==ResultSide::Draw;
+    resultProbe.matchWinner=1;okay=okay&&resultSide(resultProbe)==ResultSide::Defeat;
+    resultProbe.matchWinner=0;okay=okay&&resultSide(resultProbe)==ResultSide::Victory;
     const bool startsInDeckMaker=app.screen==Screen::DeckBuilder;
     app.miyooControls=true;
     app.screen=Screen::Match;
@@ -2867,6 +2902,32 @@ int main(int argc,char** argv) {
     if(okay)std::cout<<"Miyoo controls, source-timed action lock/preview/flight/audio/ability effects, mulligan, guarded pass and Agile Medic row selection passed.\n";
     else std::cerr<<"Miyoo controls, action timing/lock, target selection, Agile revival, Eredin discard/draw or guarded pass failed.\n";
     app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return okay?0:10;
+  }
+  if(argc>1&&std::string(argv[1])=="--result-smoke-test") {
+    if(argc<7) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 12; }
+    const auto saveResult=[&](const char* path,gwent::Phase phase,int playerScore,int opponentScore,
+                              gwent::Faction playerFaction,gwent::Faction opponentFaction,int winner) {
+      app.screen=Screen::Match;app.game=gwent::Game{};app.game.phase=phase;
+      app.game.players[0].score=playerScore;app.game.players[1].score=opponentScore;
+      app.game.players[0].faction=playerFaction;app.game.players[1].faction=opponentFaction;
+      app.game.matchWinner=winner;app.language=Language::Polish;app.pauseOpen=false;app.cardDetailsOpen=false;
+      app.activeNotification.clear();app.cardFlight.active=false;app.triggeredCardFlights.clear();app.cardEffects.clear();
+      app.endScreenStartedAt=SDL_GetTicks()-150;
+      SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);drawMatchOnScreen(renderer,app);presentFrame();
+      SDL_Surface* surface=SDL_CreateRGBSurfaceWithFormat(0,W,H,32,SDL_PIXELFORMAT_ARGB8888);
+      if(!surface)return false;
+      const bool okay=SDL_RenderReadPixels(renderer,nullptr,SDL_PIXELFORMAT_ARGB8888,surface->pixels,surface->pitch)==0&&
+                      SDL_SaveBMP(surface,path)==0;
+      SDL_FreeSurface(surface);return okay;
+    };
+    const auto nr=gwent::Faction::NorthernRealms,nilf=gwent::Faction::Nilfgaard;
+    const bool okay=saveResult(argv[2],gwent::Phase::RoundResult,15,10,nr,nr,-1)&&
+      saveResult(argv[3],gwent::Phase::RoundResult,10,15,nr,nr,-1)&&
+      saveResult(argv[4],gwent::Phase::RoundResult,10,10,nr,nr,-1)&&
+      saveResult(argv[5],gwent::Phase::RoundResult,10,10,nilf,nr,-1)&&
+      saveResult(argv[6],gwent::Phase::MatchResult,10,10,nr,nr,2);
+    if(okay)std::cout<<"Round win/loss/draw, Nilfgaard tie-break and drawn match result screens rendered.\n";
+    app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return okay?0:12;
   }
   if(char* directory=SDL_GetPrefPath("GwentClassic","MiyooMiniPlus")) {
     app.dataDirectory=directory;app.savePath=app.dataDirectory+"match-v1.gws";

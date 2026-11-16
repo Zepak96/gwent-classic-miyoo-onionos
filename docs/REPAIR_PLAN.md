@@ -365,3 +365,12 @@ rodzajami kart; pełny test na urządzeniu opisany wersją binarium i wynikiem.
   and Clear Weather clears all active effects while returning each active card
   to its original owner's graveyard. Ubuntu CTest passed 2/2; these checks found
   no engine discrepancy. Physical visual/audio timing remains open.
+- [x] Result-screen audit found that `RoundResult` always displayed the loss
+  stamp because the frontend read `matchWinner` before a match was over; match
+  draws were also rendered as defeats. The renderer now derives round outcome
+  from score and Nilfgaard's tie-break, and renders `end_draw` plus a localized
+  draw title for drawn matches. Engine tests cover last-gem loss and drawn match;
+  frontend tests render five outcome frames and input tests cover win/loss/draw
+  mapping. SDL input/result smoke checks and visual review passed locally;
+  GitHub CI will run the full committed CTest set.
+  Visual captures are under `artifacts/qa/result-screens/`.

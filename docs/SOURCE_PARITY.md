@@ -20,9 +20,16 @@ source behavior. A build or screenshot alone does not count as parity.
   until they pass; native engine regressions cover both passes ending a round.
   Miyoo X hold opens a confirmation and A confirms; SDL input probes cover hold,
   confirm, and short press behavior.
-- [ ] Round result, gems/health, ties, Nilfgaard tie-break, match result/rematch.
-- [ ] Round cleanup, Northern Realms draw, Monsters survivor, Skellige round-three
-  graveyard selection and Agile row selection.
+- [x] Round results, gem losses, score ties, Nilfgaard tie-break, and match
+  victory/defeat/draw. Engine regressions cover round wins/losses, a draw on the
+  last gem, and a match draw. SDL result-screen checks cover round win/loss/draw,
+  Nilfgaard's tie-break, and the drawn-match screen. Rematch behavior remains
+  open.
+- [x] Round cleanup, Northern Realms draw, Monsters survivor, and Skellige
+  round-three graveyard selection/Agile row selection. Regressions verify the
+  Northern Realms winner draws, a Monsters player keeps one non-Hero Unit,
+  Skellige revives at most two units on round three, AI Agile row selection,
+  player Agile row selection, and cleanup interactions with Avenger/Kambi.
 - [x] An active Leader ability is available once per match and does not reset
   between rounds, matching the source `disableLeader()` lifecycle; an engine
   regression verifies it remains spent after round two starts.
@@ -396,3 +403,14 @@ iterating melee to siege, yielding siege/ranged/melee target order. The native
 fallback now uses that order; a fixed-seed regression checks the siege target.
 These tests verify tie/fallback ordering only; the broader AI weighting and
 decision audit remains open.
+
+## Round and match result presentation
+
+The result screen previously used `matchWinner` even during `RoundResult`,
+where it is still unset. That made every completed round display the loss
+stamp; a match draw also displayed defeat. The view now derives a round outcome
+from score plus the Nilfgaard tie-break and derives a completed match outcome
+from `matchWinner`, displaying the source draw stamp and localized draw title
+when appropriate. The frontend result smoke test renders round win, loss, draw,
+Nilfgaard tie-break, and match draw frames; `--input-test` checks all outcome
+branches.
