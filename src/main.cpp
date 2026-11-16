@@ -962,7 +962,8 @@ std::vector<const gwent::Card*> pendingMedicChoices(const App& a) {
   const auto random=a.game.randomRespawn?gwent::previewRandomMedicTargetId(a.game,0):std::string{};
   for(const auto& c:a.game.players[0].graveyard)
     if(c.kind==gwent::Kind::Unit&&!c.hero&&(c.row!=gwent::Row::None||c.agile)&&
-       (!a.game.randomRespawn||c.id==random))cards.push_back(&c);
+       (!a.game.randomRespawn||c.id==random)&&
+       (a.game.pendingMedicAgileId.empty()||c.id==a.game.pendingMedicAgileId))cards.push_back(&c);
   const auto basePower=[](const gwent::Card* card) {
     const auto& catalog=gwent::referenceCardCatalog();
     const auto original=std::find_if(catalog.begin(),catalog.end(),[&](const auto& c){return c.referenceIndex==card->referenceIndex;});
@@ -1119,7 +1120,7 @@ void doHumanPlay(App& a) {
   const auto card=hand[a.handIndex];
   const auto targets=legalCardTargets(a,card);
   if(card.kind==gwent::Kind::Decoy && targets.empty()) { a.status=tr(a,"decoy_needs_unit"); return; }
-  if(!targets.empty()) {
+  if(!targets.empty()&&!card.medic) {
     a.targetMode=true; a.selectedTargets=targets; a.targetIndex=0; a.reviveRowIndex=0; a.audio.play("open");
     a.status=tr(a,a.game.randomRespawn&&card.medic?"random_medic_target":"target");return;
   }
@@ -1154,7 +1155,7 @@ bool cardHasRowChoice(const gwent::Card& card) {
   return false;
 }
 void performAi(App& a) {
-  if(a.game.phase!=gwent::Phase::OpponentTurn) return;
+  if(a.game.phase!=gwent::Phase::OpponentTurn&&a.game.pendingMedicPlayer!=1)return;
   const auto action=gwent::chooseAiAction(a.game,1);
   bool success=false;
   if(action.resolveMedic) {
@@ -2014,7 +2015,7 @@ void drawMatch(SDL_Renderer* r,const App& a) {
       const std::string counter=(a.language==Language::Polish?"WYMIANY: ":"REDRAWS: ")+std::to_string(remaining)+"/2";
       text(r,214,185,counter,gold,1);
     }
-  } else if(a.game.phase==gwent::Phase::RoundSetup) {
+  } else if(a.game.phase==gwent::Phase::RoundSetup&&a.game.pendingMedicPlayer<0) {
     std::vector<const gwent::Card*> candidates;
     for(const auto& card:me.graveyard)if(std::find(a.game.skelligeAgileReviveIds.begin(),a.game.skelligeAgileReviveIds.end(),card.id)!=a.game.skelligeAgileReviveIds.end())candidates.push_back(&card);
     box(r,0,0,W,STAGE_H,Color{0,0,0,195});frame(r,0,0,W,STAGE_H,Color{20,20,20});
@@ -2028,13 +2029,21 @@ void drawMatch(SDL_Renderer* r,const App& a) {
   }
   if(a.game.pendingMedicPlayer==0) {
     const auto choices=pendingMedicChoices(a);
-    box(r,0,0,W,STAGE_H,Color{0,0,0,195});
-    drawChoiceCarousel(r,a,choices,a.targetIndex,
-      a.language==Language::Polish?"MEDYK: WYBIERZ KARTE":"MEDIC: CHOOSE CARD",
-      a.language==Language::Polish?"LEWO/PRAWO: KARTA  GORA/DOL: RZAD  B: WYBIERZ":"LEFT/RIGHT: CARD  UP/DOWN: ROW  B: SELECT");
-    const int index=std::clamp(a.targetIndex,0,std::max(0,static_cast<int>(choices.size())-1));
-    if(!choices.empty()&&choices[index]->agile)
-      centeredTextInBox(r,180,252,280,15,tr(a,a.rowIndex==0?"melee":"ranged"),gold,1);
+    if(!a.game.pendingMedicAgileId.empty()&&!choices.empty()) {
+      const int selectedRow=std::clamp(a.rowIndex,0,1),y=143+selectedRow*45;
+      box(r,183,y+1,448,43,Color{211,166,72,68});
+      frame(r,183,y+1,448,43,Color{244,202,117,235});
+      drawCardPreview(r,a,*choices.front());
+      centeredTextInBox(r,183,244,315,18,
+        a.language==Language::Polish?"WYBIERZ RZAD":"CHOOSE ROW",gold,1);
+      centeredTextInBox(r,183,263,315,18,
+        a.language==Language::Polish?"GORA/DOL: RZAD  B: WYBIERZ  A: ANULUJ":"UP/DOWN: ROW  B: SELECT  A: CANCEL",paper,1);
+    } else {
+      box(r,0,0,W,STAGE_H,Color{0,0,0,195});
+      drawChoiceCarousel(r,a,choices,a.targetIndex,
+        a.language==Language::Polish?"MEDYK: WYBIERZ KARTE":"MEDIC: CHOOSE CARD",
+        a.language==Language::Polish?"LEWO/PRAWO: KARTA  B: WYBIERZ":"LEFT/RIGHT: CARD  B: SELECT");
+    }
   }
   if(a.game.phase==gwent::Phase::RoundResult || a.game.phase==gwent::Phase::MatchResult) {
     const Uint8 alpha=endScreenAlpha(SDL_GetTicks()-a.endScreenStartedAt);
@@ -2231,7 +2240,7 @@ void handleMatchKey(App& a,SDL_Keycode key) {
     a.pauseOpen=true;a.pauseIndex=0;return;
   }
   if(key==SDLK_BACKQUOTE) {
-    if(a.game.phase==gwent::Phase::PlayerTurn&&!a.leaderSelectionMode&&!a.leaderRevealOpen&&!a.targetMode)a.passConfirmationOpen=true;
+    if(a.game.phase==gwent::Phase::PlayerTurn&&a.game.pendingMedicPlayer<0&&!a.leaderSelectionMode&&!a.leaderRevealOpen&&!a.targetMode)a.passConfirmationOpen=true;
     else if(a.game.phase==gwent::Phase::Mulligan)handleMatchKey(a,SDLK_RETURN);
     else if(a.game.phase==gwent::Phase::RoundSetup)handleMatchKey(a,SDLK_x);
     else if(a.game.phase==gwent::Phase::RoundResult)handleMatchKey(a,SDLK_RETURN);
@@ -2296,7 +2305,7 @@ void handleMatchKey(App& a,SDL_Keycode key) {
     if(a.game.phase==gwent::Phase::PlayerTurn)beginHumanPlayConfirmation(a);
     return;
   }
-  if(key==SDLK_ESCAPE) {
+  if(key==SDLK_ESCAPE&&a.game.pendingMedicPlayer<0) {
     if(a.targetMode) { a.targetMode=false;a.selectedTargets.clear();a.status=tr(a,"your_turn");return; }
     saveCurrentMatch(a);a.screen=Screen::DeckBuilder;return;
   }
@@ -2318,20 +2327,31 @@ void handleMatchKey(App& a,SDL_Keycode key) {
     const auto choices=pendingMedicChoices(a);
     if(choices.empty())return;
     a.targetIndex=std::clamp(a.targetIndex,0,static_cast<int>(choices.size())-1);
-    if(key==SDLK_LEFT) {
+    const bool choosingRow=!a.game.pendingMedicAgileId.empty();
+    if(choosingRow&&(key==SDLK_x||key==SDLK_z||key==SDLK_ESCAPE)) {
+      if(gwent::cancelMedicRevive(a.game,0)) {
+        a.targetIndex=0;a.status=tr(a,"your_turn");
+        if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+450;
+      }
+      return;
+    }
+    if(!choosingRow&&key==SDLK_LEFT) {
       const int old=a.targetIndex;a.targetIndex=std::max(0,a.targetIndex-1);
       a.audio.play("ui_card");if(old!=a.targetIndex)noteCarouselMove(a,-1);
-    } else if(key==SDLK_RIGHT) {
+    } else if(!choosingRow&&key==SDLK_RIGHT) {
       const int old=a.targetIndex;a.targetIndex=std::min(static_cast<int>(choices.size())-1,a.targetIndex+1);
       a.audio.play("ui_card");if(old!=a.targetIndex)noteCarouselMove(a,1);
     }
-    else if((key==SDLK_UP||key==SDLK_DOWN)&&choices[a.targetIndex]->agile)a.rowIndex=1-a.rowIndex;
+    else if(choosingRow&&(key==SDLK_UP||key==SDLK_DOWN))a.rowIndex=1-a.rowIndex;
     else if(key==SDLK_AC_BACK||key==SDLK_RETURN||key==SDLK_KP_ENTER) {
       const auto id=choices[a.targetIndex]->id;
-      const auto row=choices[a.targetIndex]->agile?static_cast<gwent::Row>(a.rowIndex):gwent::Row::None;
+      const auto row=choosingRow?static_cast<gwent::Row>(std::clamp(a.rowIndex,0,1)):gwent::Row::None;
       const auto revived=*choices[a.targetIndex];
       const auto before=a.game;
       if(gwent::chooseMedicRevive(a.game,0,id,row)) {
+        if(!a.game.pendingMedicAgileId.empty()) {
+          a.rowIndex=0;a.targetIndex=0;a.audio.play("ui_card");return;
+        }
         auto visual=revived;visual.medic=true;
         queueTriggeredEffects(a,before,visual,0);
         playCardSound(a,revived,before,0,row);
@@ -2778,19 +2798,19 @@ int main(int argc,char** argv) {
       auto second=first;second.id="input-chain-second";
       auto revived=gwent::Card{};revived.id="input-chain-agile";revived.kind=gwent::Kind::Unit;
       revived.row=gwent::Row::Melee;revived.power=6;revived.agile=true;
-      chainProbe.game.players[0].hand={first};
-      chainProbe.game.players[0].graveyard={second,revived};
-      const bool chainStarted=gwent::playCard(chainProbe.game,0,first.id,gwent::Row::None,second.id);
-      std::cerr<<"Medic input probe: start="<<chainStarted<<" pending="<<chainProbe.game.pendingMedicPlayer<<"\n";
-      okay=okay&&chainStarted;
-      okay=okay&&chainProbe.game.pendingMedicPlayer==0&&chainProbe.game.players[0].hand.empty();
+      chainProbe.game.players[0].hand={first};chainProbe.game.players[0].graveyard={second,revived};
+      handleMatchKey(chainProbe,SDLK_AC_BACK); // placement preview
+      handleMatchKey(chainProbe,SDLK_AC_BACK); // first Medic is on the board before selecting its target
+      okay=okay&&chainProbe.game.pendingMedicPlayer==0&&chainProbe.game.players[0].hand.empty()&&
+        chainProbe.game.players[0].board[0].size()==1;
+      handleMatchKey(chainProbe,SDLK_AC_BACK); // revive second Medic; it opens another carousel
+      okay=okay&&chainProbe.game.pendingMedicPlayer==0&&chainProbe.game.players[0].board[0].size()==2;
+      handleMatchKey(chainProbe,SDLK_AC_BACK); // select Agile target, then choose its row
+      okay=okay&&chainProbe.game.pendingMedicAgileId==revived.id;
       handleMatchKey(chainProbe,SDLK_DOWN);
-      std::cerr<<"Medic input probe: row="<<chainProbe.rowIndex<<"\n";
       okay=okay&&chainProbe.rowIndex==1;
       handleMatchKey(chainProbe,normalizeMiyooKey(chainProbe,SDLK_LALT));
-      std::cerr<<"Medic input probe: after B pending="<<chainProbe.game.pendingMedicPlayer<<" ranged="<<chainProbe.game.players[0].board[1].size()<<"\n";
-      okay=okay&&chainProbe.game.pendingMedicPlayer==-1&&
-        chainProbe.game.players[0].board[1].size()==1&&
+      okay=okay&&chainProbe.game.pendingMedicPlayer==-1&&chainProbe.game.players[0].board[1].size()==1&&
         chainProbe.game.players[0].board[1][0].id==revived.id;
     }
     const bool startsInDeckMaker=app.screen==Screen::DeckBuilder;
@@ -3186,37 +3206,30 @@ int main(int argc,char** argv) {
     gwent::Card agile;agile.id="agile-input";agile.name="Agile unit";agile.kind=gwent::Kind::Unit;
     agile.row=gwent::Row::None;agile.power=7;agile.agile=true;agile.abilities={"agile"};
     app.game.players[0].hand={medic};app.game.players[0].graveyard={agile};
-    app.handIndex=0;app.targetIndex=0;app.reviveRowIndex=0;app.targetMode=true;app.selectedTargets={agile.id};
-    handleMatchKey(app,SDLK_UP);
-    okay=okay&&app.reviveRowIndex==1&&app.game.players[0].graveyard.size()==1;
-    handleMatchKey(app,normalizeMiyooKey(app,SDLK_LALT));
-    okay=okay&&app.game.players[0].board[1].size()==1&&
-         std::any_of(app.game.players[0].board[1].begin(),app.game.players[0].board[1].end(),[](const gwent::Card& card){return card.id=="agile-input";})&&
-         std::none_of(app.game.players[0].board[0].begin(),app.game.players[0].board[0].end(),[](const gwent::Card& card){return card.id=="agile-input";})&&
-         app.actionAnimationLockActive;
-    app.game=gwent::Game{};app.game.phase=gwent::Phase::PlayerTurn;app.game.currentPlayer=0;
-    app.game.randomRespawn=true;app.game.rngState=0x2468;
+    app.handIndex=0;app.targetIndex=0;app.rowIndex=0;app.targetMode=false;app.selectedTargets.clear();
+    handleMatchKey(app,SDLK_AC_BACK);handleMatchKey(app,SDLK_AC_BACK);
+    okay=okay&&app.game.players[0].hand.empty()&&app.game.players[0].board[0].size()==1&&app.game.pendingMedicPlayer==0;
+    handleMatchKey(app,SDLK_AC_BACK);
+    okay=okay&&app.game.pendingMedicAgileId==agile.id;
+    handleMatchKey(app,SDLK_DOWN);handleMatchKey(app,SDLK_AC_BACK);
+    okay=okay&&app.game.players[0].board[1].size()==1&&app.game.pendingMedicPlayer==-1&&app.actionAnimationLockActive;
+    // Canceling the row after selecting an Agile target leaves it in the grave.
+    app.game=gwent::Game{};app.game.players[0].hand={medic};app.game.players[0].graveyard={agile};
+    app.handIndex=0;app.targetMode=false;app.selectedTargets.clear();
+    handleMatchKey(app,SDLK_AC_BACK);handleMatchKey(app,SDLK_AC_BACK);handleMatchKey(app,SDLK_AC_BACK);
+    handleMatchKey(app,SDLK_x);
+    okay=okay&&app.game.pendingMedicPlayer==-1&&app.game.players[0].graveyard.size()==1&&
+      app.game.players[0].graveyard.front().id==agile.id;
+    // Random Agile revival still asks for a row, but not a choice among targets.
+    app.game=gwent::Game{};app.game.randomRespawn=true;app.game.rngState=0x2468;
     medic.id="random-medic-input";agile.id="random-agile-input";
     app.game.players[0].hand={medic};app.game.players[0].graveyard={agile};
-    app.handIndex=0;app.targetMode=false;app.selectedTargets.clear();app.reviveRowIndex=0;
-    handleMatchKey(app,SDLK_x);
-    handleMatchKey(app,normalizeMiyooKey(app,SDLK_LALT));
-    okay=okay&&app.targetMode&&app.selectedTargets.size()==1&&app.selectedTargets.front()==agile.id;
-    handleMatchKey(app,SDLK_DOWN);
-    okay=okay&&app.reviveRowIndex==1;
-    handleMatchKey(app,normalizeMiyooKey(app,SDLK_LALT));
-    okay=okay&&!app.targetMode&&std::any_of(app.game.players[0].board[1].begin(),app.game.players[0].board[1].end(),
-      [&](const gwent::Card& card){return card.id==agile.id;});
-    app.game=gwent::Game{};app.game.phase=gwent::Phase::PlayerTurn;app.game.currentPlayer=0;
-    app.game.randomRespawn=true;app.game.rngState=0x2468;
-    auto ordinaryRevive=gwent::Card{};ordinaryRevive.id="random-ordinary-input";ordinaryRevive.kind=gwent::Kind::Unit;
-    ordinaryRevive.row=gwent::Row::Melee;ordinaryRevive.power=5;
-    app.game.players[0].hand={medic};app.game.players[0].graveyard={ordinaryRevive};
-    app.handIndex=0;app.targetMode=false;app.selectedTargets.clear();
-    handleMatchKey(app,SDLK_x);
-    handleMatchKey(app,normalizeMiyooKey(app,SDLK_LALT));
-    okay=okay&&!app.targetMode&&std::any_of(app.game.players[0].board[0].begin(),app.game.players[0].board[0].end(),
-      [&](const gwent::Card& card){return card.id==ordinaryRevive.id;});
+    app.handIndex=0;app.targetIndex=0;app.rowIndex=0;app.targetMode=false;app.selectedTargets.clear();
+    handleMatchKey(app,SDLK_AC_BACK);handleMatchKey(app,SDLK_AC_BACK);
+    if(app.game.pendingMedicAgileId.empty())handleMatchKey(app,SDLK_AC_BACK);
+    okay=okay&&app.game.pendingMedicAgileId==agile.id;
+    handleMatchKey(app,SDLK_DOWN);handleMatchKey(app,SDLK_AC_BACK);
+    okay=okay&&app.game.pendingMedicPlayer==-1&&app.game.players[0].board[1].size()==1;
     app.game=gwent::Game{};app.screen=Screen::Match;app.miyooControls=true;
     app.game.phase=gwent::Phase::PlayerTurn;app.game.currentPlayer=0;
     app.game.players[0].leader=inputTestLeaderFor("eredin_destroyer");app.game.players[0].leaderAbilityAvailable=true;
@@ -3625,7 +3638,7 @@ int main(int argc,char** argv) {
     }
     if(app.screen==Screen::Match&&app.activeNotification.empty()&&
        !app.leaderSelectionMode&&!app.leaderRevealOpen&&!app.pauseOpen&&!app.passConfirmationOpen&&
-       app.game.phase==gwent::Phase::OpponentTurn&&!actionAnimationLocked(app,now)&&SDL_GetTicks()>=app.aiAt)performAi(app);
+       (app.game.phase==gwent::Phase::OpponentTurn||app.game.pendingMedicPlayer==1)&&!actionAnimationLocked(app,now)&&SDL_GetTicks()>=app.aiAt)performAi(app);
     app.audio.playMusic(app.screen==Screen::Match?"match":"menu");
     SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);
     if(app.screen==Screen::MainMenu)drawMainMenu(renderer,app);
