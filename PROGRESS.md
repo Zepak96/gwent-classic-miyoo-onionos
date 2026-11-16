@@ -48,6 +48,10 @@ końcowym wydaniem.
   pogody, Torrential Rain, ranged/melee Scorch, Biting Frost, Ranged Horn,
   Hope of the Aen Seidhe i Invader of the North. Pełne pokrycie wszystkich
   zdolności i wyborów lidera pozostaje otwarte.
+- Przetłumaczono statusy polskiej wersji dla błędów i akcji meczu (zapis,
+  mulligan, pas, cel, lider, Skellige oraz odrzucony ruch AI). CTest 2/2,
+  `--input-test` i `--audio-test assets` przechodzą; pełna lokalizacja menu,
+  podpowiedzi i kart pozostaje otwarta.
 
 - Naprawiono mapowanie własnych maksimów w wyborze celu AI dla Manekina:
   wariant źródłowy losuje spośród maksimum każdego własnego rzędu, nie tylko

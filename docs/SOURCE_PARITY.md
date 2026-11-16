@@ -103,6 +103,9 @@ items above:
   Invader, and Francesca Queen/Beautiful/Pureblood/Hope in addition to the
   previously covered leaders. This does not yet cover every leader's effects
   and selection flows.
+- Match action/error statuses for saves, mulligan, passes, leader activation,
+  target selection, Skellige revival and rejected AI actions now use Polish
+  strings in Polish mode. This does not establish full UI localization parity.
 - Opponent setup now chooses a random source premade recipe and a random leader
   of that recipe's faction; a deterministic 500-seed regression covers legal
   leaders/decks, repeatability, and reachability of all ten premade recipes.

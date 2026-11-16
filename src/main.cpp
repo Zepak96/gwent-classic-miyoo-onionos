@@ -510,6 +510,7 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="deck_valid")return pl?"TALIA POPRAWNA":"DECK IS VALID";
   if(key=="deck_invalid")return pl?"TALIA NIEPOPRAWNA":"DECK IS INVALID";
   if(key=="deck_saved")return pl?"ZAPISANO TALIE":"DECK SAVED";
+  if(key=="deck_save_error")return pl?"NIE UDAŁO SIĘ ZAPISAĆ TALII":"FAILED TO SAVE DECK";
   if(key=="deck_slot")return pl?"SLOT TALII":"DECK SLOT";
   if(key=="deck_controls")return pl?"GÓRA/DÓŁ: KARTA  A: DODAJ  B: USUŃ":"UP/DOWN: CARD  A: ADD  B: REMOVE";
   if(key=="deck_controls2")return pl?"L: LIDER  F: FRAKCJA  SELECT: ZAPISZ":"L: LEADER  F: FACTION  SELECT: SAVE";
@@ -550,6 +551,22 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="saved")return pl?"ZAPISANO":"GAME SAVED";
   if(key=="loaded")return pl?"WCZYTANO ZAPIS":"SAVE LOADED";
   if(key=="no_save")return pl?"BRAK POPRAWNEGO ZAPISU":"NO VALID SAVE FOUND";
+  if(key=="save_error")return pl?"BŁĄD ZAPISU MECZU":"MATCH SAVE ERROR";
+  if(key=="reference_decks_missing")return pl?"BRAK TALI REFERENCYJNYCH":"REFERENCE DECKS MISSING";
+  if(key=="reference_deck_invalid")return pl?"TALIA PRZECIWNIKA JEST NIEPOPRAWNA":"REFERENCE OPPONENT DECK INVALID";
+  if(key=="leader_used")return pl?"UŻYTO ZDOLNOŚCI LIDERA":"LEADER ABILITY USED";
+  if(key=="leader_cannot_use")return pl?"NIE MOŻNA UŻYĆ ZDOLNOŚCI LIDERA":"LEADER CANNOT BE USED";
+  if(key=="leader_no_target")return pl?"BRAK POPRAWNEGO CELU":"LEADER HAS NO VALID TARGET";
+  if(key=="no_card_selected")return pl?"NIE WYBRANO KARTY":"NO CARD SELECTED";
+  if(key=="decoy_needs_unit")return pl?"MANEKIN WYMAGA JEDNOSTKI NA PLANSZY":"DECOY NEEDS A UNIT ON THE BOARD";
+  if(key=="illegal_play")return pl?"NIEPRAWIDŁOWE ZAGRANIE":"ILLEGAL PLAY";
+  if(key=="opponent_used_leader")return pl?"RYWAL UŻYŁ ZDOLNOŚCI LIDERA":"OPPONENT USED LEADER ABILITY";
+  if(key=="ai_pass")return pl?"RUCH PRZECIWNIKA - PAS":"OPPONENT TURN - PASS";
+  if(key=="you_passed")return pl?"PASOWAŁEŚ":"YOU PASSED";
+  if(key=="skellige_revived")return pl?"SKELLIGE: WSKRZESZONO":"SKELLIGE REVIVED";
+  if(key=="illegal_target")return pl?"NIEPRAWIDŁOWY CEL":"ILLEGAL TARGET";
+  if(key=="mulligan_error")return pl?"NIE MOŻNA WYMIENIĆ TYCH KART":"MULLIGAN ERROR";
+  if(key=="ai_action_error")return pl?"BŁĄD RUCHU PRZECIWNIKA - ZGŁOŚ TEN PRZYPADEK":"AI ACTION ERROR - REPORT THIS CASE";
   return key;
 }
 std::string displayCardName(const App& a,const gwent::Card& card) {
@@ -645,7 +662,7 @@ bool loadSavedMatch(App& a) {
 }
 void saveCurrentMatch(App& a) {
   std::string error;
-  if(a.screen!=Screen::Match||a.savePath.empty()||!gwent::saveGame(a.savePath,a.game,&error))a.status="SAVE ERROR";
+  if(a.screen!=Screen::Match||a.savePath.empty()||!gwent::saveGame(a.savePath,a.game,&error))a.status=tr(a,"save_error");
   else a.status=tr(a,"saved");
 }
 std::string factionName(gwent::Faction faction,bool pl) {
@@ -758,7 +775,7 @@ gwent::Card recipeLeader(std::size_t index) {
   return leader;
 }
 void startMatch(App& a) {
-  if(recipes().size()<2) { a.status="REFERENCE DECKS MISSING"; return; }
+  if(recipes().size()<2) { a.status=tr(a,"reference_decks_missing"); return; }
   gwent::Card humanLeader=recipeLeader(a.deckIndex);std::vector<gwent::Card> humanDeck;
   if(a.userDeckSelected) {
     if(!gwent::materializeUserDeck(a.editDeck,humanDeck,humanLeader)) { a.status=tr(a,"deck_invalid");return; }
@@ -766,7 +783,7 @@ void startMatch(App& a) {
   const auto seed=static_cast<std::uint64_t>(SDL_GetTicks())^SDL_GetPerformanceCounter();
   auto opponent=gwent::makeReferenceOpponentDeck(seed);
   if(opponent.sourceDeckIndex<0||opponent.cards.empty()||opponent.leader.kind!=gwent::Kind::Leader) {
-    a.status="REFERENCE OPPONENT DECK INVALID";return;
+    a.status=tr(a,"reference_deck_invalid");return;
   }
   gwent::beginMatchWithLeaders(a.game,std::move(humanDeck),humanLeader,
       std::move(opponent.cards),opponent.leader,seed,-1);
@@ -840,10 +857,10 @@ void finishLeaderChoice(App& a) {
   a.targetIndex=0;
   if(okay) {
     queueLeaderTransitionVisuals(a,before,ability,0);
-    a.status="LEADER ABILITY USED";
+    a.status=tr(a,"leader_used");
     if(!a.game.revealedCards[0].empty())a.leaderRevealOpen=true;
     if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+400;
-  } else a.status="LEADER CANNOT BE USED";
+  } else a.status=tr(a,"leader_cannot_use");
   a.leaderSelections.clear();
 }
 void beginLeaderChoice(App& a) {
@@ -859,14 +876,14 @@ void beginLeaderChoice(App& a) {
     const auto before=a.game;
     if(gwent::activateLeader(a.game,0)) {
       queueLeaderTransitionVisuals(a,before,ability,0);
-      a.status="LEADER ABILITY USED";
+      a.status=tr(a,"leader_used");
       if(!a.game.revealedCards[0].empty())a.leaderRevealOpen=true;
       if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+400;
-    } else a.status="LEADER CANNOT BE USED";
+    } else a.status=tr(a,"leader_cannot_use");
     return;
   }
   if((ability=="eredin_destroyer"&&(a.game.players[0].hand.size()<2||a.game.players[0].deck.empty()))||
-     leaderChoiceCards(a).empty()) { a.status="LEADER HAS NO VALID TARGET";return; }
+     leaderChoiceCards(a).empty()) { a.status=tr(a,"leader_no_target");return; }
   a.leaderSelectionMode=true;
   a.targetIndex=0;
   a.audio.play("open");
@@ -886,10 +903,10 @@ const gwent::Card* findTargetCard(const gwent::Game& game,const std::string& id)
 }
 void doHumanPlay(App& a) {
   auto& hand=a.game.players[0].hand;
-  if(a.handIndex<0 || a.handIndex>=static_cast<int>(hand.size())) { a.status="NO CARD SELECTED"; return; }
+  if(a.handIndex<0 || a.handIndex>=static_cast<int>(hand.size())) { a.status=tr(a,"no_card_selected"); return; }
   const auto card=hand[a.handIndex];
   const auto targets=legalCardTargets(a,card);
-  if(card.kind==gwent::Kind::Decoy && targets.empty()) { a.status="DECOY NEEDS A UNIT"; return; }
+  if(card.kind==gwent::Kind::Decoy && targets.empty()) { a.status=tr(a,"decoy_needs_unit"); return; }
   if(!targets.empty()) {
     a.targetMode=true; a.selectedTargets=targets; a.targetIndex=0; a.reviveRowIndex=0; a.audio.play("open");a.status=tr(a,"target"); return;
   }
@@ -900,19 +917,19 @@ void doHumanPlay(App& a) {
     queueTriggeredEffects(a,before,card,0);
     playCardSound(a,card);
     a.status=displayCardName(a,card)+(a.language==Language::Polish?" - ZAGRANO":" - PLAYED"); a.handIndex=std::min(a.handIndex,static_cast<int>(a.game.players[0].hand.size())-1);
-  } else a.status="ILLEGAL PLAY";
+  } else a.status=tr(a,"illegal_play");
 }
 void performAi(App& a) {
   if(a.game.phase!=gwent::Phase::OpponentTurn) return;
   const auto action=gwent::chooseAiAction(a.game,1);
   bool success=false;
-  if(action.pass) { success=gwent::pass(a.game,1);a.audio.play("pass");a.status=tr(a,"ai_turn")+" - PASS"; }
+  if(action.pass) { success=gwent::pass(a.game,1);a.audio.play("pass");a.status=tr(a,"ai_pass"); }
   else if(action.activateLeader) {
     const auto before=a.game;
     const auto ability=activeLeaderAbility(a.game.players[1].leader);
     success=gwent::activateLeader(a.game,1,action.target,action.leaderSelection);
     if(success)queueLeaderTransitionVisuals(a,before,ability,1);
-    a.status="OPPONENT USED LEADER";
+    a.status=tr(a,"opponent_used_leader");
   } else {
     const auto& aiHand=a.game.players[1].hand;
     const auto it=std::find_if(aiHand.begin(),aiHand.end(),[&](const gwent::Card& item){return item.id==action.cardId;});
@@ -928,7 +945,7 @@ void performAi(App& a) {
     // Do not disguise an invalid ported AI action as a voluntary source-game
     // pass. Keep the turn state intact and make the failed action visible so
     // the mismatched rule can be corrected instead of silently changing play.
-    a.status="AI ACTION REJECTED - SOURCE PARITY ERROR";
+    a.status=tr(a,"ai_action_error");
   }
   a.aiAt=SDL_GetTicks()+360;
 }
@@ -1749,7 +1766,7 @@ void handleMatchKey(App& a,SDL_Keycode key) {
     if(key==SDLK_ESCAPE||key==SDLK_z||key==SDLK_BACKSPACE) { a.passConfirmationOpen=false;return; }
     if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x||key==SDLK_SPACE) {
       a.passConfirmationOpen=false;
-      if(gwent::pass(a.game,0)) { a.audio.play("pass");a.status="YOU PASSED";if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+400; }
+      if(gwent::pass(a.game,0)) { a.audio.play("pass");a.status=tr(a,"you_passed");if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+400; }
       return;
     }
     return;
@@ -1775,7 +1792,7 @@ void handleMatchKey(App& a,SDL_Keycode key) {
   }
   if(a.leaderSelectionMode) {
     const auto cards=leaderChoiceCards(a);
-    if(cards.empty()) { a.leaderSelectionMode=false;a.leaderSelections.clear();a.status="LEADER HAS NO VALID TARGET";return; }
+    if(cards.empty()) { a.leaderSelectionMode=false;a.leaderSelections.clear();a.status=tr(a,"leader_no_target");return; }
     if(key==SDLK_ESCAPE||key==SDLK_z||key==SDLK_BACKSPACE) {
       a.leaderSelectionMode=false;a.leaderSelections.clear();a.targetIndex=0;a.status=tr(a,"your_turn");return;
     }
@@ -1819,7 +1836,7 @@ void handleMatchKey(App& a,SDL_Keycode key) {
       const auto* card=candidates[static_cast<std::size_t>(a.targetIndex)];
       const auto row=card->agile?static_cast<gwent::Row>(a.rowIndex):gwent::Row::None;
       if(gwent::chooseSkelligeRevive(a.game,0,card->id,row)) {
-        a.status="SKELLIGE REVIVED: "+card->name; a.targetIndex=0;
+        a.status=tr(a,"skellige_revived")+": "+displayCardName(a,*card); a.targetIndex=0;
         if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+450;
       }
     }
@@ -1845,7 +1862,7 @@ void handleMatchKey(App& a,SDL_Keycode key) {
         a.audio.play("game_start");a.audio.play("round1_start");
         a.mulligan.clear(); a.status=tr(a,"your_turn");
         if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+450;
-      } else a.status="MULLIGAN ERROR";
+      } else a.status=tr(a,"mulligan_error");
     }
     return;
   }
@@ -1877,7 +1894,7 @@ void handleMatchKey(App& a,SDL_Keycode key) {
           queueTriggeredEffects(a,before,card,0);
           playCardSound(a,card);
           a.status=displayCardName(a,card)+(a.language==Language::Polish?" - ZAGRANO":" - PLAYED"); a.handIndex=std::min(a.handIndex,static_cast<int>(a.game.players[0].hand.size())-1);
-        } else a.status="ILLEGAL TARGET";
+        } else a.status=tr(a,"illegal_target");
       }
       a.targetMode=false; a.selectedTargets.clear();
     }
@@ -1893,7 +1910,7 @@ void handleMatchKey(App& a,SDL_Keycode key) {
     beginLeaderChoice(a);
   }
   else if(key==SDLK_BACKSPACE) {
-    if(gwent::pass(a.game,0)) { a.audio.play("pass");a.status="YOU PASSED"; if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+400; }
+    if(gwent::pass(a.game,0)) { a.audio.play("pass");a.status=tr(a,"you_passed"); if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+400; }
   }
   else if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x) doHumanPlay(a);
 }
@@ -1936,7 +1953,7 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
     if(key==SDLK_s||key==SDLK_F5) {
       std::string error;
       if(gwent::saveUserDeck(userDeckPath(a,a.deckSlot),a.editDeck,&error)) { a.userDeckSelected=true;a.status=tr(a,"deck_saved"); }
-      else a.status=tr(a,"deck_invalid")+": "+error;
+      else a.status=tr(a,"deck_save_error");
       return;
     }
     if(a.editingLeader) {
