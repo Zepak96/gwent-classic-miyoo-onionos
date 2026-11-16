@@ -455,3 +455,14 @@ change the selection weight or consume RNG before the action is chosen.
 
 The full weighted-AI parity audit remains open; these regressions prove RNG
 ordering for the covered target paths only.
+
+## Miniature validation — 2026-11-16
+
+Desktop CI run 43879730026 passed for bc33dcc5ebcc3409de106d2b0a6d7543726eeb07.
+Its frontend-smoke.bmp was downloaded and visually inspected at native 640x480
+and with nearest-neighbor enlargement of the hand. The row labels and common
+power rendering are present; two-digit powers use condensed spacing at the
+same glyph scale. This verifies that renderer fixture only, not physical-device
+readability or every possible buffed power. ARM package run 43880296800 was
+started for this same revision; installation and hardware validation remain
+pending until the package is available.
