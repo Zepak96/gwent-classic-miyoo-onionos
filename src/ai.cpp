@@ -379,7 +379,7 @@ std::vector<std::string> leaderSelection(Game& game,int who,const std::string& i
     auto discard=discardOrder(game,who);
     std::vector<std::string> chosen;
     for(const auto& card:discard)if(card.power<7 && chosen.size()<2)chosen.push_back(card.id);
-    if(chosen.size()==2&&!player.deck.empty())chosen.push_back(player.deck.back().id);
+    if(chosen.size()==2&&!player.deck.empty())chosen.push_back(player.deck.front().id);
     return chosen;
   }
   if(id=="eredin_king") {
@@ -509,18 +509,19 @@ bool performAiMulligan(Game& game,int who) {
   auto& player=game.players[who];
   for(int redraw=0;redraw<2;++redraw) {
     const auto order=discardOrder(game,who);
-    if(order.empty()||order.front().power>=15||player.deck.empty())break;
+    if(order.empty()||order.front().power>=15)break;
     const auto handCard=std::find_if(player.hand.begin(),player.hand.end(),[&](const Card& card){return card.id==order.front().id;});
     if(handCard==player.hand.end())break;
     const auto handIndex=static_cast<std::size_t>(handCard-player.hand.begin());
     const Card discarded=*handCard;
     player.hand.erase(handCard);
-    // The source Deck.swap() returns the discarded card to the bottom and
-    // draws the top card immediately, before deciding whether to redraw again.
-    player.deck.insert(player.deck.begin(),discarded);
-    const Card drawn=player.deck.back();
-    player.deck.pop_back();
-    player.hand.insert(player.hand.begin()+static_cast<std::ptrdiff_t>(handIndex),drawn);
+    // Deck.swap() uses Deck.addCardRandom(), then immediately draws index 0.
+    player.deck.push_back(discarded);
+    const auto randomIndex=static_cast<std::size_t>(roll(game))%player.deck.size();
+    std::swap(player.deck[randomIndex],player.deck.back());
+    Card drawn=std::move(player.deck.front());
+    player.deck.erase(player.deck.begin());
+    player.hand.insert(player.hand.begin()+static_cast<std::ptrdiff_t>(handIndex),std::move(drawn));
   }
   return replaceMulliganCards(game,who,{});
 }

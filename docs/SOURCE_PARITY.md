@@ -8,7 +8,7 @@ source behavior. A build or screenshot alone does not count as parity.
 ## Match lifecycle — `Game`, `Player`, `Deck`, `Board`
 
 - [ ] New game, random faction premade opponent, random legal faction leader.
-- [ ] Ten-card initial hands; source redraw order and at most two redraws.
+- [x] Ten-card initial hands; source redraw order and at most two redraws.
 - [ ] First-player coin toss and Scoia'tael's first-player choice.
 - [ ] One action per turn; automatic pass when no cards/leader action remain.
 - [ ] Voluntary pass; passed player stays out while the other keeps playing.
@@ -210,12 +210,13 @@ deck builder, and target carousel were visually reviewed at 640×480 in
 timing offsets are checked by `gwent --input-test`. Physical-device
 input/audio/gameplay still need confirmation.
 
-AI mulligan regression: `ControllerAI.redraw()` performs two independent
-discard-order decisions, with each discarded card returned to the deck bottom
-and the next card drawn from the deck top before the next decision. The port
-previously simulated both decisions but returned card IDs for a simultaneous
-hand selection; a second choice could then refer to a just-drawn card and be
-rejected. The runtime now performs the two swaps sequentially. Release CTest
+Mulligan parity now uses the source `Deck.swap()` sequence for human and AI:
+each discarded card is inserted with `Deck.addCardRandom()`, the new front card
+is drawn immediately, and the replacement returns to the selected hand index
+before the next redraw decision. The engine uses the same front-of-deck draw
+convention for opening hands and later draws. Seeded regressions lock the order
+for two human swaps and the AI's two recalculated discard decisions, reject a
+third redraw without mutation, and preserve the RNG result. Release CTest also
 passes 100 seeded complete matches across premade decks, including mulligans
-and the Skellige round-setup revive selection. This is targeted regression
-coverage, not a full proof of AI-weight parity.
+and the Skellige round-setup revive selection. Full interactive device testing
+remains open.

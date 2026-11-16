@@ -15,6 +15,22 @@ static Card unit(std::string id, int power, Row row = Row::Melee) {
   Card c; c.id = std::move(id); c.kind = Kind::Unit; c.power = power; c.row = row; return c;
 }
 static Card referenceCard(const std::string& name);
+static std::uint32_t expectedRandom(std::uint64_t& state) {
+  auto x=static_cast<std::uint32_t>(state);
+  x^=x<<13;x^=x>>17;x^=x<<5;state=x;return x;
+}
+static void expectedSourceDeckSwap(std::vector<Card>& hand,std::vector<Card>& deck,
+                                   const std::string& id,std::uint64_t& rngState) {
+  auto found=std::find_if(hand.begin(),hand.end(),[&](const Card& card){return card.id==id;});
+  assert(found!=hand.end());
+  const auto index=static_cast<std::size_t>(found-hand.begin());
+  Card discarded=*found;hand.erase(found);
+  deck.push_back(discarded);
+  const auto randomIndex=static_cast<std::size_t>(expectedRandom(rngState))%deck.size();
+  std::swap(deck[randomIndex],deck.back());
+  Card drawn=deck.front();deck.erase(deck.begin());
+  hand.insert(hand.begin()+static_cast<std::ptrdiff_t>(index),std::move(drawn));
+}
 static void scoreRules() {
   Player p;
   auto plain = unit("plain", 8);
@@ -396,6 +412,33 @@ static void openingHandAndMulligan() {
   assert(replaceMulliganCards(g, 1, {}));
   assert(g.phase == Phase::OpponentTurn && g.currentPlayer == 1);
 }
+static void sourceMulliganSwapSemantics() {
+  Game human;human.phase=Phase::Mulligan;human.rngState=0x5a17;
+  human.players[0].hand={unit("human-redraw-a",2),unit("human-keep",10),unit("human-redraw-b",3)};
+  human.players[0].deck={unit("human-deck-a",4),unit("human-deck-b",5),unit("human-deck-c",6)};
+  assert(!replaceMulliganCards(human,0,{"human-redraw-a","human-keep","human-redraw-b"}));
+  assert(human.players[0].hand.size()==3&&human.players[0].deck.size()==3&&!human.players[0].mulliganDone);
+  auto expectedHand=human.players[0].hand;auto expectedDeck=human.players[0].deck;auto expectedState=human.rngState;
+  expectedSourceDeckSwap(expectedHand,expectedDeck,"human-redraw-a",expectedState);
+  expectedSourceDeckSwap(expectedHand,expectedDeck,"human-redraw-b",expectedState);
+  assert(replaceMulliganCards(human,0,{"human-redraw-a","human-redraw-b"}));
+  assert(human.players[0].hand.size()==expectedHand.size()&&human.players[0].deck.size()==expectedDeck.size());
+  for(std::size_t i=0;i<expectedHand.size();++i)assert(human.players[0].hand[i].id==expectedHand[i].id);
+  for(std::size_t i=0;i<expectedDeck.size();++i)assert(human.players[0].deck[i].id==expectedDeck[i].id);
+  assert(human.rngState==expectedState);
+
+  Game ai;ai.phase=Phase::Mulligan;ai.rngState=0x6b28;
+  ai.players[1].hand={unit("ai-redraw",1)};
+  ai.players[1].deck={unit("ai-deck-a",2),unit("ai-deck-b",3)};
+  auto expectedAiHand=ai.players[1].hand;auto expectedAiDeck=ai.players[1].deck;auto expectedAiState=ai.rngState;
+  expectedSourceDeckSwap(expectedAiHand,expectedAiDeck,"ai-redraw",expectedAiState);
+  expectedSourceDeckSwap(expectedAiHand,expectedAiDeck,expectedAiHand[0].id,expectedAiState);
+  assert(performAiMulligan(ai,1));
+  assert(ai.players[1].hand.size()==1&&ai.players[1].deck.size()==2);
+  assert(ai.players[1].hand[0].id==expectedAiHand[0].id);
+  for(std::size_t i=0;i<expectedAiDeck.size();++i)assert(ai.players[1].deck[i].id==expectedAiDeck[i].id);
+  assert(ai.rngState==expectedAiState);
+}
 static void referenceCatalog() {
   const auto& catalog = referenceCardCatalog();
   assert(catalog.size() == 258);
@@ -541,7 +584,9 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
   // discarded card has been returned to the deck and a replacement drawn.
   const auto roachId=roachMulligan.players[1].hand[0].id;
   assert(performAiMulligan(roachMulligan,1));
-  assert(std::find_if(roachMulligan.players[1].hand.begin(),roachMulligan.players[1].hand.end(),[&](const Card& card){return card.id==roachId;})==roachMulligan.players[1].hand.end());
+  assert(roachMulligan.players[1].hand.size()==3);
+  assert(std::any_of(roachMulligan.players[1].hand.begin(),roachMulligan.players[1].hand.end(),[&](const Card& card){return card.id==roachId;}) ||
+         std::any_of(roachMulligan.players[1].deck.begin(),roachMulligan.players[1].deck.end(),[&](const Card& card){return card.id==roachId;}));
 
   Game leaderChoice;
   leaderChoice.players[0].leader.id="foltest_siegemaster";
@@ -901,4 +946,4 @@ static void leaderAbilities() {
   for(int owner=0;owner<2;++owner)
     for(std::size_t i=0;i<untouchedDecks[owner].size();++i)assert(emptyCrach.players[owner].deck[i].id==untouchedDecks[owner][i]);
 }
-int main() { scoreRules(); duplicateWeatherIsDiscarded(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
+int main() { scoreRules(); duplicateWeatherIsDiscarded(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }

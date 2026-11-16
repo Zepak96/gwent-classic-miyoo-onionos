@@ -242,7 +242,7 @@ void beginMatch(Game& g, std::vector<Card> playerDeck, Faction playerFaction,
     p.faction = i == 0 ? playerFaction : opponentFaction;
     shuffleDeck(g, p.deck);
     for (int n = 0; n < 10 && !p.deck.empty(); ++n) {
-      p.hand.push_back(p.deck.back()); p.deck.pop_back();
+      p.hand.push_back(std::move(p.deck.front())); p.deck.erase(p.deck.begin());
     }
   }
   g.currentPlayer = g.firstPlayer;
@@ -261,14 +261,18 @@ bool replaceMulliganCards(Game& g, int who, const std::vector<std::string>& ids)
     if (card == player.hand.end()) return false;
     replacements.push_back(*card);
   }
-  // Validate the whole selection before changing any state.
-  for (const auto& card : replacements) {
-    auto found = findCard(player.hand, card.id);
+  // Match Deck.swap(): return one selected card through Deck.addCardRandom(),
+  // draw the deck's front card, and put it back at the same hand index before
+  // processing the next selection.
+  for (const auto& selected : replacements) {
+    auto found=findCard(player.hand,selected.id);
+    const auto handIndex=static_cast<std::size_t>(found-player.hand.begin());
+    Card discarded=*found;
     player.hand.erase(found);
-    player.deck.insert(player.deck.begin(), card);
-  }
-  for (std::size_t i = 0; i < replacements.size() && !player.deck.empty(); ++i) {
-    player.hand.push_back(player.deck.back()); player.deck.pop_back();
+    addCardRandom(g,player.deck,discarded);
+    Card drawn=std::move(player.deck.front());
+    player.deck.erase(player.deck.begin());
+    player.hand.insert(player.hand.begin()+static_cast<std::ptrdiff_t>(handIndex),std::move(drawn));
   }
   player.mulliganDone = true;
   if (g.players[0].mulliganDone && g.players[1].mulliganDone) {
@@ -296,7 +300,7 @@ void resolveLeaderPassives(Game& g) {
       for (auto& affected : g.players) affected.doubleSpyPower=true;
     if (hasAbility(player.leader,"king_bran")) player.halfWeather=true;
     if (hasAbility(player.leader,"francesca_daisy") && !player.deck.empty()) {
-      player.hand.push_back(player.deck.back()); player.deck.pop_back();
+      player.hand.push_back(std::move(player.deck.front())); player.deck.erase(player.deck.begin());
     }
   }
   if(!g.factionAbilitiesInitialized) {
@@ -426,7 +430,7 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
     case Kind::Unit:
       if (c.spy) {
         g.players[1 - who].board[rowIndex(deployRow)].push_back(c);
-        for (int i = 0; i < 2 && !p.deck.empty(); ++i) { p.hand.push_back(p.deck.back()); p.deck.pop_back(); }
+        for (int i = 0; i < 2 && !p.deck.empty(); ++i) { p.hand.push_back(std::move(p.deck.front())); p.deck.erase(p.deck.begin()); }
       } else p.board[rowIndex(deployRow)].push_back(c);
       if (c.muster) {
         applyMuster(p, c);
@@ -621,7 +625,7 @@ bool startNextRound(Game& g) {
       }
     }
     if (winner >= 0 && owner == winner && player.faction == Faction::NorthernRealms && !player.deck.empty()) {
-      player.hand.push_back(player.deck.back()); player.deck.pop_back();
+      player.hand.push_back(std::move(player.deck.front())); player.deck.erase(player.deck.begin());
     }
   }
   g.skelligeRevivesRemaining=0;
