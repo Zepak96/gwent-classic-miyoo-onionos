@@ -358,3 +358,10 @@ rodzajami kart; pełny test na urządzeniu opisany wersją binarium i wynikiem.
   binary SHA-256: `80209b060cdfc30fce6990e4168da8527de990ae85574c59be550f5d10c0fe1f`.
   Installed on SD and verified all 603 files against the package. Backup:
   `GwentClassic.previous-21b05e5`. Physical match testing remains open.
+- [x] Weather parity is now regression-checked against `Weather.types`,
+  `Weather.addCard()`, `changeWeather()` and `clearWeather()` in the pinned
+  source: Frost/Fog/Rain affect the expected rows, Skellige Storm applies Fog
+  and Rain together, duplicate Frost goes directly to its owner's graveyard,
+  and Clear Weather clears all active effects while returning each active card
+  to its original owner's graveyard. Ubuntu CTest passed 2/2; these checks found
+  no engine discrepancy. Physical visual/audio timing remains open.

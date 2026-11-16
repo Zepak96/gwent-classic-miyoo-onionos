@@ -63,8 +63,11 @@ source behavior. A build or screenshot alone does not count as parity.
   the 10-point threshold but cannot destroy Heroes. Regression cases cover all
   three rows, exactly 10 versus 9 total strength, preserving own units, and
   global ties/Hero immunity.
-- [ ] Clear Weather, each individual weather type, Skellige Storm, duplicate
-  weather behavior and weather-card ownership/discard.
+- [x] Clear Weather, each individual weather type, Skellige Storm, duplicate
+  weather behavior and weather-card ownership/discard. Engine regressions verify
+  Frost/Fog/Rain row mapping, Storm's Fog+Rain effects, duplicate Frost discard,
+  Clear Weather removing all four active weather cards, and each card going to
+  its owner's graveyard.
 - [x] Cow removal summons Bovine Defense Force; Kambi removal summons Hemdall
   both during Scorch and round cleanup. Regression cases cover each path.
 - [ ] Every leader ability in the source catalog: all Foltest, Emhyr, Eredin,

@@ -165,6 +165,36 @@ static void duplicateWeatherIsDiscarded() {
   assert(!game.weather[0] && game.weatherCards.empty());
   assert(std::any_of(game.players[0].graveyard.begin(),game.players[0].graveyard.end(),[](const Card& card){return card.id=="frost-first";}));
 }
+static void allSourceWeatherTypesAndOwnership() {
+  Game game;
+  auto frost=referenceCard("Biting Frost"); frost.id="weather-frost-owner-0";
+  auto rain=referenceCard("Torrential Rain"); rain.id="weather-rain-owner-0";
+  auto clear=referenceCard("Clear Weather"); clear.id="weather-clear-owner-0";
+  auto fog=referenceCard("Impenetrable Fog"); fog.id="weather-fog-owner-1";
+  auto storm=referenceCard("Skellige Storm"); storm.id="weather-storm-owner-1";
+  game.players[0].hand={frost,rain,clear,unit("weather-p0-spare-1",1),unit("weather-p0-spare-2",1)};
+  game.players[1].hand={fog,storm,unit("weather-p1-spare-1",1),unit("weather-p1-spare-2",1)};
+
+  assert(playCard(game,0,frost.id));
+  assert((game.weather==std::array<bool,3>{true,false,false}));
+  assert(playCard(game,1,fog.id));
+  assert((game.weather==std::array<bool,3>{true,true,false}));
+  assert(playCard(game,0,rain.id));
+  assert((game.weather==std::array<bool,3>{true,true,true}));
+  assert(playCard(game,1,storm.id));
+  // Source Skellige Storm carries rain + fog (and a display-only storm tag).
+  assert((game.weather==std::array<bool,3>{true,true,true}));
+  assert(game.weatherCards.size()==4);
+
+  assert(playCard(game,0,clear.id));
+  assert((game.weather==std::array<bool,3>{false,false,false}));
+  assert(game.weatherCards.empty());
+  const auto inGrave=[](const Player& player,const std::string& id) {
+    return std::any_of(player.graveyard.begin(),player.graveyard.end(),[&](const Card& card){return card.id==id;});
+  };
+  assert(inGrave(game.players[0],frost.id)&&inGrave(game.players[0],rain.id)&&inGrave(game.players[0],clear.id));
+  assert(inGrave(game.players[1],fog.id)&&inGrave(game.players[1],storm.id));
+}
 static void turnsAndRounds() {
   Game g; g.players[0].hand={unit("a", 8),unit("a-spare",1)}; g.players[1].hand={unit("b",3),unit("b-spare",1)};
   assert(playCard(g,0,"a")); assert(g.currentPlayer==1);
@@ -1501,4 +1531,4 @@ static void leaderAbilities() {
   for(int owner=0;owner<2;++owner)
     for(std::size_t i=0;i<untouchedDecks[owner].size();++i)assert(emptyCrach.players[owner].deck[i].id==untouchedDecks[owner][i]);
 }
-int main() { scoreRules(); duplicateWeatherIsDiscarded(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiHeroMoraleWeight(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
+int main() { scoreRules(); duplicateWeatherIsDiscarded(); allSourceWeatherTypesAndOwnership(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiHeroMoraleWeight(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
