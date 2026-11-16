@@ -82,6 +82,14 @@ objawy, dopóki nie da się ich odtworzyć w kodzie lub logu.
 12. **Spójność cyfr po zmianie siły.** Renderer wspólny musi zachować krój,
     skalę i centrowanie również po premii Rogu, Więzi lub osłabieniu; należy
     obejrzeć wartości jedno-, dwu- i trzycyfrowe w docelowym buildzie.
+13. **Czyszczenie planszy może zostawić kartę z poprzedniej rundy.** Test pełnego
+    meczu odtworzył kolizję: usuwanie Kambi wywołuje Avengera, który wstawia
+    Hemdalla do aktualnie czyszczonego rzędu. Wstawienie przesuwa indeksy
+    pętli, przez co Olaf pozostał na planszy, mimo że jego identyfikator został
+    równocześnie dodany do kolejki odrodzenia Skellige z cmentarza. Czyszczenie
+    rundy ma najpierw odłączyć stare karty od rzędów, a potem rozpatrzyć ich
+    usunięcia i efekty Avengera; regresja sprawdza brak starego Olafa na planszy
+    i zgodność identyfikatorów kolejki z cmentarzem.
 
 ## Kolejność naprawy i kryteria odbioru
 
@@ -186,5 +194,7 @@ rodzajami kart; pełny test na urządzeniu opisany wersją binarium i wynikiem.
 - [x] Potwierdzono niespójne ścieżki rysowania cyfr siły.
 - [x] Ujednolicono skalę cyfr siły; bohaterowie i jednostki korzystają ze
   wspólnego bitmapowego renderera z centrowaniem według szerokości liczby.
+- [x] Odtworzono i naprawiono błąd czyszczenia rundy po efekcie Avengera,
+  który zostawiał kartę na planszy oraz rozjeżdżał kolejkę odrodzenia Skellige.
 - [ ] Dokończyć poprawki i testy opisane w etapach 1–5.
 - [ ] Ponowić test fizyczny na Miyoo po udostępnieniu karty SD/urządzenia.

@@ -249,6 +249,21 @@ static void factionStartAndSkelligeRoundThree() {
   assert(skellige.skelligeRevivesRemaining==0 && skellige.phase==Phase::PlayerTurn);
   assert(skellige.players[0].board[0].size()==1 && skellige.players[0].graveyard.empty());
 
+  Game avengerSkellige;
+  avengerSkellige.phase=Phase::RoundResult;avengerSkellige.round=2;
+  avengerSkellige.players[0].faction=Faction::Skellige;
+  avengerSkellige.players[0].hand.push_back(unit("avenger-skellige-spare",1));
+  avengerSkellige.players[0].board[0]={referenceCard("Olaf"),referenceCard("Kambi")};
+  assert(startNextRound(avengerSkellige));
+  assert(avengerSkellige.phase==Phase::RoundSetup);
+  assert(std::find(avengerSkellige.skelligeAgileReviveIds.begin(),avengerSkellige.skelligeAgileReviveIds.end(),
+                   referenceCard("Olaf").id)!=avengerSkellige.skelligeAgileReviveIds.end());
+  assert(std::none_of(avengerSkellige.players[0].board[0].begin(),avengerSkellige.players[0].board[0].end(),
+                      [](const Card& card){return card.name=="Olaf";}));
+  for(const auto& id:avengerSkellige.skelligeAgileReviveIds)
+    assert(std::any_of(avengerSkellige.players[0].graveyard.begin(),avengerSkellige.players[0].graveyard.end(),
+                       [&](const Card& card){return card.id==id&&card.agile;}));
+
   Game aiSkellige;
   aiSkellige.phase=Phase::RoundResult; aiSkellige.round=2; aiSkellige.players[1].faction=Faction::Skellige;
   aiSkellige.players[0].hand.push_back(unit("human-spare",1));

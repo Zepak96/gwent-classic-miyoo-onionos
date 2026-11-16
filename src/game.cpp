@@ -705,9 +705,22 @@ bool startNextRound(Game& g) {
       }
     }
     for (int r = 0; r < 3; ++r) {
-      for (int n = static_cast<int>(player.board[r].size()) - 1; n >= 0; --n) {
-        if (r == keepRow && n == keepIndex) continue;
-        removeBoardCard(g,owner,r,n);
+      // Detach this round's row before resolving removals. Avenger effects may
+      // insert Hemdall/Bovine into a board row; erasing in-place while those
+      // effects insert into the same vector can shift indices and leave an old
+      // unit behind (or remove a newly summoned one). That stale unit can then
+      // coexist with a Skellige revive queued from the graveyard.
+      auto oldRow=std::move(player.board[r]);
+      player.board[r].clear();
+      for (int n = 0; n < static_cast<int>(oldRow.size()); ++n) {
+        Card card=std::move(oldRow[static_cast<std::size_t>(n)]);
+        if (r == keepRow && n == keepIndex) {
+          player.board[r].push_back(std::move(card));
+          continue;
+        }
+        const bool temporaryAvengerToken=card.id.rfind("summoned_",0)==0;
+        if(!temporaryAvengerToken)player.graveyard.push_back(card);
+        triggerAvenger(g,owner,card);
       }
     }
     if (winner >= 0 && owner == winner && player.faction == Faction::NorthernRealms && !player.deck.empty()) {
