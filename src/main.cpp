@@ -1835,8 +1835,7 @@ void handleMatchKey(App& a,SDL_Keycode key) {
       a.audio.play("ui_card");
     } else if(key==SDLK_BACKSPACE||key==SDLK_z) { if(!a.mulligan.empty())a.mulligan.pop_back(); }
     else if(key==SDLK_RETURN||key==SDLK_KP_ENTER) {
-      const auto opponentMulligan=gwent::chooseAiMulligan(a.game,1);
-      if(gwent::replaceMulliganCards(a.game,0,a.mulligan) && gwent::replaceMulliganCards(a.game,1,opponentMulligan)) {
+      if(gwent::replaceMulliganCards(a.game,0,a.mulligan) && gwent::performAiMulligan(a.game,1)) {
         a.audio.play("game_start");a.audio.play("round1_start");
         a.mulligan.clear(); a.status=tr(a,"your_turn");
         if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+450;
@@ -2316,7 +2315,7 @@ int main(int argc,char** argv) {
       clearFrame();drawMatchOnScreen(renderer,app);presentFrame();
       if(!saveFrame(argv[11])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
     }
-    gwent::replaceMulliganCards(app.game,0,{}); gwent::replaceMulliganCards(app.game,1,gwent::chooseAiMulligan(app.game,1));
+    gwent::replaceMulliganCards(app.game,0,{}); gwent::performAiMulligan(app.game,1);
     app.game.phase=gwent::Phase::PlayerTurn;app.game.currentPlayer=0;
     clearFrame();
     drawMatchOnScreen(renderer,app);

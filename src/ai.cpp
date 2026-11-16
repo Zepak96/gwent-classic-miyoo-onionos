@@ -497,24 +497,25 @@ AiAction chooseAiAction(Game& game,int who) {
   return actions.back().action;
 }
 
-std::vector<std::string> chooseAiMulligan(const Game& game,int who) {
-  if(who<0||who>1||game.phase!=Phase::Mulligan||game.players[who].mulliganDone)return {};
-  Game simulatedGame=game;
-  Player& simulated=simulatedGame.players[who];
-  std::vector<std::string> selected;
+bool performAiMulligan(Game& game,int who) {
+  if(who<0||who>1||game.phase!=Phase::Mulligan||game.scoiataelChoicePending||game.players[who].mulliganDone)
+    return false;
+  auto& player=game.players[who];
   for(int redraw=0;redraw<2;++redraw) {
-    const auto order=discardOrder(simulatedGame,who);
-    if(order.empty()||order.front().power>=15)break;
-    const auto handCard=std::find_if(simulated.hand.begin(),simulated.hand.end(),[&](const Card& card){return card.id==order.front().id;});
-    if(handCard==simulated.hand.end()||simulated.deck.empty())break;
+    const auto order=discardOrder(game,who);
+    if(order.empty()||order.front().power>=15||player.deck.empty())break;
+    const auto handCard=std::find_if(player.hand.begin(),player.hand.end(),[&](const Card& card){return card.id==order.front().id;});
+    if(handCard==player.hand.end())break;
+    const auto handIndex=static_cast<std::size_t>(handCard-player.hand.begin());
     const Card discarded=*handCard;
-    selected.push_back(discarded.id);
-    simulated.hand.erase(handCard);
-    const auto insertAt=static_cast<std::size_t>(roll(simulatedGame)%(simulated.deck.size()+1));
-    simulated.deck.insert(simulated.deck.begin()+static_cast<std::ptrdiff_t>(insertAt),discarded);
-    simulated.hand.push_back(simulated.deck.back());
-    simulated.deck.pop_back();
+    player.hand.erase(handCard);
+    // The source Deck.swap() returns the discarded card to the bottom and
+    // draws the top card immediately, before deciding whether to redraw again.
+    player.deck.insert(player.deck.begin(),discarded);
+    const Card drawn=player.deck.back();
+    player.deck.pop_back();
+    player.hand.insert(player.hand.begin()+static_cast<std::ptrdiff_t>(handIndex),drawn);
   }
-  return selected;
+  return replaceMulliganCards(game,who,{});
 }
 }

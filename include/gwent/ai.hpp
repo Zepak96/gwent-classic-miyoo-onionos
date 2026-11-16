@@ -14,5 +14,5 @@ struct AiAction {
 };
 // Weighted, seeded ControllerAI ported from the pinned Gwent Classic reference.
 AiAction chooseAiAction(Game& game, int playerIndex);
-std::vector<std::string> chooseAiMulligan(const Game& game, int playerIndex);
+bool performAiMulligan(Game& game, int playerIndex);
 }

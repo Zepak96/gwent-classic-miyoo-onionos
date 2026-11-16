@@ -5,6 +5,7 @@
 #include "gwent/deck.hpp"
 #include <algorithm>
 #include <cassert>
+#include <iostream>
 #include <filesystem>
 #include <fstream>
 #include <utility>
@@ -502,11 +503,12 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
   Game roachMulligan;roachMulligan.phase=Phase::Mulligan;
   roachMulligan.players[1].hand={referenceCard("Roach"),referenceCard("Geralt of Rivia"),unit("low-priority",2)};
   roachMulligan.players[1].deck={unit("replacement-a",4),unit("replacement-b",5)};
-  const auto roachDiscard=chooseAiMulligan(roachMulligan,1);
   // ControllerAI.redraw() makes two sequential discardOrder() decisions; a
-  // low-power Roach is eligible on the second redraw once weaker candidates
-  // have moved through the simulated hand/deck swap.
-  assert(std::find(roachDiscard.begin(),roachDiscard.end(),roachMulligan.players[1].hand[0].id)!=roachDiscard.end());
+  // low-power Roach can become eligible on the second redraw after the first
+  // discarded card has been returned to the deck and a replacement drawn.
+  const auto roachId=roachMulligan.players[1].hand[0].id;
+  assert(performAiMulligan(roachMulligan,1));
+  assert(std::find_if(roachMulligan.players[1].hand.begin(),roachMulligan.players[1].hand.end(),[&](const Card& card){return card.id==roachId;})==roachMulligan.players[1].hand.end());
 
   Game leaderChoice;
   leaderChoice.players[0].leader.id="foltest_siegemaster";
@@ -524,9 +526,7 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
   {
     Game game;
     beginMatch(game,deck0,recipes[0].faction,deck1,recipes[2].faction,0x987654,0);
-    const auto aiMulligan=chooseAiMulligan(game,1);
-    assert(aiMulligan.size()<=2);
-    assert(replaceMulliganCards(game,0,{})); assert(replaceMulliganCards(game,1,aiMulligan));
+    assert(replaceMulliganCards(game,0,{})); assert(performAiMulligan(game,1));
     int actions=0;
     while(game.phase!=Phase::MatchResult && actions<500) {
       if(game.phase==Phase::RoundResult) { assert(startNextRound(game)); continue; }
@@ -537,6 +537,52 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
       assert(ok); ++actions;
     }
     assert(game.phase==Phase::MatchResult && actions<500);
+  }
+  // Exercise every source premade deck as both sides, with its exact source
+  // leader, so illegal weighted choices and stalled round transitions surface
+  // across many shuffled hands rather than only the two fixtures above.
+  for(std::uint64_t seed=0;seed<100;++seed) {
+    const auto& playerRecipe=recipes[static_cast<std::size_t>(seed%recipes.size())];
+    const auto opponentIndex=static_cast<std::size_t>((seed*7+3)%recipes.size());
+    const auto& opponentRecipe=recipes[opponentIndex];
+    Card playerLeader,opponentLeader;
+    assert(referenceLeader(playerRecipe.leaderReferenceIndex,playerLeader));
+    assert(referenceLeader(opponentRecipe.leaderReferenceIndex,opponentLeader));
+    Game simulation;
+    beginMatchWithLeaders(simulation,makeReferenceDeck(playerRecipe),playerLeader,
+      makeReferenceDeck(opponentRecipe),opponentLeader,0xA17E0000ULL+seed,static_cast<int>(seed%2));
+    if(simulation.scoiataelChoicePending)
+      assert(chooseScoiataelFirstPlayer(simulation,simulation.firstPlayer));
+    assert(replaceMulliganCards(simulation,0,{}));
+    assert(performAiMulligan(simulation,1));
+    int actions=0;
+    while(simulation.phase!=Phase::MatchResult&&actions<500) {
+      if(simulation.phase==Phase::RoundResult) { assert(startNextRound(simulation));continue; }
+      if(simulation.phase==Phase::RoundSetup) {
+        const int owner=simulation.skelligeRevivePlayer;
+        const auto candidate=std::find_if(simulation.players[owner].graveyard.begin(),simulation.players[owner].graveyard.end(),[&](const Card& card){
+          return std::find(simulation.skelligeAgileReviveIds.begin(),simulation.skelligeAgileReviveIds.end(),card.id)!=simulation.skelligeAgileReviveIds.end();
+        });
+        assert(candidate!=simulation.players[owner].graveyard.end());
+        const Row row=candidate->agile?Row::Melee:Row::None;
+        assert(chooseSkelligeRevive(simulation,owner,candidate->id,row));
+        continue;
+      }
+      const int actor=simulation.currentPlayer;
+      const auto action=chooseAiAction(simulation,actor);
+      const bool legal=action.pass?pass(simulation,actor):action.activateLeader?
+        activateLeader(simulation,actor,action.target,action.leaderSelection):
+        playCard(simulation,actor,action.cardId,action.target,action.selectedCardId);
+      if(!legal) {
+        std::cerr<<"AI illegal action at seed "<<seed<<" step "<<actions<<" player "<<actor
+                 <<" phase "<<static_cast<int>(simulation.phase)<<" action card="<<action.cardId
+                 <<" pass="<<action.pass<<" leader="<<action.activateLeader<<" target="<<static_cast<int>(action.target)
+                 <<" selected="<<action.selectedCardId<<"\n";
+        assert(false);
+      }
+      ++actions;
+    }
+    assert(simulation.phase==Phase::MatchResult&&actions<500);
   }
 }
 static Card leader(std::string id) {

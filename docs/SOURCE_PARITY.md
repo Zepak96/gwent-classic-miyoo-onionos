@@ -39,9 +39,14 @@ source behavior. A build or screenshot alone does not count as parity.
 - [ ] Source board maxima, board/grave card counts, per-card weights, weather,
   Scorch, Horn, Mardroeme, Medic, Berserker, Decoy and Agile choices.
 - [ ] Source leader weights/actions and exact target selection.
-- [ ] Source AI redraw and discard ordering.
+- [x] Source AI redraw and discard ordering, including two sequential
+  `ControllerAI.redraw()` calls that each recalculate discard order after
+  drawing the replacement.
 - [ ] No illegal action may be silently converted into a pass.
 - [ ] Repeatable simulations cover every premade deck and every leader action.
+  Current regression coverage completes 100 seeded matches using source
+  premade-deck recipes and leaders; it does not yet prove every possible leader
+  action was selected or all AI weights match the source.
 
 ## Localization — source card data and UI strings
 
@@ -136,3 +141,13 @@ deck builder, and target carousel were visually reviewed at 640×480 in
 `artifacts/qa/deck-builder-card-preview.png`, and
 `artifacts/qa/target-carousel.png`. Physical-device input/audio/gameplay still
 need confirmation.
+
+AI mulligan regression: `ControllerAI.redraw()` performs two independent
+discard-order decisions, with each discarded card returned to the deck bottom
+and the next card drawn from the deck top before the next decision. The port
+previously simulated both decisions but returned card IDs for a simultaneous
+hand selection; a second choice could then refer to a just-drawn card and be
+rejected. The runtime now performs the two swaps sequentially. Release CTest
+passes 100 seeded complete matches across premade decks, including mulligans
+and the Skellige round-setup revive selection. This is targeted regression
+coverage, not a full proof of AI-weight parity.
