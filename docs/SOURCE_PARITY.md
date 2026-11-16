@@ -75,6 +75,10 @@ source behavior. A build or screenshot alone does not count as parity.
 - [ ] One source weighted-random AI; no difficulty selector.
 - [ ] Source board maxima, board/grave card counts, per-card weights, weather,
   Scorch, Horn, Mardroeme, Medic, Berserker, Decoy and Agile choices.
+- [x] Equal-benefit target ordering matches source AI: Commander’s Horn keeps
+  the first row in close/ranged/siege order, and fallback Decoy targets use
+  the source `map(...).concat(accumulator)` reverse-row ordering. Fixed-seed
+  engine regressions distinguish both native selections from the old port.
 - [ ] Source leader weights/actions and exact target selection.
 - [x] Pass weighting: AI immediately passes when ahead after the opponent has
   passed, also passes on a Nilfgaard tie, does not force-pass on another

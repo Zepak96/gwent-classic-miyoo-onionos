@@ -89,7 +89,10 @@ BoardData collectBoardData(const Game& game,int who) {
         if(isUnit(card))rowMaximum[row]=std::max(rowMaximum[row],cardPower(game,owner,row,card,game.players[owner].board[row]));
       best=std::max(best,rowMaximum[row]);
     }
-    if(owner==who)for(int row=0;row<3;++row)
+    // Source ControllerAI builds max.rmax.filter(...).reduce((a,r) =>
+    // r.cards.map(...).concat(a), []), which prepends each row's maxima.
+    // That leaves fallback Decoy targets in siege, ranged, melee order.
+    if(owner==who)for(int row=2;row>=0;--row)
       if(rowMaximum[row]>=0)
         for(const auto& card:game.players[owner].board[row])
           if(isUnit(card)&&cardPower(game,owner,row,card,game.players[owner].board[row])==rowMaximum[row])data.decoyFallbackOwnRowMaxima.push_back(&card);
@@ -450,8 +453,10 @@ AiAction cardAction(Game& game,int who,const Card& card,const BoardData& data) {
       }
     }
   } else if(card.kind==Kind::CommanderHorn) {
-    int best=0,bestRow=2;
-    for(const int row:{2,1,0}) {
+    int best=0,bestRow=0;
+    // Source ControllerAI.horn() visits close, ranged, then siege and keeps
+    // the first row when the score gain ties.
+    for(const int row:{0,1,2}) {
       const int score=weightHornRow(game,who,row);
       if(score>best){best=score;bestRow=row;}
     }

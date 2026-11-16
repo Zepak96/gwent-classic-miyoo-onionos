@@ -806,6 +806,22 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
   assert(action.pass || action.activateLeader ||
          playCard(preview,1,action.cardId,action.target,action.selectedCardId));
 
+  Game hornTie;
+  hornTie.phase=Phase::OpponentTurn;hornTie.currentPlayer=1;
+  Card tieHorn;tieHorn.id="tie-horn";tieHorn.name="Commander's Horn";tieHorn.kind=Kind::CommanderHorn;
+  hornTie.players[1].hand={tieHorn};
+  for(int row=0;row<3;++row)hornTie.players[1].board[row].push_back(unit("tie-row-"+std::to_string(row),5,static_cast<Row>(row)));
+  const auto hornTieChoice=chooseAiAction(hornTie,1);
+  assert(hornTieChoice.cardId==tieHorn.id&&hornTieChoice.target==Row::Melee);
+
+  Game fallbackDecoy;
+  fallbackDecoy.phase=Phase::OpponentTurn;fallbackDecoy.currentPlayer=1;fallbackDecoy.rngState=1;
+  Card fallback;fallback.id="fallback-decoy";fallback.name="Decoy";fallback.kind=Kind::Decoy;
+  fallbackDecoy.players[1].hand={fallback};
+  for(int row=0;row<3;++row)fallbackDecoy.players[1].board[row].push_back(unit("decoy-row-"+std::to_string(row),5,static_cast<Row>(row)));
+  const auto fallbackChoice=chooseAiAction(fallbackDecoy,1);
+  assert(fallbackChoice.cardId==fallback.id&&fallbackChoice.selectedCardId=="decoy-row-2");
+
   Game mardroemeAi;
   mardroemeAi.phase=Phase::OpponentTurn;mardroemeAi.currentPlayer=1;
   for(int i=0;i<2;++i) {
