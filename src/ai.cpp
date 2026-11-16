@@ -70,15 +70,17 @@ BoardData collectBoardData(const Game& game,int who) {
     int best=-1;
     std::array<int,3> rowMaximum{{-1,-1,-1}};
     for(int row=0;row<3;++row) {
+      // ControllerAI.getMaximums() compares the source Card.power field; it
+      // does not use weather/horn adjusted row power for max.me/max.op/rmax.
       for(const auto& card:game.players[owner].board[row])
-        if(isUnit(card))rowMaximum[row]=std::max(rowMaximum[row],cardPower(game,owner,row,card,game.players[owner].board[row]));
+        if(isUnit(card))rowMaximum[row]=std::max(rowMaximum[row],card.power);
       best=std::max(best,rowMaximum[row]);
     }
     if(owner==who)for(int row=0;row<3;++row)
       if(rowMaximum[row]>=0&&rowMaximum[row]==best)
         for(const auto& card:game.players[owner].board[row])if(isUnit(card))data.decoyFallbackOwn.push_back(&card);
     for(int row=0;row<3;++row) for(const auto& card:game.players[owner].board[row])
-      if(isUnit(card) && cardPower(game,owner,row,card,game.players[owner].board[row])==best)
+      if(isUnit(card) && card.power==best)
         (owner==who?data.strongestOwn[row]:data.strongestEnemy[row]).push_back(&card);
     if(owner==who)data.ownMax=best; else data.enemyMax=best;
   }
@@ -147,10 +149,11 @@ int weightScorchRow(const Game& game,int who,int row) {
   if(currentRowScore(game,enemy,row)<10)return 0;
   int strongest=-1,total=0;
   for(const auto& card:game.players[enemy].board[row]) if(isUnit(card))
-    strongest=std::max(strongest,cardPower(game,enemy,row,card,game.players[enemy].board[row]));
-  for(const auto& card:game.players[enemy].board[row]) if(isUnit(card) && !card.hero &&
-       cardPower(game,enemy,row,card,game.players[enemy].board[row])==strongest)
-    total+=cardPower(game,enemy,row,card,game.players[enemy].board[row]);
+    strongest=std::max(strongest,card.power);
+  // Source uses max.rmax[index].cards and sums raw Card.power values; its
+  // isUnit() filter excludes Heroes from these maxima.
+  for(const auto& card:game.players[enemy].board[row]) if(isUnit(card)&&card.power==strongest)
+    total+=card.power;
   return total;
 }
 int weightGlobalScorch(const BoardData& data) {

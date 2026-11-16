@@ -175,6 +175,11 @@ items above:
   rows so Clear Weather has exactly zero raw value, then verifies the AI still
   selects it rather than passing. This closes only this fallback case; full AI
   weight and action distribution parity remains open.
+- AI Scorch maxima now use the source's unmodified `Card.power` values rather
+  than row score after weather/horn effects. A seeded selection regression
+  verifies Global Scorch is down-weighted when weather changes displayed row
+  order but not the source maximum-card comparison. Full AI weight parity is
+  still open.
 - An AI action rejected by the port is reported; it is not converted into a
   voluntary pass.
 - Source `Carousel` choices now use the five-card source geometry, source card

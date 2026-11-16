@@ -601,6 +601,23 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
   const auto zeroWeightChoice=chooseAiAction(zeroWeightClear,1);
   assert(!zeroWeightChoice.pass&&zeroWeightChoice.cardId==clear.id);
 
+  // Source getMaximums() compares Card.power, not weather-adjusted row power.
+  // Weather makes the AI's printed-10 unit score 1 while the opponent's
+  // printed-8 unit stays at 8; source therefore gives Global Scorch weight 0.
+  Game rawPowerScorch;
+  rawPowerScorch.phase=Phase::OpponentTurn;rawPowerScorch.currentPlayer=1;
+  rawPowerScorch.weather[0]=true;
+  rawPowerScorch.players[1].board[0].push_back(unit("printed-ten-ai",10));
+  rawPowerScorch.players[0].board[1].push_back(unit("printed-eight-opponent",8,Row::Ranged));
+  Card aiScorch;aiScorch.id="ai-global-scorch";aiScorch.name="Scorch";aiScorch.kind=Kind::Scorch;
+  rawPowerScorch.players[1].hand={aiScorch,unit("ai-one-point",1,Row::Siege)};
+  int rawMaximumScorchChoices=0;
+  for(std::uint64_t seed=1;seed<=256;++seed) {
+    auto sample=rawPowerScorch;sample.rngState=seed*0x85ebca6bu;
+    if(chooseAiAction(sample,1).cardId==aiScorch.id)++rawMaximumScorchChoices;
+  }
+  assert(rawMaximumScorchChoices==0);
+
   Game difficultyChoice;
   difficultyChoice.phase=Phase::OpponentTurn;difficultyChoice.currentPlayer=1;
   difficultyChoice.players[1].hand={unit("weak",1),unit("strong",10)};
