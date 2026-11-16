@@ -3333,6 +3333,33 @@ int main(int argc,char** argv) {
     app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();
     return saved&&moved&&opened&&returnedToCollection&&returned&&absentSaveHandled?0:13;
   }
+  if(argc>3&&std::string(argv[1])=="--medic-smoke-test") {
+    app.screen=Screen::Match;app.language=Language::Polish;app.game=gwent::Game{};
+    app.activeNotification.clear();app.notificationQueue.clear();app.targetIndex=0;app.rowIndex=0;
+    const auto& catalog=gwent::referenceCardCatalog();
+    const auto medic=std::find_if(catalog.begin(),catalog.end(),[](const auto& c){return c.medic&&!c.hero;});
+    const auto agile=std::find_if(catalog.begin(),catalog.end(),[](const auto& c){return c.agile&&!c.hero;});
+    if(medic==catalog.end()||agile==catalog.end())return 14;
+    auto first=*medic;first.id="medic-render-first";app.game.players[0].hand={first};
+    auto target=*agile;target.id="medic-render-agile";app.game.players[0].graveyard={target};
+    for(const auto& c:catalog)if(app.game.players[0].graveyard.size()<5&&c.kind==gwent::Kind::Unit&&!c.hero&&!c.agile&&!c.medic&&c.row!=gwent::Row::None) {
+      auto choice=c;choice.id="medic-render-choice-"+std::to_string(app.game.players[0].graveyard.size());
+      app.game.players[0].graveyard.push_back(std::move(choice));
+    }
+    bool okay=gwent::playCard(app.game,0,first.id);
+    const auto capture=[&](const char* path) {
+      SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);
+      drawMatchOnScreen(renderer,app);presentFrame();
+      auto* surface=SDL_CreateRGBSurfaceWithFormat(0,W,H,32,SDL_PIXELFORMAT_ARGB8888);
+      const bool saved=surface&&SDL_RenderReadPixels(renderer,nullptr,SDL_PIXELFORMAT_ARGB8888,surface->pixels,surface->pitch)==0&&SDL_SaveBMP(surface,path)==0;
+      if(surface)SDL_FreeSurface(surface);return saved;
+    };
+    okay=okay&&app.game.pendingMedicPlayer==0&&capture(argv[2]);
+    okay=okay&&gwent::chooseMedicRevive(app.game,0,target.id,gwent::Row::None);
+    app.rowIndex=1;
+    okay=okay&&app.game.pendingMedicAgileId==target.id&&capture(argv[3]);
+    app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return okay?0:14;
+  }
   if(argc>1 && std::string(argv[1])=="--smoke-test") {
     if(app.screen!=Screen::DeckBuilder) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 11; }
     const auto clearFrame=[&](){SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);};
