@@ -354,14 +354,6 @@ int weightLeader(Game& game,int who,const BoardData& data,const std::string& id)
   if(id=="emhyr_relentless")return weightMedic(game,who,data,0,1-who);
   if(id=="eredin_commander")return weightHornRow(game,who,0);
   if(id=="eredin_bringer_of_death")return weightMedic(game,who,data,0,who);
-  if(id=="eredin_destroyer") {
-    auto discard=discardOrder(game,who);
-    if(discard.size()<2)return 0;
-    discard.resize(2);
-    discard.erase(std::remove_if(discard.begin(),discard.end(),[](const Card& c){return c.power>=7;}),discard.end());
-    if(discard.size()<2)return 0;
-    return discard.front().muster||has(discard.front(),"muster")?50:25;
-  }
   if(id=="eredin_king") {
     int best=0;
     for(const auto& card:game.players[who].deck)if(card.kind==Kind::Weather&&!card.abilities.empty())
@@ -476,6 +468,15 @@ AiAction chooseLeaderAction(Game& game,int who,const BoardData& data) {
     action.leaderSelection=leaderSelection(game,who,game.players[who].leader.abilities.front(),data);
   return action;
 }
+AiAction resolveSelectedAction(Game& game,int who,const AiAction& intent,const BoardData& data) {
+  if(intent.pass)return intent;
+  if(intent.activateLeader)return chooseLeaderAction(game,who,data);
+  const auto& hand=game.players[who].hand;
+  const auto card=std::find_if(hand.begin(),hand.end(),[&](const Card& candidate) {
+    return candidate.id==intent.cardId;
+  });
+  return card==hand.end()?intent:cardAction(game,who,*card,data);
+}
 }
 
 AiAction chooseAiAction(Game& game,int who) {
@@ -490,20 +491,25 @@ AiAction chooseAiAction(Game& game,int who) {
   std::vector<WeightedAction> actions;
   actions.reserve(player.hand.size()+2);
   for(const auto& card:player.hand) {
-    const auto choice=cardAction(game,who,card,data);
-    int weight=std::max(0,weightCard(game,who,card,data));
+    const int weight=std::max(0,weightCard(game,who,card,data));
+    // ControllerAI first computes every weight, then rolls once to choose an
+    // action, and only then resolves random targets (Decoy/Medic/Leader).
+    // Check legality against a throwaway state so candidate evaluation cannot
+    // consume the match RNG or preselect a target for an unchosen action.
     Game preview=game;
-    const bool legal=playCard(preview,who,choice.cardId,choice.target,choice.selectedCardId);
-    if(!legal)weight=0;
-    actions.push_back({choice,static_cast<double>(weight),legal});
+    const auto previewAction=cardAction(preview,who,card,data);
+    const bool legal=playCard(preview,who,previewAction.cardId,previewAction.target,previewAction.selectedCardId);
+    AiAction intent;intent.cardId=card.id;
+    actions.push_back({intent,static_cast<double>(legal?weight:0),legal});
   }
   if(player.leaderAbilityAvailable && !player.leader.abilities.empty()) {
-    const auto choice=chooseLeaderAction(game,who,data);
     int weight=weightLeader(game,who,data,player.leader.abilities.front());
     Game preview=game;
-    const bool legal=activateLeader(preview,who,choice.target,choice.leaderSelection);
+    const auto previewAction=chooseLeaderAction(preview,who,data);
+    const bool legal=activateLeader(preview,who,previewAction.target,previewAction.leaderSelection);
     if(!legal)weight=0;
-    actions.push_back({choice,static_cast<double>(weight),legal});
+    AiAction intent;intent.activateLeader=true;
+    actions.push_back({intent,static_cast<double>(weight),legal});
   }
   double passWeight=0.0;
   if(2-player.roundLosses>1) {
@@ -522,17 +528,19 @@ AiAction chooseAiAction(Game& game,int who) {
       // Clear Weather as well as the typed weather cards.
       if(((card.kind==Kind::Weather || card.kind==Kind::ClearWeather) &&
           weightWeather(game,who,card)>-1) ||
-         has(card,"avenger") || has(card,"avenger_kambi"))
-        return cardAction(game,who,card,data);
+         has(card,"avenger") || has(card,"avenger_kambi")) {
+        AiAction intent;intent.cardId=card.id;
+        return resolveSelectedAction(game,who,intent,data);
+      }
     return {true,{},{},{}};
   }
   const double ticket=(static_cast<double>(roll(game))/4294967296.0)*total;
   double passed=0;
   for(const auto& action:actions) {
     passed+=action.weight;
-    if(ticket<passed)return action.action;
+    if(ticket<passed)return resolveSelectedAction(game,who,action.action,data);
   }
-  return actions.back().action;
+  return resolveSelectedAction(game,who,actions.back().action,data);
 }
 
 bool performAiMulligan(Game& game,int who) {

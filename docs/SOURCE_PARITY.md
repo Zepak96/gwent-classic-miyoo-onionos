@@ -421,3 +421,35 @@ Nilfgaard tie-break, and match draw frames; `--input-test` checks all outcome
 branches. Engine/frontend CI passed for commit `550435f`; the ARMHF package was
 installed on SD and all 603 files were SHA-256 verified. Physical-device result
 screen confirmation remains open.
+
+## Miyoo card miniatures and rules panel
+
+The match rules panel now renders in the reserved 4:3 display band below the
+centered 16:9 board, instead of covering the hand. The compact card badges use
+the source artwork: row class (melee/ranged/siege/agile) and ability. The power
+badge PNGs contain a large transparent export margin; drawing their full canvas
+made the medal half-size and placed its number away from the visible circle.
+The renderer now crops that margin before scaling the medal into the number's
+24x25 box. The mini row and ability badges have been increased and given a
+stronger dark/gold backing. The large card preview remains unchanged.
+
+The renderer's built-in smoke screenshot is checked in desktop CI; CI must
+render the latest badge-crop change before a new visual is treated as verified.
+The prior local frame predates this crop and is not evidence for the latest
+miniature badge alignment or a physical Miyoo capture.
+
+## AI action RNG ordering
+
+The pinned ControllerAI computes candidate weights, rolls once to select an
+action, and only then resolves random targets for the chosen Decoy, Medic, or
+Leader. The native port previously resolved those targets while building every
+candidate and therefore consumed RNG for actions that were never played. It
+now previews candidate legality on copied game state and resolves the chosen
+action against the live match only after the weighted ticket. Seeded engine
+regressions cover an unchosen Decoy, a chosen Decoy, and an unchosen random
+Medic Leader. The Eredin Destroyer weight also follows the source's generic
+leader fallback; its discard ordering belongs to action resolution and must not
+change the selection weight or consume RNG before the action is chosen.
+
+The full weighted-AI parity audit remains open; these regressions prove RNG
+ordering for the covered target paths only.

@@ -598,7 +598,7 @@ bool activateLeader(Game& g, int who, Row target, const std::vector<std::string>
   };
   if (id=="foltest_king") playWeatherFromDeck("Impenetrable Fog",false);
   else if (id=="foltest_lord") clearWeather(g);
-  else if (id=="foltest_siegemaster") { if(player.specialOccupied[2]) canActivate=false; else {player.specialOccupied[2]=true;g.horn[who][2]=true;} }
+  else if (id=="foltest_siegemaster") { if(!player.specialOccupied[2]) {player.specialOccupied[2]=true;g.horn[who][2]=true;} }
   else if (id=="foltest_steelforged") scorchEnemyRow(g,who,2);
   else if (id=="foltest_son") scorchEnemyRow(g,who,1);
   else if (id=="emhyr_imperial") playWeatherFromDeck("Torrential Rain",false);
@@ -619,7 +619,7 @@ bool activateLeader(Game& g, int who, Row target, const std::vector<std::string>
     else { insertSourceHandCard(player,*found,who); grave.erase(found); }
   }
   else if (id=="emhyr_whiteflame" || id=="emhyr_invader" || id=="eredin_treacherous" || id=="francesca_daisy" || id=="king_bran") canActivate=false;
-  else if (id=="eredin_commander") { if(player.specialOccupied[0]) canActivate=false; else {player.specialOccupied[0]=true;g.horn[who][0]=true;} }
+  else if (id=="eredin_commander") { if(!player.specialOccupied[0]) {player.specialOccupied[0]=true;g.horn[who][0]=true;} }
   else if (id=="eredin_bringer_of_death") {
     auto& grave=player.graveyard;
     auto found=selected.empty()?grave.end():findCard(grave,selected);
@@ -670,7 +670,7 @@ bool activateLeader(Game& g, int who, Row target, const std::vector<std::string>
   }
   else if (id=="eredin_treacherous") canActivate=false;
   else if (id=="francesca_queen") scorchEnemyRow(g,who,0);
-  else if (id=="francesca_beautiful") { if(player.specialOccupied[1]) canActivate=false; else {player.specialOccupied[1]=true;g.horn[who][1]=true;} }
+  else if (id=="francesca_beautiful") { if(!player.specialOccupied[1]) {player.specialOccupied[1]=true;g.horn[who][1]=true;} }
   else if (id=="francesca_pureblood") playWeatherFromDeck("Biting Frost",false);
   else if (id=="francesca_hope") {
     std::vector<Card> agile;

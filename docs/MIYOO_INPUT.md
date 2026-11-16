@@ -19,13 +19,13 @@ nie zastępuje odczytu `event0` na konkretnej wersji firmware.
 
 | Miyoo | Zdarzenie SDL Mini | Akcja w grze |
 |---|---|---|
-| D-pad | strzałki | W edytorze porusza się po siatce kart; przejście przez krawędź łączy kolekcję z talią. W meczu wybiera kartę; rząd zmienia się tylko dla kart, które pozwalają go wybrać |
-| A | Left Ctrl | Zatwierdź / zagraj; podczas mulliganu zaznacza kartę |
-| B | Left Alt | Cofnij/anuluj; w edytorze wraca z talii do kolekcji; nigdy nie zagrywa ani nie usuwa karty |
+| D-pad | strzałki | W edytorze porusza się po siatce kart; przejście przez krawędź łączy kolekcję z talią. W meczu wybiera kartę; w podglądzie zagrania góra/dół zmienia rząd, jeśli karta pozwala go wybrać |
+| A | Left Ctrl | Anuluje podgląd zagrania, wyboru celu lub zdolności przywódcy; podczas mulliganu zaznacza kartę |
+| B | Left Alt | W meczu otwiera wybór karty, a następne B zagrywa ją do podświetlonego rzędu. Potwierdza też wybrany cel, kartę przywódcy i pasowanie; w edytorze wraca z talii do kolekcji |
 | X | Left Shift | Krótkie naciśnięcie otwiera podgląd karty; przytrzymanie podczas swojej tury otwiera potwierdzenie spasowania |
-| Y | Space | Zmienia frakcję w edytorze; używa zdolności lidera w meczu; zatwierdza/pomija wymianę w mulliganie |
-| L | Tab | W meczu zmienia wybrany rząd tylko dla karty z wyborem rzędu; w edytorze otwiera wybór lidera |
-| R | Backspace | W meczu zmienia wybrany rząd tylko dla karty z wyborem rzędu; w edytorze przesuwa kursor w dół |
+| Y | Space | Zmienia frakcję w edytorze; w meczu otwiera podgląd zdolności przywódcy, który B potwierdza, a A anuluje; zatwierdza/pomija wymianę w mulliganie |
+| L | Tab | W meczu zmienia wybrany rząd dla karty z wyborem rzędu; w edytorze otwiera wybór lidera |
+| R | Backspace | W meczu zmienia wybrany rząd dla karty z wyborem rzędu; w edytorze przesuwa kursor w dół |
 | L2 / R2 | PageDown / PageUp | L2: następny, R2: poprzedni slot talii; w meczu L2 przewija rękę o pięć kart naprzód, R2 wstecz |
 | Start | Enter | Rozpoczyna mecz z edytora; otwiera pauzę w meczu; zatwierdza/pomija mulligan |
 | Select | Escape | Zapis talii w edytorze; zamyka podgląd, jeśli jest otwarty. W meczu otwiera potwierdzenie pasowania lub zatwierdza wybór fazy |
@@ -36,8 +36,8 @@ wcześniejszego prototypu. W edytorze `P` wczytuje następny preset, `R` wznawia
 zapisany mecz, `Z` zmienia język, a `F` zmienia frakcję. Te klawisze są dostępne
 na klawiaturze; fizyczne Y zmienia frakcję, a język jest domyślnie polski.
 
-Klawisz Select nie pasuje automatycznie: najpierw otwiera pytanie, A zatwierdza,
-a B anuluje. Przytrzymanie X również otwiera potwierdzenie spasowania. Na ekranie
+Klawisz Select nie pasuje automatycznie: najpierw otwiera pytanie, B zatwierdza,
+a A anuluje. Przytrzymanie X również otwiera potwierdzenie spasowania. Na ekranie
 mulliganu lewo/prawo wybiera kartę, A ją zaznacza, a Start, Y lub Select
 zatwierdza wybór albo pomija wymianę, gdy nic nie zaznaczono. Krótkie naciśnięcie
 X otwiera tekstowy inspektor karty. Wbudowany smoke `--input-test`

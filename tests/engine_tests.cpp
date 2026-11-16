@@ -1118,6 +1118,55 @@ static void sourceAiPassDecisions() {
   assert(!lastGemAction.pass&&lastGemAction.cardId=="last-gem-action");
 }
 
+static void sourceAiDefersRandomActionTargets() {
+  // Source ControllerAI consumes one random draw for weighted action
+  // selection, then resolves a random target only if that action was chosen.
+  // Decoy is a valid but unchosen candidate here; its target must not advance
+  // the authoritative match RNG before the high-weight Spy is selected.
+  Game unchosenDecoy;
+  unchosenDecoy.phase=Phase::OpponentTurn;unchosenDecoy.currentPlayer=1;unchosenDecoy.rngState=1856;
+  Card decoy;decoy.id="rng-decoy-candidate";decoy.name="Decoy";decoy.kind=Kind::Decoy;
+  auto medicA=unit("rng-decoy-medic-a",1);medicA.medic=true;medicA.abilities={"medic"};
+  auto medicB=unit("rng-decoy-medic-b",2);medicB.medic=true;medicB.abilities={"medic"};
+  auto spy=unit("rng-selected-spy",100);spy.spy=true;spy.abilities={"spy"};
+  unchosenDecoy.players[1].hand={decoy,spy};
+  unchosenDecoy.players[1].board[0]={medicA,medicB};
+  auto expectedState=unchosenDecoy.rngState;
+  expectedRandom(expectedState);
+  const auto chosenSpy=chooseAiAction(unchosenDecoy,1);
+  assert(!chosenSpy.pass&&chosenSpy.cardId==spy.id&&unchosenDecoy.rngState==expectedState);
+
+  // The same random target is resolved after the weighted ticket when Decoy
+  // itself is selected. The returned target and final RNG state must match
+  // those two sequential source decisions.
+  Game chosenDecoy=unchosenDecoy;
+  chosenDecoy.players[1].hand={decoy};chosenDecoy.rngState=0x2345;
+  expectedState=chosenDecoy.rngState;
+  expectedRandom(expectedState); // Weighted action ticket.
+  const auto expectedTargetRoll=expectedRandom(expectedState);
+  const auto selectedDecoy=chooseAiAction(chosenDecoy,1);
+  const auto& targetBoard=chosenDecoy.players[1].board[0];
+  assert(selectedDecoy.cardId==decoy.id&&
+         selectedDecoy.selectedCardId==targetBoard[expectedTargetRoll%targetBoard.size()].id&&
+         chosenDecoy.rngState==expectedState);
+
+  // A Medic-style Leader target is also only resolved if the Leader action is
+  // selected. The preview for its legality may inspect a random target, but
+  // must do so on a copied state.
+  Game unchosenLeader;
+  unchosenLeader.phase=Phase::OpponentTurn;unchosenLeader.currentPlayer=1;unchosenLeader.rngState=1856;
+  unchosenLeader.players[1].leader=leader("eredin_bringer_of_death");
+  unchosenLeader.players[1].leaderAbilityAvailable=true;
+  auto scorchA=unit("rng-leader-scorch-a",3);scorchA.abilities={"scorch_c"};
+  auto scorchB=unit("rng-leader-scorch-b",4);scorchB.abilities={"scorch_c"};
+  unchosenLeader.players[1].graveyard={scorchA,scorchB};
+  unchosenLeader.players[1].hand={spy};
+  expectedState=unchosenLeader.rngState;expectedRandom(expectedState);
+  const auto chosenWithoutLeader=chooseAiAction(unchosenLeader,1);
+  assert(!chosenWithoutLeader.pass&&!chosenWithoutLeader.activateLeader&&
+         chosenWithoutLeader.cardId==spy.id&&unchosenLeader.rngState==expectedState);
+}
+
 static void sourceAiHeroMoraleWeight() {
   constexpr std::uint64_t seed=2688;
   auto state=seed;
@@ -1367,11 +1416,25 @@ static void leaderAbilities() {
   closeHorn.players[0].board[0].push_back(unit("close-horn",5,Row::Melee));
   assert(activateLeader(closeHorn,0));
   assert(closeHorn.players[0].score==10&&closeHorn.players[0].specialOccupied[0]);
-  Game occupiedCloseHorn;
-  occupiedCloseHorn.players[0].leader=leader("eredin_commander");occupiedCloseHorn.players[0].leaderAbilityAvailable=true;
-  occupiedCloseHorn.players[0].specialOccupied[0]=true;
-  assert(!activateLeader(occupiedCloseHorn,0));
-  assert(occupiedCloseHorn.players[0].leaderAbilityAvailable&&!occupiedCloseHorn.horn[0][0]);
+  const auto occupiedRowHornConsumesAction=[](const std::string& ability,Row row) {
+    Game game;
+    const auto index=static_cast<std::size_t>(row);
+    game.players[0].leader=leader(ability);game.players[0].leaderAbilityAvailable=true;
+    game.players[0].specialOccupied[index]=true;
+    game.players[0].board[index].push_back(unit("occupied-horn-unit",5,row));
+    game.players[1].hand.push_back(unit("opponent-turn-unit",1));
+    const int scoreBefore=calculateScore(game.players[0],game.weather,game.horn[0]);
+    assert(activateLeader(game,0));
+    assert(!game.players[0].leaderAbilityAvailable);
+    assert(game.players[0].specialOccupied[index]&&!game.horn[0][index]);
+    assert(calculateScore(game.players[0],game.weather,game.horn[0])==scoreBefore);
+    assert(game.currentPlayer==1&&game.phase==Phase::OpponentTurn);
+  };
+  // The source Row.leaderHorn() is a no-op when occupied, but activateLeader()
+  // still disables the leader and ends the turn.
+  occupiedRowHornConsumesAction("foltest_siegemaster",Row::Siege);
+  occupiedRowHornConsumesAction("eredin_commander",Row::Melee);
+  occupiedRowHornConsumesAction("francesca_beautiful",Row::Ranged);
 
   Game rowScorch;
   rowScorch.players[0].leader=leader("foltest_steelforged"); rowScorch.players[0].leaderAbilityAvailable=true;
@@ -1543,4 +1606,4 @@ static void leaderAbilities() {
   for(int owner=0;owner<2;++owner)
     for(std::size_t i=0;i<untouchedDecks[owner].size();++i)assert(emptyCrach.players[owner].deck[i].id==untouchedDecks[owner][i]);
 }
-int main() { scoreRules(); duplicateWeatherIsDiscarded(); allSourceWeatherTypesAndOwnership(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiHeroMoraleWeight(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
+int main() { scoreRules(); duplicateWeatherIsDiscarded(); allSourceWeatherTypesAndOwnership(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiDefersRandomActionTargets(); sourceAiHeroMoraleWeight(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
