@@ -12,6 +12,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -1172,6 +1173,28 @@ void drawCardTile(SDL_Renderer* r,const App& app,int x,int y,int w,int h,const g
   if(card.spy) text(r,x+w-10,y+4,"S",blue,1);
   if(card.medic) text(r,x+w-10,y+4,"M",green,1);
 }
+void drawMiniRowGlyph(SDL_Renderer* r,int x,int y,const char* rowIcon) {
+  const Color stroke{255,207,102,255};
+  const auto line=[&](int x1,int y1,int x2,int y2) {
+    color(r,stroke);SDL_RenderDrawLine(r,x+x1,y+y1,x+x2,y+y2);
+  };
+  if(std::strcmp(rowIcon,"close")==0) {
+    // Short, high-contrast sword silhouette.
+    line(2,9,9,2);line(4,10,3,8);line(3,8,6,11);line(1,11,3,9);
+  } else if(std::strcmp(rowIcon,"ranged")==0) {
+    // Bow and arrow stay distinct after reduction to the 11px card badge.
+    line(3,1,4,5);line(4,5,4,7);line(4,7,3,11);
+    line(5,6,11,6);line(9,4,11,6);line(9,8,11,6);
+  } else if(std::strcmp(rowIcon,"siege")==0) {
+    // Ballista frame, crossbar and raised arm.
+    line(1,4,11,4);line(3,4,5,9);line(9,4,7,9);line(4,9,8,9);
+    line(5,4,8,1);line(8,1,10,2);line(2,11,10,11);
+  } else {
+    // Agile: two opposing arrows.
+    line(2,3,9,10);line(7,10,9,10);line(9,8,9,10);
+    line(2,9,9,2);line(7,2,9,2);line(9,2,9,4);
+  }
+}
 void drawSourceCard(SDL_Renderer* r,const App& a,int x,int y,const gwent::Card& card,bool selected=false,int displayPower=-1) {
   constexpr int w=28,h=43;
   drawImage(r,a,"img/sm/"+gwent::referenceCardImage(card.referenceIndex),x,y,w,h);
@@ -1197,7 +1220,7 @@ void drawSourceCard(SDL_Renderer* r,const App& a,int x,int y,const gwent::Card& 
     const char* rowIcon=card.agile?"agile":card.row==gwent::Row::Ranged?"ranged":card.row==gwent::Row::Siege?"siege":"close";
     box(r,x+15,y+30,13,13,Color{9,8,7,238});
     frame(r,x+15,y+30,13,13,Color{210,169,88,255});
-    drawImage(r,a,"img/icons/card_row_"+std::string(rowIcon)+".png",x+16,y+31,11,11);
+    drawMiniRowGlyph(r,x+16,y+31,rowIcon);
   }
   std::string ability=card.abilities.empty()?std::string{}:card.abilities.back();
   if(ability=="cerys")ability="muster";
