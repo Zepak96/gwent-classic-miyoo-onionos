@@ -51,6 +51,13 @@ końcowym wydaniem.
   tagi dźwięków pogody oraz osobne zaplanowane SFX animacji Horn/Spy/Morale,
   transformacji Mardroeme i wyzwolonych efektów Medic/Bond/Muster. Build i CTest
   przechodzą; fizyczny odsłuch i synchronizacja na Miyoo nadal niezweryfikowane.
+- Commit `c8fb50d` zbudowano jako ELF32 ARM hard-float, a archiwum OnionOS
+  zawiera 618 wpisów (SHA-256
+  `ddd30aa2730122f7e2b88152a1bdd17551722938c0a3b31d0cf98fe2dc9b4dc0`).
+  Zaktualizowano `E:\Roms\PORTS\Games\GwentClassic`; audyt SHA-256 potwierdził
+  602/602 pliki. Hash binarki: `ff33832ddad11d9b77b26e5b3562a92d4fc160949b889994333c78419ab12ee9`.
+  Poprzednie katalogi zachowano na SD i w `.work/sd-backup-c8fb50d/`; uruchomienie
+  i odsłuch na urządzeniu wciąż wymagają testu fizycznego.
 - Rozszerzono testy zdolności liderów z repo referencyjnego o oczyszczenie
   pogody, Torrential Rain, ranged/melee Scorch, Biting Frost, Ranged Horn,
   Hope of the Aen Seidhe i Invader of the North. Pełne pokrycie wszystkich
