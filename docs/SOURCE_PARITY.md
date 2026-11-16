@@ -477,16 +477,13 @@ folder was backed up locally in artifacts/qa/package-bc33dcc/sd-backup-20261116-
 This proves copying and file integrity, not successful execution on Miyoo.
 Physical startup, input, audio and miniature readability remain to be checked.
 
-## Confirmed open AI discrepancy — fractional Horn weights
+## Fractional Horn weights and integer AI tickets
 
-Source ControllerAI.weightCard returns Math.max(...rows)/2 for Commander's Horn,
-so an odd row gain preserves a half-point weight. Native src/ai.cpp currently
-returns int from weightCard and uses integer best/2, dropping that half point.
-Additionally source common.js randomInt floors the weighted ticket, while the
-native selector currently uses a continuous double ticket. These two differences
-must be fixed together and tested at odd Horn gains and fractional cumulative
-boundaries. Current SD revision bc33dcc still contains these differences; the
-full AI distribution must not be described as matching the source.
+The audit found two differences in the previous SD build bc33dcc. Source
+ControllerAI.weightCard preserves Math.max(...rows)/2 for Commander's Horn,
+including half-point weights. The old native int return discarded the fraction.
+Source common.js randomInt floors the weighted ticket, whereas the old native
+selector used a continuous double ticket. Both affected action distribution.
 
 The discrepancy above was corrected in 68a7a67: Horn weights remain double
 precision and the weighted ticket is floored like source randomInt(). A seeded
@@ -494,3 +491,7 @@ regression evaluates 2,857 seeds with a three-point Horn gain (weight 1.5)
 and a one-point unit, checking both selection regions and final RNG state.
 Engine CI job 133347163861 passed, including this test. Frontend CI is still
 running; SD remains on bc33dcc until a new ARM package is validated.
+
+ARM workflow 43881332283 now builds c2d06b8, which includes the 68a7a67
+engine correction. Desktop frontend checks for 68a7a67 are still running.
+No newer SD installation is claimed by this entry.
