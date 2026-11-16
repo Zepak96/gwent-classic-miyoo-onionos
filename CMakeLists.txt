@@ -85,3 +85,13 @@ if(GWENT_BUILD_TESTS)
   add_test(NAME engine_rules COMMAND gwent_engine_tests)
   add_test(NAME card_catalog COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/validate_catalog.py ${CMAKE_SOURCE_DIR}/data)
 endif()
+option(GWENT_CAMPAIGN_BENCHMARK "Build campaign draft balance benchmark" OFF)
+if(GWENT_CAMPAIGN_BENCHMARK)
+  set(CAMPAIGN_HEADER ${GWENT_GENERATED_DIR}/campaign_drafts.hpp)
+  add_custom_command(OUTPUT ${CAMPAIGN_HEADER}
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_campaign_benchmark.py ${CMAKE_CURRENT_SOURCE_DIR}/data/campaign-decks-draft.json ${CAMPAIGN_HEADER}
+    DEPENDS tools/generate_campaign_benchmark.py data/campaign-decks-draft.json VERBATIM)
+  add_executable(gwent_campaign_benchmark tools/campaign_benchmark.cpp ${CAMPAIGN_HEADER})
+  target_include_directories(gwent_campaign_benchmark PRIVATE ${GWENT_GENERATED_DIR})
+  target_link_libraries(gwent_campaign_benchmark PRIVATE gwent_engine)
+endif()
