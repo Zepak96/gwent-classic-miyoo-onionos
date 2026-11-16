@@ -13,8 +13,13 @@ source behavior. A build or screenshot alone does not count as parity.
   regressions cover random first player, player choice, opponent-Scoia random
   choice, and the source behavior when both factions are Scoia'tael. The SDL
   input test now drives the player's left/right choice and confirms it.
-- [ ] One action per turn; automatic pass when no cards/leader action remain.
-- [ ] Voluntary pass; passed player stays out while the other keeps playing.
+- [x] One action per turn; the source `Player.endTurn()` auto-passes only when
+  both the hand and Leader action are exhausted. Native engine regressions cover
+  exhausted starts, exhausted final action, and Leader as a remaining action.
+- [x] Voluntary pass marks the player passed and leaves the opponent acting
+  until they pass; native engine regressions cover both passes ending a round.
+  Miyoo X hold opens a confirmation and A confirms; SDL input probes cover hold,
+  confirm, and short press behavior.
 - [ ] Round result, gems/health, ties, Nilfgaard tie-break, match result/rematch.
 - [ ] Round cleanup, Northern Realms draw, Monsters survivor, Skellige round-three
   graveyard selection and Agile row selection.
@@ -37,6 +42,10 @@ source behavior. A build or screenshot alone does not count as parity.
   of noncombat or opponent-owned targets; Cow removal also exercises Avenger.
 - [ ] Muster from hand/deck; next-gen Geralt/Ciri muster and Roach Avenger.
 - [ ] Berserker/Mardroeme transformations and Vildkaarl lifecycle.
+- [x] Berserker/Mardroeme transformation ordering now re-sorts the transformed
+  Vildkaarl by the source row comparator (base power, then name); engine
+  regression covers the transformed card moving after a 9-strength unit. The
+  remaining Vildkaarl callback/audio lifecycle is still under audit.
 - [ ] Global Scorch and each row Scorch threshold/targets.
 - [ ] Clear Weather, each individual weather type, Skellige Storm, duplicate
   weather behavior and weather-card ownership/discard.

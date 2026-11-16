@@ -250,6 +250,11 @@ void transformBerserkers(Player& player, int rowNumber) {
     card = *target;
     card.id = oldId;
   }
+  // Source Berserker.placed() removes the old card and calls Row.addCard() for
+  // the Vildkaarl. Row.addCard() sorts by printed base power, then name. A
+  // replacement in place leaves the stronger transformed card in the old
+  // Berserker's slot and makes the board order diverge from the reference.
+  std::stable_sort(row.begin(), row.end(), sourceHandCardBefore);
 }
 }
 

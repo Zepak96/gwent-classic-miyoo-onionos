@@ -662,9 +662,11 @@ static void referenceCatalog() {
   mardroeme.players[0].hand={potion,unit("mardroeme-spare",1)};
   auto berserker=unit("bear-source",4); berserker.name="Berserker"; berserker.berserker=true;
   mardroeme.players[0].board[0].push_back(berserker);
+  mardroeme.players[0].board[0].push_back(unit("after-berserker",9));
   assert(playCard(mardroeme,0,"potion",Row::Melee));
-  assert(mardroeme.players[0].board[0][0].name=="Transformed Vildkaarl");
-  assert(mardroeme.players[0].board[0][0].power==14);
+  assert(mardroeme.players[0].board[0][0].id=="after-berserker");
+  assert(mardroeme.players[0].board[0][1].name=="Transformed Vildkaarl");
+  assert(mardroeme.players[0].board[0][1].power==14);
   assert(mardroeme.players[0].mardroeme[0]);
   auto laterBerserker=unit("later-berserker",4);laterBerserker.name="Berserker";laterBerserker.berserker=true;
   mardroeme.players[0].hand.push_back(laterBerserker);
