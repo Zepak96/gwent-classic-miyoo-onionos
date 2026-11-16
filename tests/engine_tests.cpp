@@ -601,9 +601,32 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
     auto sample=enemyBoardSpyDecoy;sample.rngState=seed*0xc2b2ae35u;
     if(chooseAiAction(sample,1).cardId==boardSpyDecoy.id)++boardSpyDecoyChoices;
   }
-  // getBoardData() traverses all six rows: an opponent-side Spy raises the
-  // source Decoy weight while the selected return target remains on the AI side.
-  assert(boardSpyDecoyChoices>230);
+  Game noEnemyBoardSpyDecoy=enemyBoardSpyDecoy;
+  noEnemyBoardSpyDecoy.players[0].board[0].clear();
+  int noEnemySpyDecoyChoices=0;
+  for(std::uint64_t seed=1;seed<=256;++seed) {
+    auto sample=noEnemyBoardSpyDecoy;sample.rngState=seed*0xc2b2ae35u;
+    if(chooseAiAction(sample,1).cardId==boardSpyDecoy.id)++noEnemySpyDecoyChoices;
+  }
+  // The pinned source collects AI decision data from board.row[0..2], so a
+  // human-side Spy must leave the AI's Decoy weight and selection unchanged.
+  assert(boardSpyDecoyChoices==noEnemySpyDecoyChoices);
+
+  Game decoyTargetSide;
+  decoyTargetSide.phase=Phase::OpponentTurn;decoyTargetSide.currentPlayer=1;
+  Card chooseDecoy;chooseDecoy.id="source-side-decoy";chooseDecoy.name="Decoy";chooseDecoy.kind=Kind::Decoy;
+  decoyTargetSide.players[1].hand={chooseDecoy};
+  Card aiSpy=unit("ai-own-spy",3);aiSpy.spy=true;aiSpy.abilities={"spy"};
+  Card humanSpy=unit("human-side-spy",1);humanSpy.spy=true;humanSpy.abilities={"spy"};
+  decoyTargetSide.players[1].board[1].push_back(aiSpy);
+  decoyTargetSide.players[0].board[0].push_back(humanSpy);
+  const auto decoyTarget=chooseAiAction(decoyTargetSide,1);
+  assert(decoyTarget.cardId==chooseDecoy.id&&decoyTarget.selectedCardId==aiSpy.id);
+  assert(playCard(decoyTargetSide,1,decoyTarget.cardId,decoyTarget.target,decoyTarget.selectedCardId));
+  assert(std::any_of(decoyTargetSide.players[1].hand.begin(),decoyTargetSide.players[1].hand.end(),
+                     [&](const Card& card){return card.id==aiSpy.id;}));
+  assert(std::any_of(decoyTargetSide.players[0].board[0].begin(),decoyTargetSide.players[0].board[0].end(),
+                     [&](const Card& card){return card.id==humanSpy.id;}));
 
   // Source's zero-total fallback still plays Clear Weather when its raw
   // weather weight is exactly zero. Both sides gain the same amount here, so
@@ -617,9 +640,9 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
   const auto zeroWeightChoice=chooseAiAction(zeroWeightClear,1);
   assert(!zeroWeightChoice.pass&&zeroWeightChoice.cardId==clear.id);
 
-  // Source getMaximums() compares Card.power, not weather-adjusted row power.
-  // Weather makes the AI's printed-10 unit score 1 while the opponent's
-  // printed-8 unit stays at 8; source therefore gives Global Scorch weight 0.
+  // Source getMaximums() reads Card.power after Row.updateScore() has applied
+  // weather. The AI's printed-10 unit therefore has current power 1 and the
+  // opposing printed-8 unit is the Scorch maximum.
   Game rawPowerScorch;
   rawPowerScorch.phase=Phase::OpponentTurn;rawPowerScorch.currentPlayer=1;
   rawPowerScorch.weather[0]=true;
@@ -627,12 +650,12 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
   rawPowerScorch.players[0].board[1].push_back(unit("printed-eight-opponent",8,Row::Ranged));
   Card aiScorch;aiScorch.id="ai-global-scorch";aiScorch.name="Scorch";aiScorch.kind=Kind::Scorch;
   rawPowerScorch.players[1].hand={aiScorch,unit("ai-one-point",1,Row::Siege)};
-  int rawMaximumScorchChoices=0;
+  int weatherAdjustedScorchChoices=0;
   for(std::uint64_t seed=1;seed<=256;++seed) {
     auto sample=rawPowerScorch;sample.rngState=seed*0x85ebca6bu;
-    if(chooseAiAction(sample,1).cardId==aiScorch.id)++rawMaximumScorchChoices;
+    if(chooseAiAction(sample,1).cardId==aiScorch.id)++weatherAdjustedScorchChoices;
   }
-  assert(rawMaximumScorchChoices==0);
+  assert(weatherAdjustedScorchChoices>200);
 
   Game difficultyChoice;
   difficultyChoice.phase=Phase::OpponentTurn;difficultyChoice.currentPlayer=1;

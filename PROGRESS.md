@@ -272,3 +272,10 @@ Pin `gwent.js` kończy inicjalizację przez `let dm = new DeckMaker()`, bez ekra
 - `ControllerAI.getBoardData()` zlicza Szpiegów, Medyków i karty Pożogi ze wszystkich sześciu rzędów. Natywne AI uwzględniało tylko swoje rzędy, co zmieniało wagę Manekina, gdy na planszy przeciwnika leżał Szpieg, Medyk lub Pożoga.
 - Wagi obejmują teraz obie strony; wybór celu Manekina nadal wskazuje legalną kartę po stronie AI. Test 256 deterministycznych decyzji potwierdza wzrost prawdopodobieństwa zagrania Manekina przy wrogim Szpiegu.
 - CTest (2/2) przechodzi. Pełny rozkład wag i fizyczny test urządzenia pozostają otwarte.
+
+## Korekta: wagi Manekina AI — 16.11.2026
+
+- Ponowna kontrola przypiętego `gwent.js` wykazała, że `ControllerAI.getBoardData()` liczy zdolności z `board.row[0..2]`, czyli trzech rzędów kontrolowanych przez AI. Poprzednia notatka o wszystkich sześciu rzędach była niezgodna ze źródłem.
+- Waga Manekina używa własnych list AI Szpiegów, Medyków i Pożogi; przeciwnik nie zmienia tej wagi. Test 256 decyzji z tymi samymi ziarnami sprawdza równość wyników z i bez wrogiego Szpiega. Dodatkowo regresja weryfikuje wybór własnego Szpiega, kiedy po obu stronach leżą Szpiedzy.
+- Desktop CTest: 2/2 zaliczone; `--input-test` zaliczył sterowanie Miyoo, blokadę akcji, podgląd/lot kart, efekty zdolności, mulligan i Medyka; `--audio-test assets` zdekodował 35 efektów oraz oba utwory tła.
+- Zbudowano pakiet ARM hard-float dla Cortex-A7. ZIP przechodzi test CRC, zawiera 604 pliki razem ze skrótem OnionOS, a wszystkie 603 pliki gry na karcie SD odpowiadają paczce SHA-256. Miyoo Mini Plus nie uruchomiono fizycznie w tej walidacji.

@@ -53,6 +53,11 @@ int currentRowScore(const Game& game,int owner,int row) {
   return scoreRow(game,owner,row,game.players[owner].board[row],
                   game.weather[row],game.horn[owner][row]);
 }
+int currentBoardCardPower(const Game& game,int owner,const Card* target) {
+  for(int row=0;row<3;++row)for(const auto& card:game.players[owner].board[row])
+    if(&card==target)return cardPower(game,owner,row,card,game.players[owner].board[row]);
+  return target?target->power:0;
+}
 void collectCards(const std::vector<Card>& cards,int owner,BoardData& data,bool grave=false,bool ownBoard=false) {
   for(const auto& card:cards) {
     if(!isUnit(card)) continue;
@@ -73,25 +78,23 @@ void collectCards(const std::vector<Card>& cards,int owner,BoardData& data,bool 
 BoardData collectBoardData(const Game& game,int who) {
   BoardData data;
   for(int owner=0;owner<2;++owner) {
-    // ControllerAI.getBoardData() counts abilities across all six board rows.
-    // Keep own-side candidates separately for legal Decoy target selection.
+    // Keep board-wide counts for helpers that inspect both sides; the source
+    // ControllerAI separately scans its own three rows for Decoy choices.
     for(const auto& row:game.players[owner].board)collectCards(row,owner,data,false,owner==who);
     collectCards(game.players[owner].graveyard,owner,data,true);
     int best=-1;
     std::array<int,3> rowMaximum{{-1,-1,-1}};
     for(int row=0;row<3;++row) {
-      // ControllerAI.getMaximums() compares the source Card.power field; it
-      // does not use weather/horn adjusted row power for max.me/max.op/rmax.
       for(const auto& card:game.players[owner].board[row])
-        if(isUnit(card))rowMaximum[row]=std::max(rowMaximum[row],card.power);
+        if(isUnit(card))rowMaximum[row]=std::max(rowMaximum[row],cardPower(game,owner,row,card,game.players[owner].board[row]));
       best=std::max(best,rowMaximum[row]);
     }
     if(owner==who)for(int row=0;row<3;++row)
       if(rowMaximum[row]>=0)
         for(const auto& card:game.players[owner].board[row])
-          if(isUnit(card)&&card.power==rowMaximum[row])data.decoyFallbackOwnRowMaxima.push_back(&card);
+          if(isUnit(card)&&cardPower(game,owner,row,card,game.players[owner].board[row])==rowMaximum[row])data.decoyFallbackOwnRowMaxima.push_back(&card);
     for(int row=0;row<3;++row) for(const auto& card:game.players[owner].board[row])
-      if(isUnit(card) && card.power==best)
+      if(isUnit(card) && cardPower(game,owner,row,card,game.players[owner].board[row])==best)
         (owner==who?data.strongestOwn[row]:data.strongestEnemy[row]).push_back(&card);
     if(owner==who)data.ownMax=best; else data.enemyMax=best;
   }
@@ -103,12 +106,6 @@ int totalMaxPower(const BoardData& data,int ownerSide) {
   if(power<0)return 0;
   int count=0; for(const auto& row:rows)count+=static_cast<int>(row.size());
   return power*count;
-}
-std::vector<const Card*> allStrongest(const BoardData& data,int ownerSide) {
-  const auto& rows=ownerSide==0?data.strongestOwn:data.strongestEnemy;
-  std::vector<const Card*> result;
-  for(const auto& row:rows)result.insert(result.end(),row.begin(),row.end());
-  return result;
 }
 int weightRowChange(const Game& game,int who,int row,const Card& card) {
   auto cards=game.players[who].board[row];
@@ -160,11 +157,10 @@ int weightScorchRow(const Game& game,int who,int row) {
   if(currentRowScore(game,enemy,row)<10)return 0;
   int strongest=-1,total=0;
   for(const auto& card:game.players[enemy].board[row]) if(isUnit(card))
-    strongest=std::max(strongest,card.power);
-  // Source uses max.rmax[index].cards and sums raw Card.power values; its
-  // isUnit() filter excludes Heroes from these maxima.
-  for(const auto& card:game.players[enemy].board[row]) if(isUnit(card)&&card.power==strongest)
-    total+=card.power;
+    strongest=std::max(strongest,cardPower(game,enemy,row,card,game.players[enemy].board[row]));
+  // Source max.rmax uses current Row Card.power values, including row effects.
+  for(const auto& card:game.players[enemy].board[row]) if(isUnit(card)&&cardPower(game,enemy,row,card,game.players[enemy].board[row])==strongest)
+    total+=cardPower(game,enemy,row,card,game.players[enemy].board[row]);
   return total;
 }
 int weightGlobalScorch(const BoardData& data) {
@@ -217,9 +213,11 @@ int weightMedic(const Game& game,int who,const BoardData& data,int score,int gra
   return score+bonus;
 }
 int weightDecoy(const BoardData& data) {
-  if(!data.spies.empty())return 50;
-  if(!data.medics.empty())return 15;
-  if(!data.scorches.empty())return 10;
+  // ControllerAI.getBoardData() scans board.row[0..2], the AI's three rows
+  // in the source layout. Opponent-side abilities must not affect this weight.
+  if(!data.ownSpies.empty())return 50;
+  if(!data.ownMedics.empty())return 15;
+  if(!data.ownScorches.empty())return 10;
   return data.ownMax>=0?1:0;
 }
 std::vector<Card> discardOrder(Game& game,int who) {
@@ -381,7 +379,7 @@ int weightLeader(Game& game,int who,const BoardData& data,const std::string& id)
     if(game.round<2)return 0;
     if(hasInHand(game.players[who],"medic")||hasInHand(game.players[who],"spy"))return 0;
     if(hasInHand(game.players[who],"decoy") &&
-       (!data.medics.empty() || (!data.spies.empty() &&
+       (!data.ownMedics.empty() || (!data.ownSpies.empty() &&
         std::any_of(game.players[who].deck.begin(),game.players[who].deck.end(),[](const Card& c){return c.medic;}))))return 0;
     return 15;
   }
@@ -419,9 +417,11 @@ AiAction cardAction(Game& game,int who,const Card& card,const BoardData& data) {
   AiAction action;action.cardId=card.id;
   if(card.kind==Kind::Decoy || has(card,"decoy")) {
     const Card* target=nullptr;
-    auto lowest=[](const std::vector<const Card*>& cards)->const Card* {
+    auto lowest=[&](const std::vector<const Card*>& cards)->const Card* {
       if(cards.empty())return nullptr;
-      return *std::min_element(cards.begin(),cards.end(),[](const Card* a,const Card* b){return a->power<b->power;});
+      return *std::min_element(cards.begin(),cards.end(),[&](const Card* a,const Card* b){
+        return currentBoardCardPower(game,who,a)<currentBoardCardPower(game,who,b);
+      });
     };
     target=lowest(data.ownSpies);
     if(!target && !data.ownMedics.empty())target=data.ownMedics[roll(game)%data.ownMedics.size()];
