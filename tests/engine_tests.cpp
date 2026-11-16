@@ -1028,15 +1028,12 @@ static void sourceAiPassDecisions() {
 }
 
 static void sourceAiHeroMoraleWeight() {
-  std::uint64_t seed=0;
-  for(std::uint64_t candidate=1;candidate<1000;++candidate) {
-    auto state=candidate;
-    const double ticket=static_cast<double>(expectedRandom(state))/4294967296.0;
-    // The source weights Isengrim as 10 strength plus one gained point (11),
-    // ahead of a five-point unit. The old native weight was only one.
-    if(ticket>1.0/6.0&&ticket<11.0/16.0) { seed=candidate;break; }
-  }
-  assert(seed!=0);
+  constexpr std::uint64_t seed=2688;
+  auto state=seed;
+  const double ticket=static_cast<double>(expectedRandom(state))/4294967296.0;
+  // The source weights Isengrim as 10 strength plus one gained point (11),
+  // ahead of a five-point unit. The old native weight was only one.
+  assert(ticket>1.0/6.0&&ticket<11.0/16.0);
   Game game;game.phase=Phase::OpponentTurn;game.currentPlayer=1;game.rngState=seed;
   game.players[1].hand={referenceCard("Isengrim Faoiltiarna"),unit("ordinary-five",5)};
   game.players[1].board[0]={unit("ally-five",5)};
