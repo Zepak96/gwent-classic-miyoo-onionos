@@ -928,14 +928,14 @@ gwent::Card recipeLeader(std::size_t index) {
   if(!recipes().empty()) gwent::referenceLeader(recipes()[index%recipes().size()].leaderReferenceIndex,leader);
   return leader;
 }
-void startMatch(App& a) {
+void startMatch(App& a,std::uint64_t fixtureSeed=0) {
   try {
   if(recipes().size()<2) { a.status=tr(a,"reference_decks_missing"); return; }
   gwent::Card humanLeader=recipeLeader(a.deckIndex);std::vector<gwent::Card> humanDeck;
   if(a.userDeckSelected) {
     if(!gwent::materializeUserDeck(a.editDeck,humanDeck,humanLeader)) { a.status=tr(a,"deck_invalid");return; }
   } else humanDeck=gwent::makeReferenceDeck(recipes()[a.deckIndex]);
-  const auto seed=static_cast<std::uint64_t>(SDL_GetTicks())^SDL_GetPerformanceCounter();
+  const auto seed=fixtureSeed?fixtureSeed:(static_cast<std::uint64_t>(SDL_GetTicks())^SDL_GetPerformanceCounter());
   auto opponent=gwent::makeReferenceOpponentDeck(seed);
   if(opponent.sourceDeckIndex<0||opponent.cards.empty()||opponent.leader.kind!=gwent::Kind::Leader) {
     a.status=tr(a,"reference_deck_invalid");return;
@@ -3161,7 +3161,7 @@ int main(int argc,char** argv) {
       presentFrame();
       if(!saveFrame(argv[4])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
     }
-    startMatch(app);
+    startMatch(app,0x4757454E54ULL);
     if(argc>11) {
       app.game.phase=gwent::Phase::Mulligan;
       app.mulligan.clear();
