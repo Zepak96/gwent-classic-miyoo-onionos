@@ -690,6 +690,12 @@ void loadSettings(App& a) {
   a.musicEnabled=music!=0;
 }
 void playCardSound(App& a,const gwent::Card& card) {
+  if(std::find(card.abilities.begin(),card.abilities.end(),"vildkarrl")!=card.abilities.end()) {
+    // The source's Vildkaarl placed handler plays Mardroeme and suppresses
+    // the normal row-placement sound for transformed Vildkaarl cards.
+    a.audio.play("mardroeme");
+    return;
+  }
   std::string key;
   if(!card.abilities.empty()) {
     key=card.abilities.back();

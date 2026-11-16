@@ -38,6 +38,9 @@ nadal nie spełnia kryterium 1:1 i nie jest wydaniem do instalacji.
   wcześniej druga decyzja mogła wskazywać kartę już dobraną. Teraz port wykonuje
   dwie rzeczywiste podmiany w kolejności źródłowej. CTest przechodzi 2/2, w tym
   100 deterministycznych pełnych meczów z taliami i liderami źródłowymi.
+- Przemienione karty Vildkaarl z tagiem `vildkarrl` odtwarzają teraz źródłowy
+  efekt dźwiękowy Mardroeme zamiast standardowego dźwięku rzędu. Desktop build,
+  CTest 2/2, test sterowania i dekodowanie wszystkich 37 plików audio przechodzą.
 
 - Naprawiono mapowanie własnych maksimów w wyborze celu AI dla Manekina:
   wariant źródłowy losuje spośród maksimum każdego własnego rzędu, nie tylko
