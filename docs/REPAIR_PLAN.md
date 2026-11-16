@@ -260,5 +260,11 @@ rodzajami kart; pełny test na urządzeniu opisany wersją binarium i wynikiem.
 - [x] Build ARM hard-float i walidacja archiwum OnionOS przeszły. Pakiet jest
   wgrany na kartę SD; wszystkie 603 pliki katalogu gry mają zgodne rozmiary i
   sumy SHA-256 z artefaktem.
+- [x] Build `d035158` z poprawionym przepływem losowego Medyka przeszedł CI
+  desktopowe oraz build ARM. Paczka `GwentClassic-OnionOS.zip`
+  (`44cf693e6c38e06d021e6805cb096b383f2a557e9069c0983f34d5471f6f7bb7`)
+  została zainstalowana na SD; wszystkie 603 pliki i launcher `.port` zgodne
+  są z artefaktem SHA-256. Poprzedni build zachowano jako
+  `GwentClassic.previous-d035158`. Fizyczny test na Miyoo pozostaje otwarty.
 - [ ] Dokończyć poprawki i testy opisane w etapach 1–5.
 - [ ] Potwierdzić uruchomienie, sterowanie i pełny mecz na fizycznym Miyoo.
