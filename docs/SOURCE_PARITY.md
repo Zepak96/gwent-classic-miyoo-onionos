@@ -184,6 +184,10 @@ items above:
   verifies Global Scorch is down-weighted when weather changes displayed row
   order but not the source maximum-card comparison. Full AI weight parity is
   still open.
+- Francesca Hope's AI weight now preserves the source helper's `-1` result
+  when no Agile units are present, and its action weight is no longer clipped
+  to zero. A 128-seed regression verifies how that negative weight shifts the
+  weighted action interval; other source AI weights remain under audit.
 - An AI action rejected by the port is reported; it is not converted into a
   voluntary pass.
 - Source `Carousel` choices now use the five-card source geometry, source card

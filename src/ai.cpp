@@ -356,10 +356,16 @@ int weightLeader(Game& game,int who,const BoardData& data,const std::string& id)
   if(id=="francesca_beautiful")return weightHornRow(game,who,1);
   if(id=="francesca_pureblood")return weightWeatherFromDeck(game,who,"frost");
   if(id=="francesca_hope") {
+    const bool hasAgile=std::any_of(game.players[who].board[0].begin(),game.players[who].board[0].end(),
+                                    [](const Card& card){return card.agile;}) ||
+                        std::any_of(game.players[who].board[1].begin(),game.players[who].board[1].end(),
+                                    [](const Card& card){return card.agile;});
+    if(!hasAgile)return -1; // source helper returns score=-1 when there are no Agile units.
     Game after=game;
     if(!activateLeader(after,who))return 0;
     const int before=calculateScore(game.players[who],game.weather,game.horn[who]);
-    return std::max(0,after.players[who].score-before);
+    const int afterScore=calculateScore(after.players[who],after.weather,after.horn[who]);
+    return afterScore-before;
   }
   if(id=="crach_an_craite") {
     if(game.round<2)return 0;
@@ -473,7 +479,7 @@ AiAction chooseAiAction(Game& game,int who) {
   }
   if(player.leaderAbilityAvailable && !player.leader.abilities.empty()) {
     const auto choice=chooseLeaderAction(game,who,data);
-    int weight=std::max(0,weightLeader(game,who,data,player.leader.abilities.front()));
+    int weight=weightLeader(game,who,data,player.leader.abilities.front());
     Game preview=game;
     const bool legal=activateLeader(preview,who,choice.target,choice.leaderSelection);
     if(!legal)weight=0;

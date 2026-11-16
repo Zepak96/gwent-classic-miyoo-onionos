@@ -720,6 +720,21 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
   const auto leaderAction=chooseAiAction(leaderChoice,0);
   assert(leaderAction.activateLeader || (!leaderAction.pass && leaderAction.cardId=="ai-small-play"));
 
+  Game noAgileFrancesca;
+  noAgileFrancesca.phase=Phase::OpponentTurn;noAgileFrancesca.currentPlayer=1;
+  noAgileFrancesca.players[1].leader.id="francesca_hope";
+  noAgileFrancesca.players[1].leader.kind=Kind::Leader;
+  noAgileFrancesca.players[1].leader.abilities={"francesca_hope"};
+  noAgileFrancesca.players[1].leaderAbilityAvailable=true;
+  noAgileFrancesca.players[1].hand={unit("hope-weight-two",2),unit("hope-weight-one",1)};
+  for(std::uint64_t seed=1;seed<=128;++seed) {
+    auto sample=noAgileFrancesca;sample.rngState=seed;
+    const auto choice=chooseAiAction(sample,1);
+    // Source gives Francesca's no-op helper weight -1, so the total action
+    // weight is 2 and the first card fills that entire interval.
+    assert(!choice.pass&&!choice.activateLeader&&choice.cardId=="hope-weight-two");
+  }
+
   const auto& recipes=referencePremadeDecks();
   const auto deck0=makeReferenceDeck(recipes[0]);
   const auto deck1=makeReferenceDeck(recipes[2]);
