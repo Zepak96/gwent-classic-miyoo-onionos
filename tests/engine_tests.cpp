@@ -834,6 +834,15 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
           std::cerr<<" grave=";
           for(const auto& card:simulation.players[owner].graveyard)
             std::cerr<<card.name<<"["<<card.id<<", agile="<<card.agile<<"],";
+          for(int zone=0;zone<3;++zone) {
+            const auto& cards=zone==0?simulation.players[owner].hand:zone==1?simulation.players[owner].deck:simulation.players[owner].graveyard;
+            std::cerr<<" zone"<<zone<<"=";
+            for(const auto& card:cards)if(std::find(simulation.skelligeAgileReviveIds.begin(),simulation.skelligeAgileReviveIds.end(),card.id)!=simulation.skelligeAgileReviveIds.end())
+              std::cerr<<card.name<<"["<<card.id<<"],";
+          }
+          for(int row=0;row<3;++row)for(const auto& card:simulation.players[owner].board[row])
+            if(std::find(simulation.skelligeAgileReviveIds.begin(),simulation.skelligeAgileReviveIds.end(),card.id)!=simulation.skelligeAgileReviveIds.end())
+              std::cerr<<" board"<<row<<"="<<card.name<<"["<<card.id<<"],";
           std::cerr<<"\n";
           assert(false);
         }
