@@ -508,6 +508,11 @@ static void referenceCatalog() {
     Card chosenLeader;
     assert(!premade.empty() && referenceLeader(recipe.leaderReferenceIndex, chosenLeader));
     assert(validateDeck(premade, chosenLeader, recipe.faction).empty());
+    const UserDeck defaultSelection{"Deck 1",recipe.faction,recipe.leaderReferenceIndex,recipe.cardCounts};
+    assert(validateUserDeck(defaultSelection).empty());
+    std::vector<Card> selectedCards;Card selectedLeader;
+    assert(materializeUserDeck(defaultSelection,selectedCards,selectedLeader));
+    assert(selectedCards.size()==premade.size()&&selectedLeader.referenceIndex==chosenLeader.referenceIndex);
   }
   std::vector<bool> observed(recipes.size(),false);
   for(std::uint64_t seed=1;seed<=500;++seed) {

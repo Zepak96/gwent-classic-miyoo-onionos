@@ -19,23 +19,30 @@ nie zastępuje odczytu `event0` na konkretnej wersji firmware.
 
 | Miyoo | Zdarzenie SDL Mini | Akcja w grze |
 |---|---|---|
-| D-pad | strzałki | Nawigacja kart/rzędów/menu |
+| D-pad | strzałki | W edytorze góra/dół wybiera kartę, lewo/prawo przełącza bank i talię; w meczu wybiera kartę/rząd |
 | A | Left Ctrl | Zatwierdź / zagraj; podczas mulliganu zaznacza kartę |
-| B | Left Alt | W edytorze: usuń kopię w panelu talii albo wróć do wyboru talii w panelu banku; w meczu wróć do wyboru talii po zapisaniu meczu |
-| X | Left Shift | Podgląd karty; w menu talii otwiera edytor |
-| Y | Space | Zdolność lidera; podczas mulliganu zatwierdza/pomija; język w menu talii |
+| B | Left Alt | W edytorze: przejście z banku do talii albo usunięcie kopii w panelu talii; zamyka podgląd karty. W meczu anuluje bieżący wybór lub zapisuje mecz i wraca do edytora |
+| X | Left Shift | Otwiera/zamyka czytelny podgląd karty |
+| Y | Space | Zmienia frakcję w edytorze; używa zdolności lidera w meczu; zatwierdza/pomija wymianę w mulliganie |
 | L | Tab | Poprzedni rząd w meczu; wybór lidera w edytorze |
 | R | Backspace | Następny rząd w meczu; nawigacja w edytorze |
-| L2 / R2 | PageDown / PageUp | Przewijanie stron/ręki |
-| Start | Enter | Rozpocznij mecz w edytorze/wyborze talii; pauza podczas meczu; zatwierdza/pomija mulligan |
-| Select | Escape | Pasowanie po dodatkowym potwierdzeniu; zapis talii w edytorze; zatwierdza mulligan |
-| MENU | `KEY_HOME` → `SDLK_HOME` przez lokalną poprawkę SDL | Zapisuje mecz i zamyka grę, aby OnionOS odzyskał kontrolę |
+| L2 / R2 | PageDown / PageUp | L2: następny, R2: poprzedni slot talii; w meczu L2 przewija rękę o pięć kart naprzód, R2 wstecz |
+| Start | Enter | Rozpoczyna mecz z edytora; otwiera pauzę w meczu; zatwierdza/pomija mulligan |
+| Select | Escape | Zapis talii w edytorze; zamyka podgląd, jeśli jest otwarty. W meczu otwiera potwierdzenie pasowania lub zatwierdza wybór fazy |
+| MENU | `KEY_HOME` → `SDLK_HOME` przez lokalną poprawkę SDL | Zapisuje mecz (jeśli trwa) i zamyka grę, aby OnionOS odzyskał kontrolę |
+
+Jest jeden ekran przygotowania talii. Usunięto dodatkowy ekran `DeckSelect` z
+wcześniejszego prototypu. W edytorze `P` wczytuje następny preset, `R` wznawia
+zapisany mecz, `Z` zmienia język, a `F` zmienia frakcję. Te klawisze są dostępne
+na klawiaturze; fizyczne Y zmienia frakcję, a język jest domyślnie polski.
 
 Klawisz Select nie pasuje automatycznie: najpierw otwiera pytanie, A zatwierdza,
 a B anuluje. Na ekranie mulliganu lewo/prawo wybiera kartę, A ją zaznacza, a
 Start, Y lub Select zatwierdza wybór albo pomija wymianę, gdy nic nie
-zaznaczono. X otwiera tekstowy inspektor karty. Wbudowany smoke `--input-test` sprawdza translację klawiszy
-Mini SDL, pauzę, bezpieczne potwierdzanie pasowania oraz ochronę wyboru celu.
+zaznaczono. X otwiera tekstowy inspektor karty. Wbudowany smoke `--input-test`
+sprawdza mapowanie klawiszy Mini SDL i alternatywnych zdarzeń gamepada dla obu
+ekranów, zachowanie B zależnie od panelu, pauzę, bezpieczne potwierdzanie
+pasowania oraz ochronę wyboru celu.
 
 ## Status weryfikacji
 
