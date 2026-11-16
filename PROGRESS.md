@@ -1,12 +1,24 @@
 # Postęp projektu
 
-## Praca kontynuowana na czystej gałęzi — 15.11.2026
+## Aktualny audyt zgodności — 16.11.2026
 
-Gałąź `codex/full-source-parity` bazuje na publicznym HEAD `01df8a7` i zawiera
-niezmienione pliki źródłowe `asundr/gwent-classic` przypięte do
-`08592d847f2573440a34deb9f32bc855b2544cdd`. Mapa pełnego audytu źródło→port
-znajduje się w `docs/SOURCE_PARITY.md`. Port nadal nie spełnia kryterium 1:1 i
-nie jest wydaniem do instalacji.
+Publiczna gałąź `codex/full-source-parity` zawiera niezmienione pliki źródłowe
+`asundr/gwent-classic` przypięte do `08592d847f2573440a34deb9f32bc855b2544cdd`.
+Mapa pełnego audytu źródło→port znajduje się w `docs/SOURCE_PARITY.md`. Port
+nadal nie spełnia kryterium 1:1 i nie jest wydaniem do instalacji.
+
+- Katalog `data/cards.json` porównuje się teraz rekord po rekordzie z JSON-em
+  osadzonym w upstreamowym `cards.js`: 216/216 zgodnych, pola i kolejność bez
+  różnic. Ten test potwierdza zawartość katalogu, nie kompletność implementacji
+  wszystkich zdolności.
+- W 640×480 podglądach karty tekst oryginalnego obrazka jest oddzielony od
+  portretu; nazwy i opisy są rysowane jako tekst PL/EN. Klatki inspektora,
+  edytora i karuzeli obejrzano po wygenerowaniu przez SDL dummy smoke.
+- Release CTest przechodzi 2/2, `--input-test` przechodzi, a `--audio-test`
+  dekoduje 35 SFX i oba utwory. Test audio z SDL dummy nie potwierdza głośnika
+  fizycznego Miyoo.
+- Zmiany źródłowe i README są opublikowane na publicznej gałęzi; ta aktualizacja
+  nie zawiera nowej paczki ARM ani zapisu na kartę SD.
 
 - Naprawiono mapowanie własnych maksimów w wyborze celu AI dla Manekina:
   wariant źródłowy losuje spośród maksimum każdego własnego rzędu, nie tylko

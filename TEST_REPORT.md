@@ -196,3 +196,12 @@ Ported the reference `Player.canPlay()`, `Player.endTurn()`, and `Game.startRoun
   decoded all 35 SFX and both music tracks and exercised music switch/mute.
   These dummy-device checks do not verify actual speaker output or gameplay on
   physical Miyoo hardware. ARM/package/SD/device checks remain open.
+
+## Exact card-catalog comparison — 16.11.2026
+
+- `tests/validate_catalog.py` now parses the card JSON embedded in the pinned
+  upstream `cards.js` and compares all fields and record order to `data/cards.json`.
+- The current data matches all 216 upstream records exactly, including the
+  upstream Witcher 3 DLC/next-gen additions. Release CTest passed 2/2 after the
+  check was added. This verifies catalog data only; it does not prove that every
+  card ability or interaction is fully implemented in the engine.

@@ -1,3 +1,4 @@
+import ast
 import json
 import pathlib
 import sys
@@ -9,6 +10,19 @@ ability_text = json.loads((root / "ability-text.json").read_text(encoding="utf-8
 card_names_pl = json.loads((root / "card-names-pl.json").read_text(encoding="utf-8"))
 ability_text_pl = json.loads((root / "ability-text-pl.json").read_text(encoding="utf-8"))
 assert len(cards) == manifest["record_count"] == 216
+# Parse the JSON string assembled by the pinned upstream cards.js and compare
+# every field/order, rather than relying only on a local record-count manifest.
+source_file = root.parent / "upstream" / "asundr-gwent-classic" / "cards.js"
+source_fragments = []
+for line in source_file.read_text(encoding="utf-8").splitlines():
+    fragment = line.strip()
+    if fragment.startswith("var card_dict") or fragment == ");":
+        continue
+    if fragment.startswith("+ "):
+        fragment = fragment[2:].strip()
+    source_fragments.append(ast.literal_eval(fragment))
+source_cards = json.loads("".join(source_fragments))
+assert cards == source_cards, "Card records/order differ from pinned upstream cards.js"
 required = {"name", "id", "deck", "row", "strength", "ability", "filename", "count"}
 assert all(required <= set(card) for card in cards)
 assert all(card["name"].strip() for card in cards)
