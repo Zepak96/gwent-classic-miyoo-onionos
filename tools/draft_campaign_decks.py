@@ -27,6 +27,17 @@ for faction, leader_ids in leaders.items():
         units = [24, 23, 22, 22, 22][level]
         start = round((len(ordered) - units) * level / 4)
         chosen = ordered[start:start + units]
+        if faction == 'realms' and level == 4:
+            # Preserve full draw/return engines and worthwhile Bond sets rather
+            # than letting low printed Spy power lose to unrelated high units.
+            required = [item for item in ordered if
+                        ('hero' not in cards[item[0]]['ability'].split() and
+                         ('spy' in cards[item[0]]['ability'].split() or
+                          'medic' in cards[item[0]]['ability'].split() or
+                          ('bond' in cards[item[0]]['ability'].split() and
+                           int(cards[item[0]]['strength'] or 0) >= 4)))]
+            assert len(required) <= units
+            chosen = required + [item for item in reversed(ordered) if item not in required][:units-len(required)]
         counts = collections.Counter(i for i, _ in chosen)
         # Avoid flooding weak decks with specials; concentrated advanced decks get utility.
         specials = [[4, 1], [5, 1]] if level == 0 else [[1, 1], [5, 1], [2, 1]]
@@ -52,6 +63,17 @@ for faction, leader_ids in leaders.items():
         recipes.append({'id': f'{faction}-{level+1}', 'faction': faction, 'stage': level+1,
                         'leader': leader_id, 'cards': entries, 'units': unit_count,
                         'specials': special_count, 'balance_status': 'unverified-draft'})
+# Training benchmark 43908517238 found two Skellige inversions. Preserve the
+# five compositions but order them by measured score. This is provisional
+# until the independent holdout and newer engine revision both agree.
+skellige = [d for d in recipes if d['faction'] == 'skellige']
+recipes = [d for d in recipes if d['faction'] != 'skellige']
+for stage, source_stage in enumerate((4, 2, 1, 3, 5), 1):
+    deck = dict(skellige[source_stage-1])
+    deck['id'] = f'skellige-{stage}'
+    deck['stage'] = stage
+    deck['composition_origin_stage'] = source_stage
+    recipes.append(deck)
 output = ROOT / 'data/campaign-decks-draft.json'
 output.write_text(json.dumps({'schema_version': 1, 'status': 'not-enabled-in-game', 'decks': recipes},
                              ensure_ascii=False, indent=2) + '\n', encoding='utf-8')

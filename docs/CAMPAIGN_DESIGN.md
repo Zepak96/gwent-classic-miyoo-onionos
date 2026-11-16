@@ -69,3 +69,31 @@ przeciwnika, wersji przepisu i osiągnięcia. Kampania działa offline.
 3. Konkretne legalne listy kart dla wszystkich etapów i raport balansu.
 4. Wieże, portrety, dialogi, osiągnięcia i trwały zapis progresu.
 5. Testy pełnych ścieżek oraz kontrola wizualna na urządzeniu.
+
+## Pierwszy pomiar — CI 43908517238, silnik 7f3b659
+
+Przeprowadzono 4800 partii: 20 talii po 240 spotkań z 10 źródłowymi
+przepisami kontrolnymi, 12 wspólnych ziaren i obie strony stołu. Wynik
+oznacza (wygrane + 0,5 × remisy) / liczba partii. To zbiór treningowy,
+a nie dowód uniwersalnej trudności ani niezależna walidacja.
+
+- Północ: 0,037 / 0,052 / 0,156 / 0,175 / 0,271.
+- Nilfgaard: 0,067 / 0,104 / 0,163 / 0,365 / 0,792.
+- Potwory: 0,237 / 0,250 / 0,562 / 0,681 / 0,817.
+- Skellige: 0,258 / 0,221 / 0,342 / 0,179 / 0,410 — dwie inwersje.
+
+Skellige zostało przełożone według zmierzonego wyniku: stare składy
+4, 2, 1, 3, 5. Pole composition_origin_stage zachowuje pochodzenie.
+Wcześniejsze budżety tabeli były propozycją, nie regułą wymagającą sztucznego
+zmieniania legalnej talii. Nowa kolejność musi ponownie przejść pomiar.
+
+Boss Północy uzyskał zbyt niski wynik względem pozostałych frakcji. Heurystyka
+preferowała wysoką drukowaną siłę kosztem słabszych szpiegów i pełnych grup
+Więzi. Nowy draft wymusza szpiegów, medyków i komplety Więzi o sile co najmniej
+4, a pozostałe miejsca uzupełnia najlepiej ocenionymi jednostkami.
+Skuteczność tego wariantu nie jest jeszcze zmierzona.
+
+Benchmark przyjmuje argumenty seedStart i seedCount; po dostrojeniu należy
+użyć niezależnego zakresu, np. 101 48. Zmiany silnika medyków/Skellige wymagają
+powtórzenia obu zestawów i zapisania rewizji, zamiast porównywania wyników z
+różnych wersji mechaniki jak jednego eksperymentu.
