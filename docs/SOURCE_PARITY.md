@@ -413,4 +413,6 @@ from score plus the Nilfgaard tie-break and derives a completed match outcome
 from `matchWinner`, displaying the source draw stamp and localized draw title
 when appropriate. The frontend result smoke test renders round win, loss, draw,
 Nilfgaard tie-break, and match draw frames; `--input-test` checks all outcome
-branches.
+branches. Engine/frontend CI passed for commit `550435f`; the ARMHF package was
+installed on SD and all 603 files were SHA-256 verified. Physical-device result
+screen confirmation remains open.

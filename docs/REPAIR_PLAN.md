@@ -371,6 +371,13 @@ rodzajami kart; pełny test na urządzeniu opisany wersją binarium i wynikiem.
   from score and Nilfgaard's tie-break, and renders `end_draw` plus a localized
   draw title for drawn matches. Engine tests cover last-gem loss and drawn match;
   frontend tests render five outcome frames and input tests cover win/loss/draw
-  mapping. SDL input/result smoke checks and visual review passed locally;
-  GitHub CI will run the full committed CTest set.
-  Visual captures are under `artifacts/qa/result-screens/`.
+  mapping. Local SDL input/result smoke checks and five-frame visual review
+  passed; desktop CI passed for commit `550435f`, including Release CTest and
+  screen smoke test. ARMHF package SHA-256:
+  `ac2af1a15df9ba36864bc7cf9c8dcd7d3cf65dbbcb2db69e8971edb3fcc734ea`;
+  binary SHA-256:
+  `a08da61a4cc517a590eb356b6406b14607a207d7c2ef49b33051ef907fac38f9`.
+  Installed on SD; all 603 files were verified. Backup:
+  `GwentClassic.previous-550435f`. Visual captures are under
+  `artifacts/qa/result-screens/`. Physical-device result confirmation remains
+  open.
