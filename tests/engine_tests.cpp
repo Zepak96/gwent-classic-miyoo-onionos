@@ -629,6 +629,14 @@ static void leaderAbilities() {
   beginMatchWithLeaders(cancellation,deck,leader("foltest_lord"),deck,leader("emhyr_whiteflame"),0x4321,0);
   assert(!cancellation.players[0].leaderAbilityAvailable && cancellation.players[0].leaderAbilityCancelled);
   assert(!cancellation.players[1].leaderAbilityAvailable && cancellation.players[1].leaderAbilityCancelled);
+  for(const auto& passiveId:std::vector<std::string>{"emhyr_invader","eredin_treacherous","francesca_daisy","king_bran"}) {
+    Game suppressedPassive;
+    beginMatchWithLeaders(suppressedPassive,deck,leader("emhyr_whiteflame"),deck,leader(passiveId),0x432100+passiveId.size(),0);
+    assert(suppressedPassive.players[0].hand.size()==10&&suppressedPassive.players[1].hand.size()==10);
+    assert(!suppressedPassive.randomRespawn&&!suppressedPassive.players[0].doubleSpyPower&&
+           !suppressedPassive.players[1].doubleSpyPower&&!suppressedPassive.players[1].halfWeather);
+    assert(suppressedPassive.players[0].leaderAbilityCancelled&&suppressedPassive.players[1].leaderAbilityCancelled);
+  }
 
   Game spies;
   beginMatchWithLeaders(spies,deck,leader("eredin_treacherous"),deck,leader("emhyr_emperor"),0x5678,0);

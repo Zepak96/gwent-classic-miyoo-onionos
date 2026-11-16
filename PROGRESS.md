@@ -49,6 +49,10 @@ końcowym wydaniem.
   pogody, Torrential Rain, ranged/melee Scorch, Biting Frost, Ranged Horn,
   Hope of the Aen Seidhe i Invader of the North. Pełne pokrycie wszystkich
   zdolności i wyborów lidera pozostaje otwarte.
+- Zweryfikowano też szczególną inicjalizację źródłowego Emhyra Białego Płomienia:
+  wyłącza ona pasywne zdolności obu liderów, w tym dodatkową kartę Franceski,
+  połowę pogody Brana, losowe wskrzeszanie Invadera i podwójne punkty szpiegów
+  Zdrajcy. Cztery regresje potwierdzają brak tych efektów przy Białym Płomieniu.
 - Przetłumaczono statusy polskiej wersji dla błędów i akcji meczu (zapis,
   mulligan, pas, cel, lider, Skellige oraz odrzucony ruch AI). CTest 2/2,
   `--input-test` i `--audio-test assets` przechodzą; pełna lokalizacja menu,

@@ -103,6 +103,10 @@ items above:
   Invader, and Francesca Queen/Beautiful/Pureblood/Hope in addition to the
   previously covered leaders. This does not yet cover every leader's effects
   and selection flows.
+- Emhyr White Flame's source initialization suppresses both players' leader
+  initialization when either side uses it, including passive Invader,
+  Treacherous, Daisy, and King Bran effects; each passive suppression case now
+  has a targeted regression.
 - Match action/error statuses for saves, mulligan, passes, leader activation,
   target selection, Skellige revival and rejected AI actions now use Polish
   strings in Polish mode. This does not establish full UI localization parity.
