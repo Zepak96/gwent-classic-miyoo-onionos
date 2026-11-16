@@ -235,6 +235,8 @@ struct App {
   gwent_port::AudioSystem audio;
   std::string status{"PRESS ENTER"};
   Uint32 aiAt{0};
+  Uint32 actionAnimationLockUntil{0};
+  bool actionAnimationLockActive{false};
 };
 void animatePlayedCard(App& a,const gwent::Card& card,int player,int handIndex,int handSizeBefore);
 void queueTriggeredEffects(App& a,const gwent::Game& before,const gwent::Card& played,int player);
@@ -333,6 +335,46 @@ bool sourceWaitsForRowPlacementAudio(const gwent::Card& card,const gwent::Game& 
   return card.kind==gwent::Kind::Unit&&
     !card.spy&&!hasAbility("spy")&&!hasAbility("vildkarrl")&&
     !(card.berserker&&rowHasMardroeme)&&!hasAbility("decoy");
+}
+bool actionAnimationLocked(const App& app,Uint32 now) {
+  return app.actionAnimationLockActive&&!SDL_TICKS_PASSED(now,app.actionAnimationLockUntil);
+}
+void extendAnimationDeadline(Uint32& deadline,Uint32 candidate) {
+  if(static_cast<Sint32>(candidate-deadline)>0)deadline=candidate;
+}
+void lockInputUntilQueuedAnimationsFinish(App& app,Uint32 minimumUntil) {
+  Uint32 deadline=minimumUntil;
+  const auto includeFlight=[&](const App::CardFlight& flight) {
+    if(!flight.active)return;
+    Uint32 end=flight.startedAt+SOURCE_CARD_FLIGHT_MS;
+    if(flight.destination==App::CardZone::Board&&flight.row>=0&&flight.row<3&&flight.card.kind==gwent::Kind::Unit) {
+      const auto row=static_cast<gwent::Row>(flight.row);
+      if(sourceWaitsForRowPlacementAudio(flight.card,app.game,flight.owner,row))end+=SOURCE_ROW_PLACEMENT_AUDIO_WAIT_MS;
+      end+=600;
+    }
+    extendAnimationDeadline(deadline,end);
+  };
+  includeFlight(app.cardFlight);
+  for(const auto& flight:app.triggeredCardFlights)includeFlight(flight);
+  for(const auto& effect:app.cardEffects)if(effect.active)
+    extendAnimationDeadline(deadline,effect.startedAt+effect.duration+600);
+  for(const auto& sound:app.scheduledSounds)
+    extendAnimationDeadline(deadline,sound.startedAt+SOURCE_ROW_PLACEMENT_AUDIO_WAIT_MS);
+  app.actionAnimationLockUntil=deadline;
+  app.actionAnimationLockActive=true;
+}
+void lockCardActionUntilAnimationsFinish(App& app,const gwent::Card& played,const gwent::Game& before,
+                                         int player,gwent::Row targetRow) {
+  const Uint32 now=SDL_GetTicks();
+  Uint32 minimumUntil=now+SOURCE_CARD_PREVIEW_MS;
+  if(app.cardFlight.active) {
+    minimumUntil=app.cardFlight.startedAt+SOURCE_CARD_FLIGHT_MS;
+    if(app.cardFlight.destination==App::CardZone::Board&&
+       sourceWaitsForRowPlacementAudio(played,before,player,targetRow))
+      minimumUntil+=SOURCE_ROW_PLACEMENT_AUDIO_WAIT_MS;
+    minimumUntil+=600;
+  }
+  lockInputUntilQueuedAnimationsFinish(app,minimumUntil);
 }
 void queueCardTransitionFlights(App& app,const gwent::Game& before,const gwent::Card& played,int player) {
   const auto oldLocations=cardLocations(before),newLocations=cardLocations(app.game);
@@ -902,6 +944,7 @@ void finishLeaderChoice(App& a) {
   a.targetIndex=0;
   if(okay) {
     queueLeaderTransitionVisuals(a,before,ability,0);
+    lockInputUntilQueuedAnimationsFinish(a,SDL_GetTicks());
     a.status=tr(a,"leader_used");
     if(!a.game.revealedCards[0].empty())a.leaderRevealOpen=true;
     if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+400;
@@ -921,6 +964,7 @@ void beginLeaderChoice(App& a) {
     const auto before=a.game;
     if(gwent::activateLeader(a.game,0)) {
       queueLeaderTransitionVisuals(a,before,ability,0);
+      lockInputUntilQueuedAnimationsFinish(a,SDL_GetTicks());
       a.status=tr(a,"leader_used");
       if(!a.game.revealedCards[0].empty())a.leaderRevealOpen=true;
       if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+400;
@@ -961,6 +1005,7 @@ void doHumanPlay(App& a) {
     animatePlayedCard(a,card,0,a.handIndex,handSizeBefore);
     queueTriggeredEffects(a,before,card,0);
     playCardSound(a,card,before,0,static_cast<gwent::Row>(a.rowIndex));
+    lockCardActionUntilAnimationsFinish(a,card,before,0,static_cast<gwent::Row>(a.rowIndex));
     a.status=displayCardName(a,card)+(a.language==Language::Polish?" - ZAGRANO":" - PLAYED"); a.handIndex=std::min(a.handIndex,static_cast<int>(a.game.players[0].hand.size())-1);
   } else a.status=tr(a,"illegal_play");
 }
@@ -973,7 +1018,7 @@ void performAi(App& a) {
     const auto before=a.game;
     const auto ability=activeLeaderAbility(a.game.players[1].leader);
     success=gwent::activateLeader(a.game,1,action.target,action.leaderSelection);
-    if(success)queueLeaderTransitionVisuals(a,before,ability,1);
+    if(success) { queueLeaderTransitionVisuals(a,before,ability,1);lockInputUntilQueuedAnimationsFinish(a,SDL_GetTicks()); }
     a.status=tr(a,"opponent_used_leader");
   } else {
     const auto& aiHand=a.game.players[1].hand;
@@ -983,7 +1028,12 @@ void performAi(App& a) {
     const auto card=it==aiHand.end()?gwent::Card{}:*it;
     const auto before=a.game;
     success=gwent::playCard(a.game,1,action.cardId,action.target,action.selectedCardId);
-    if(success) { animatePlayedCard(a,card,1,cardIndex,handSizeBefore);queueTriggeredEffects(a,before,card,1);playCardSound(a,card,before,1,action.target); }
+    if(success) {
+      animatePlayedCard(a,card,1,cardIndex,handSizeBefore);
+      queueTriggeredEffects(a,before,card,1);
+      playCardSound(a,card,before,1,action.target);
+      lockCardActionUntilAnimationsFinish(a,card,before,1,action.target);
+    }
     a.status=(a.language==Language::Polish?"RYWAL ZAGRYWA ":"OPPONENT PLAYED ")+displayCardName(a,card);
   }
   if(!success) {
@@ -1989,6 +2039,7 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
     if(a.screen==Screen::Match)saveCurrentMatch(a);
     running=false;return;
   }
+  if(a.screen==Screen::Match&&actionAnimationLocked(a,SDL_GetTicks()))return;
   if(a.screen==Screen::Match&&!a.activeNotification.empty())return;
   if(a.screen==Screen::Match&&(a.leaderSelectionMode||a.leaderRevealOpen||a.passConfirmationOpen||a.pauseOpen)) { handleMatchKey(a,key);return; }
   if(a.cardDetailsOpen) {
@@ -2266,6 +2317,15 @@ int main(int argc,char** argv) {
          moraleEffectDelay>=2450&&moraleEffectDelay<=2550&&placementSound!=timingProbe.scheduledSounds.end()&&
          static_cast<Sint32>(placementSound->startedAt-SDL_GetTicks())>=1400&&
          static_cast<Sint32>(placementSound->startedAt-SDL_GetTicks())<=1550;
+    timingProbe.screen=Screen::Match;timingProbe.game.phase=gwent::Phase::PlayerTurn;
+    timingProbe.game.players[0].hand={moraleTiming};timingProbe.handIndex=0;
+    lockCardActionUntilAnimationsFinish(timingProbe,moraleTiming,gwent::Game{},0,gwent::Row::Melee);
+    const Uint32 lockCheckedAt=SDL_GetTicks(),lockUntil=timingProbe.actionAnimationLockUntil;
+    bool timingProbeRunning=true;handleKey(timingProbe,SDLK_RIGHT,timingProbeRunning);
+    okay=okay&&actionAnimationLocked(timingProbe,lockCheckedAt)&&
+         !actionAnimationLocked(timingProbe,lockUntil)&&timingProbe.handIndex==0&&
+         static_cast<Sint32>(lockUntil-(timingProbe.cardEffects.front().startedAt+
+           timingProbe.cardEffects.front().duration+600))>=0;
     okay=okay&&std::string(sourceWeatherOverlayForRow(0))=="frost"&&
          std::string(sourceWeatherOverlayForRow(1))=="fog"&&
          std::string(sourceWeatherOverlayForRow(2))=="rain";
@@ -2382,8 +2442,8 @@ int main(int argc,char** argv) {
     okay=okay&&app.game.players[0].board[1].size()==1&&
          std::any_of(app.game.players[0].board[1].begin(),app.game.players[0].board[1].end(),[](const gwent::Card& card){return card.id=="agile-input";})&&
          std::none_of(app.game.players[0].board[0].begin(),app.game.players[0].board[0].end(),[](const gwent::Card& card){return card.id=="agile-input";});
-    if(okay)std::cout<<"Miyoo controls, source-timed card preview/flight/audio/ability effects, mulligan, guarded pass and Agile Medic row selection passed.\n";
-    else std::cerr<<"Miyoo controls, card timing, target selection, Agile revival or guarded pass failed.\n";
+    if(okay)std::cout<<"Miyoo controls, source-timed action lock/preview/flight/audio/ability effects, mulligan, guarded pass and Agile Medic row selection passed.\n";
+    else std::cerr<<"Miyoo controls, action timing/lock, target selection, Agile revival or guarded pass failed.\n";
     app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return okay?0:10;
   }
   if(char* directory=SDL_GetPrefPath("GwentClassic","MiyooMiniPlus")) {
@@ -2599,7 +2659,7 @@ int main(int argc,char** argv) {
           app.selectDownAt=SDL_GetTicks();app.selectLongPressed=false;
         } else { const auto mapped=controllerKey(event.cbutton,app.screen);if(mapped!=SDLK_UNKNOWN)handleKey(app,mapped,running); }
       } else if(event.type==SDL_CONTROLLERBUTTONUP&&event.cbutton.button==SDL_CONTROLLER_BUTTON_BACK) {
-        if(app.selectDownAt&&!app.selectLongPressed) {
+        if(app.selectDownAt&&!app.selectLongPressed&&!actionAnimationLocked(app,SDL_GetTicks())) {
           if(app.cardDetailsOpen)handleKey(app,SDLK_BACKSPACE,running);
           else if(app.screen==Screen::Match&&app.game.phase==gwent::Phase::PlayerTurn)app.passConfirmationOpen=true;
           else if(app.screen==Screen::Match&&app.game.phase==gwent::Phase::RoundResult)handleMatchKey(app,SDLK_RETURN);
@@ -2612,6 +2672,7 @@ int main(int argc,char** argv) {
     }
     if(app.selectDownAt&&!app.selectLongPressed&&app.activeNotification.empty()&&
        (app.screen==Screen::Match||app.screen==Screen::DeckBuilder)&&
+       !actionAnimationLocked(app,SDL_GetTicks())&&
        SDL_TICKS_PASSED(SDL_GetTicks(),app.selectDownAt+500)) {
       app.cardDetailsOpen=true;app.selectLongPressed=true;app.audio.play("open");
     }
@@ -2649,7 +2710,7 @@ int main(int argc,char** argv) {
     updateNotification(app,now);
     if(app.screen==Screen::Match&&app.activeNotification.empty()&&
        !app.leaderSelectionMode&&!app.leaderRevealOpen&&!app.pauseOpen&&!app.passConfirmationOpen&&
-       app.game.phase==gwent::Phase::OpponentTurn&&SDL_GetTicks()>=app.aiAt)performAi(app);
+       app.game.phase==gwent::Phase::OpponentTurn&&!actionAnimationLocked(app,now)&&SDL_GetTicks()>=app.aiAt)performAi(app);
     app.audio.playMusic(app.screen==Screen::Match?"match":"menu");
     SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);
     if(app.screen==Screen::DeckSelect)drawDeckSelect(renderer,app);

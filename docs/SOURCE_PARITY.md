@@ -160,6 +160,12 @@ items above:
   follow-on flights wait for their animation chains. The state engine still
   resolves immediately instead of awaiting the visual chain, and physical Miyoo
   animation review remains open.
+- After a card or leader action, player input and the next AI action are now
+  held until the queued source-timed flight/effect sequence and row placement
+  wait finish. The SDL input regression checks the 1000 ms preview, 499 ms
+  flight, row placement cue, delayed ability overlay and locked-input deadline.
+  Rule state still changes immediately at action selection, and device timing
+  needs physical confirmation.
 - Large card displays now crop original artwork at its printed gold divider
   and draw localized names and rules as native text. This applies to the card
   inspector, hand preview, target carousel, and deck collection; 640×480 smoke
