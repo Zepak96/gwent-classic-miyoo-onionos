@@ -3201,6 +3201,12 @@ int main(int argc,char** argv) {
     addMiniature([](const auto& c){return c.bond;});
     addMiniature([](const auto& c){return c.morale;});
     addMiniature([](const auto& c){return c.agile&&!c.hero;});
+    if(miniatureFixture.size()!=8) {
+      std::cerr<<"Miniature fixture is missing a required catalog card\n";
+      app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 12;
+    }
+    auto buffed=miniatureFixture[2];buffed.id="miniature-fixture-three-digits";buffed.power=120;
+    miniatureFixture.push_back(std::move(buffed));
     app.game.players[0].hand=miniatureFixture;app.handIndex=0;
     clearFrame();
     drawMatchOnScreen(renderer,app);
