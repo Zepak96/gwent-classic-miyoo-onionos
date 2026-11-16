@@ -672,6 +672,19 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
   assert(std::any_of(roachMulligan.players[1].hand.begin(),roachMulligan.players[1].hand.end(),[&](const Card& card){return card.id==roachId;}) ||
          std::any_of(roachMulligan.players[1].deck.begin(),roachMulligan.players[1].deck.end(),[&](const Card& card){return card.id==roachId;}));
 
+  Game clearWeatherRedraw;clearWeatherRedraw.phase=Phase::Mulligan;clearWeatherRedraw.rngState=0x6162;
+  auto clearInHand=referenceCard("Clear Weather");clearInHand.id="ai-mulligan-clear";
+  auto frostInHand=referenceCard("Biting Frost");frostInHand.id="ai-mulligan-frost";
+  clearWeatherRedraw.players[1].hand={clearInHand,frostInHand};
+  for(int i=0;i<2;++i) {
+    auto protectedReplacement=unit("ai-mulligan-protected-"+std::to_string(i),4);
+    protectedReplacement.hero=true;protectedReplacement.abilities={"hero"};
+    clearWeatherRedraw.players[1].deck.push_back(protectedReplacement);
+  }
+  assert(performAiMulligan(clearWeatherRedraw,1));
+  assert(std::count_if(clearWeatherRedraw.players[1].hand.begin(),clearWeatherRedraw.players[1].hand.end(),
+      [](const Card& card){return card.kind==Kind::Weather||card.kind==Kind::ClearWeather;})==1);
+
   Game leaderChoice;
   leaderChoice.players[0].leader.id="foltest_siegemaster";
   leaderChoice.players[0].leader.kind=Kind::Leader;

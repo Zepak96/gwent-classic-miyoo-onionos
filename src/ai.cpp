@@ -249,7 +249,10 @@ std::vector<Card> discardOrder(Game& game,int who) {
     cards.insert(cards.end(),group.begin(),group.end());
   }
   std::vector<Card> weather;
-  for(const auto& card:player.hand)if(card.kind==Kind::Weather)weather.push_back(card);
+  // Clear Weather also has source row "weather" and participates in the
+  // same multi-weather redraw selection pool.
+  for(const auto& card:player.hand)
+    if(card.kind==Kind::Weather||card.kind==Kind::ClearWeather)weather.push_back(card);
   if(weather.size()>1) {
     weather.erase(weather.begin()+static_cast<std::ptrdiff_t>(roll(game)%weather.size()));
     cards.insert(cards.end(),weather.begin(),weather.end());

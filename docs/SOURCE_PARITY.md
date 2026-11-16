@@ -41,7 +41,9 @@ source behavior. A build or screenshot alone does not count as parity.
 - [ ] Source leader weights/actions and exact target selection.
 - [x] Source AI redraw and discard ordering, including two sequential
   `ControllerAI.redraw()` calls that each recalculate discard order after
-  drawing the replacement.
+  drawing the replacement. Clear Weather joins typed weather cards in the
+  source's multi-weather discard pool; a deterministic mulligan regression
+  checks the Clear Weather/Biting Frost case.
 - [ ] No illegal action may be silently converted into a pass.
 - [ ] Repeatable simulations cover every premade deck and every leader action.
   Current regression coverage completes 100 seeded matches using source
@@ -243,6 +245,7 @@ indices are retained; the AI hand uses the requested index. The engine uses the
 same front-of-deck draw convention for opening hands and later draws. Seeded
 regressions lock the order for two human swaps and the AI's two recalculated
 discard decisions, reject a third redraw without mutation, and preserve the RNG
-result. Release CTest also passes 100 seeded complete matches across premade
-decks, including mulligans and the Skellige round-setup revive selection. Full
-interactive device testing remains open.
+result. AI discard ordering includes Clear Weather whenever its hand contains
+multiple cards from source row `weather`. Release CTest also passes 100 seeded
+complete matches across premade decks, including mulligans and the Skellige
+round-setup revive selection. Full interactive device testing remains open.
