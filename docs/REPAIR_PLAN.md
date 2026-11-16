@@ -140,7 +140,10 @@ objawy, dopóki nie da się ich odtworzyć w kodzie lub logu.
     mogła przypisać ruch do kopii drugiego gracza. Przy inicjalizacji meczu
     każda karta dostaje teraz ID z prefiksem właściciela i indeksem instancji.
     Test używa tej samej neutralnej karty po obu stronach i wymaga różnych ID.
-    Stare zapisy z aktywnym meczem wymagają osobnego sprawdzenia migracji.
+    Symulacje pełnych meczów dla 100 seedów kontrolują unikalność ID i obecność
+    każdej oryginalnej karty w dokładnie jednej strefie po każdej akcji oraz po
+    końcu meczu. Stare zapisy z aktywnym meczem wymagają osobnego sprawdzenia
+    migracji.
 
 ## Kolejność naprawy i kryteria odbioru
 

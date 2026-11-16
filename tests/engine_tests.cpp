@@ -53,6 +53,41 @@ static void expectedSourceDeckSwap(std::vector<Card>& hand,std::vector<Card>& de
   Card drawn=deck.front();deck.erase(deck.begin());
   expectedSourceHandAdd(hand,std::move(drawn),owner,index);
 }
+static bool matchCardIdsAreUnique(const Game& game) {
+  std::vector<std::string> ids;
+  const auto include=[&](const std::vector<Card>& cards) {
+    for(const auto& card:cards) {
+      if(card.id.empty()||std::find(ids.begin(),ids.end(),card.id)!=ids.end())return false;
+      ids.push_back(card.id);
+    }
+    return true;
+  };
+  for(int owner=0;owner<2;++owner) {
+    const auto& player=game.players[owner];
+    if(!include(player.deck)||!include(player.hand)||!include(player.graveyard))return false;
+    for(const auto& row:player.board)if(!include(row))return false;
+    for(const auto& special:player.specialCards)
+      if(!special.id.empty()&&!include(std::vector<Card>{special}))return false;
+  }
+  for(const auto& active:game.weatherCards)
+    if(!include(std::vector<Card>{active.card}))return false;
+  return true;
+}
+static bool matchContainsOriginalIds(const Game& game,const std::vector<std::string>& expected) {
+  std::vector<std::string> actual;
+  const auto collect=[&](const std::vector<Card>& cards) {
+    for(const auto& card:cards)actual.push_back(card.id);
+  };
+  for(const auto& player:game.players) {
+    collect(player.deck);collect(player.hand);collect(player.graveyard);
+    for(const auto& row:player.board)collect(row);
+    for(const auto& special:player.specialCards)if(!special.id.empty())actual.push_back(special.id);
+  }
+  for(const auto& active:game.weatherCards)actual.push_back(active.card.id);
+  return std::all_of(expected.begin(),expected.end(),[&](const std::string& id){
+    return std::count(actual.begin(),actual.end(),id)==1;
+  });
+}
 static void scoreRules() {
   Player p;
   auto plain = unit("plain", 8);
@@ -872,18 +907,27 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
     const auto& playerRecipe=recipes[static_cast<std::size_t>(seed%recipes.size())];
     const auto opponentIndex=static_cast<std::size_t>((seed*7+3)%recipes.size());
     const auto& opponentRecipe=recipes[opponentIndex];
+    const auto playerCards=makeReferenceDeck(playerRecipe);
+    const auto opponentCards=makeReferenceDeck(opponentRecipe);
+    std::vector<std::string> originalIds;
+    for(std::size_t i=0;i<playerCards.size();++i)
+      originalIds.push_back("p0:"+std::to_string(i)+":"+playerCards[i].id);
+    for(std::size_t i=0;i<opponentCards.size();++i)
+      originalIds.push_back("p1:"+std::to_string(i)+":"+opponentCards[i].id);
     Card playerLeader,opponentLeader;
     assert(referenceLeader(playerRecipe.leaderReferenceIndex,playerLeader));
     assert(referenceLeader(opponentRecipe.leaderReferenceIndex,opponentLeader));
     Game simulation;
-    beginMatchWithLeaders(simulation,makeReferenceDeck(playerRecipe),playerLeader,
-      makeReferenceDeck(opponentRecipe),opponentLeader,0xA17E0000ULL+seed,static_cast<int>(seed%2));
+    beginMatchWithLeaders(simulation,playerCards,playerLeader,
+      opponentCards,opponentLeader,0xA17E0000ULL+seed,static_cast<int>(seed%2));
+    assert(matchCardIdsAreUnique(simulation)&&matchContainsOriginalIds(simulation,originalIds));
     if(simulation.scoiataelChoicePending)
       assert(chooseScoiataelFirstPlayer(simulation,simulation.firstPlayer));
     assert(replaceMulliganCards(simulation,0,{}));
     assert(performAiMulligan(simulation,1));
     int actions=0;
     while(simulation.phase!=Phase::MatchResult&&actions<500) {
+      assert(matchCardIdsAreUnique(simulation)&&matchContainsOriginalIds(simulation,originalIds));
       if(simulation.phase==Phase::RoundResult) { assert(startNextRound(simulation));continue; }
       if(simulation.phase==Phase::RoundSetup) {
         const int owner=simulation.skelligeRevivePlayer;
@@ -928,6 +972,7 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
       ++actions;
     }
     assert(simulation.phase==Phase::MatchResult&&actions<500);
+    assert(matchCardIdsAreUnique(simulation)&&matchContainsOriginalIds(simulation,originalIds));
   }
 }
 static Card leader(std::string id) {

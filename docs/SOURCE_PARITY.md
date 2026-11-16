@@ -152,6 +152,9 @@ items above:
   The same neutral catalog card may be present in both decks, while the
   renderer tracks card flights and effects by ID. A regression verifies that
   identical catalog copies on opposite sides receive distinct runtime IDs.
+  The 100-seed full-match simulations now also assert that all live-zone IDs
+  remain unique and every original deck card remains present in exactly one
+  zone after each action and after the match ends.
 - Mardroeme's persistent row effect, its distinction from special-slot
   occupancy, Ermion activation, Berserker transformation on later plays and
   Muster summons, round reset, and save/load state.
