@@ -466,3 +466,13 @@ same glyph scale. This verifies that renderer fixture only, not physical-device
 readability or every possible buffed power. ARM package run 43880296800 was
 started for this same revision; installation and hardware validation remain
 pending until the package is available.
+
+## SD update — 2026-11-16, bc33dcc
+
+ARM workflow 43880296800 completed successfully for bc33dcc5ebcc3409de106d2b0a6d7543726eeb07.
+Package SHA-256: a73bd9f27c6ece3807aaefba9c7d6824f859819db0974adb54d33e048ae1aae5.
+Installed to E: (MIYOO MINI, FAT32) using tools/install_verified_sd.ps1;
+all 604 archive files matched their destination SHA-256. The previous game
+folder was backed up locally in artifacts/qa/package-bc33dcc/sd-backup-20261116-145649.
+This proves copying and file integrity, not successful execution on Miyoo.
+Physical startup, input, audio and miniature readability remain to be checked.
