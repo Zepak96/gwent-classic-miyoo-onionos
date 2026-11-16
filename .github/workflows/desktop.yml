@@ -30,6 +30,10 @@ jobs:
         run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./build-sdl/gwent --audio-test
       - name: Frontend smoke test
         run: SDL_VIDEODRIVER=dummy ./build-sdl/gwent --smoke-test frontend-smoke.bmp deck-builder-smoke.bmp card-details-smoke.bmp card-flight-smoke.bmp deck-builder-settings-smoke.bmp deck-builder-back-smoke.bmp leader-choice-smoke.bmp leader-reveal-smoke.bmp pause-smoke.bmp mulligan-smoke.bmp
+      - name: Main menu rendering and navigation
+        run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./build-sdl/gwent --menu-smoke-test main-menu-smoke.bmp
+      - name: Main menu software composition
+        run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy GWENT_SOFTWARE_COMPOSITE=1 ./build-sdl/gwent --menu-smoke-test composite-main-menu-smoke.bmp
       - name: Miyoo physical-key mapping
         run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./build-sdl/gwent --input-test
       - name: Round and match result screens
@@ -41,6 +45,8 @@ jobs:
         with:
           name: frontend-smoke-frames
           path: |
+            main-menu-smoke.bmp
+            composite-main-menu-smoke.bmp
             frontend-smoke.bmp
             deck-builder-smoke.bmp
             card-details-smoke.bmp
