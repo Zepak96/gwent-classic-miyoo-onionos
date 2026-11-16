@@ -15,6 +15,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <new>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -591,6 +592,7 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="no_save")return pl?"BRAK POPRAWNEGO ZAPISU":"NO VALID SAVE FOUND";
   if(key=="save_error")return pl?"BŁĄD ZAPISU MECZU":"MATCH SAVE ERROR";
   if(key=="reference_decks_missing")return pl?"BRAK TALI REFERENCYJNYCH":"REFERENCE DECKS MISSING";
+  if(key=="memory_error")return pl?"BRAK PAMIECI — SPROBUJ PONOWNIE":"NOT ENOUGH MEMORY — TRY AGAIN";
   if(key=="reference_deck_invalid")return pl?"TALIA PRZECIWNIKA JEST NIEPOPRAWNA":"REFERENCE OPPONENT DECK INVALID";
   if(key=="leader_used")return pl?"UŻYTO ZDOLNOŚCI LIDERA":"LEADER ABILITY USED";
   if(key=="leader_cannot_use")return pl?"NIE MOŻNA UŻYĆ ZDOLNOŚCI LIDERA":"LEADER CANNOT BE USED";
@@ -839,6 +841,7 @@ gwent::Card recipeLeader(std::size_t index) {
   return leader;
 }
 void startMatch(App& a) {
+  try {
   if(recipes().size()<2) { a.status=tr(a,"reference_decks_missing"); return; }
   gwent::Card humanLeader=recipeLeader(a.deckIndex);std::vector<gwent::Card> humanDeck;
   if(a.userDeckSelected) {
@@ -855,6 +858,11 @@ void startMatch(App& a) {
   queueNotification(a,a.game.firstPlayer==0?"me-coin":"op-coin");
   a.audio.play("game_opening");
   a.status=tr(a,"mulligan");
+  } catch(const std::bad_alloc&) {
+    a.screen=Screen::DeckBuilder;
+    a.status=tr(a,"memory_error");
+    std::cerr<<"Match startup failed: not enough memory to create the match.\n";
+  }
 }
 std::vector<std::string> legalCardTargets(const App& a,const gwent::Card& card) {
   std::vector<std::string> ids;
@@ -2202,6 +2210,13 @@ int main(int argc,char** argv) {
   };
   SDL_RenderSetLogicalSize(renderer,W,H);
   SDL_SetRenderDrawBlendMode(renderer,SDL_BLENDMODE_BLEND);
+  // Show feedback before the first MP3 decode, which can take noticeable time
+  // on the handheld even though the SDL window is already open.
+  SDL_SetRenderDrawColor(renderer,12,9,8,255);SDL_RenderClear(renderer);
+  frame(renderer,18,18,W-36,H-36,Color{133,101,48});
+  centeredTextInBox(renderer,20,145,W-40,34,"GWENT CLASSIC",paper,2);
+  centeredTextInBox(renderer,20,187,W-40,22,"LADOWANIE...",Color{197,169,111},1);
+  SDL_RenderPresent(presentationRenderer);
   App app; bool running=true;
   app.miyooControls=(presentationInfo.name&&std::string(presentationInfo.name)=="Miyoo Mini");
   if(const char* mimic=SDL_getenv("GWENT_MIMIC_MIYOO_INPUT"))app.miyooControls=app.miyooControls||std::string(mimic)=="1";
