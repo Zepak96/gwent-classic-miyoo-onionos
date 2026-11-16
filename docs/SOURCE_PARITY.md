@@ -112,9 +112,27 @@ items above:
   number of same-name Bond cards when that count exceeds one, and the source
   name-keyed multiplier applies to every same-name card. Two- and three-copy
   cases plus differing catalog group metadata have regression coverage.
+- Match actions now create concurrent 499 ms card flights from before/after
+  zone diffs. This covers multi-card Muster summons and Scorch removals, Medic
+  revivals, Spy draws, Decoy swaps, and weather cards sent to the grave; a UI
+  regression checks multi-card Muster and Scorch queues. Full source preview,
+  all action-specific waits, and physical Miyoo animation review remain open.
+- Large card displays now crop original artwork at its printed gold divider
+  and draw localized names and rules as native text. This applies to the card
+  inspector, hand preview, target carousel, and deck collection; 640×480 smoke
+  captures were visually reviewed. Exact card-image scaling and all remaining
+  source UI states still need comparative review.
+- Release builds keep `assert`-based engine regression expressions enabled.
+  Without this, `NDEBUG` removed state-changing expressions from the test suite
+  and the Release test executable crashed. Release CTest now exercises the same
+  setup and checks as Debug.
 
-Verification for the current source tree: SDL2 desktop build, CTest 2/2, and
-`gwent --input-test` with dummy SDL video/audio; target-carousel smoke image
-visually reviewed at `artifacts/qa/target-carousel-choice.png`. ARM build and
-hard-float ABI are checked separately; package installation and physical-device
-input/audio/gameplay still need confirmation.
+Verification for the current source tree: SDL2 Release desktop build, CTest
+2/2, `gwent --input-test`, and `gwent --audio-test assets` with dummy SDL
+video/audio. The audio command decoded all 35 SFX and both background tracks;
+it does not verify audible output on physical hardware. The card inspector,
+deck builder, and target carousel were visually reviewed at 640×480 in
+`artifacts/qa/card-details-polish.png`,
+`artifacts/qa/deck-builder-card-preview.png`, and
+`artifacts/qa/target-carousel.png`. Physical-device input/audio/gameplay still
+need confirmation.

@@ -21,6 +21,8 @@
 
 namespace {
 constexpr int W=640,H=480,STAGE_H=360;
+constexpr int MATCH_RULES_PANEL_Y=423,MATCH_RULES_PANEL_H=51;
+constexpr int DECK_RULES_PANEL_Y=368,DECK_RULES_PANEL_H=104;
 struct Color { Uint8 r,g,b,a{255}; };
 constexpr Color ink{13,19,20}, panel{25,34,34}, panelLight{37,48,46}, gold{196,156,78},
                 paper{229,218,186}, muted{145,148,132}, green{94,137,102}, blue{87,125,143};
@@ -150,9 +152,11 @@ void rowScoreText(SDL_Renderer* r,int x,int y,const std::string& value) {
 enum class Screen { DeckSelect, DeckBuilder, Match };
 enum class Language { Polish, English };
 struct App {
+  enum class CardZone { Board, Weather, Hand, Deck, Grave };
   struct CardFlight {
     bool active{false};
     gwent::Card card;
+    CardZone destination{CardZone::Board};
     int owner{-1};
     int row{-1};
     int fromX{0},fromY{0},toX{0},toY{0};
@@ -165,6 +169,7 @@ struct App {
     Uint32 startedAt{0};
     Uint32 duration{1650};
   };
+  struct ScheduledSound { std::string key;Uint32 startedAt{0}; };
   struct RowLayout {
     bool initialized{false};
     std::size_t cardCount{0};
@@ -185,6 +190,7 @@ struct App {
   bool pauseOpen{false};
   int pauseIndex{0};
   bool sfxEnabled{true};
+  bool musicEnabled{true};
   bool notificationsEnabled{true};
   std::string activeNotification;
   Uint32 notificationStartedAt{0};
@@ -192,7 +198,9 @@ struct App {
   std::vector<std::string> notificationQueue;
   std::vector<std::string> leaderSelections;
   CardFlight cardFlight;
+  std::vector<CardFlight> triggeredCardFlights;
   std::vector<CardEffect> cardEffects;
+  std::vector<ScheduledSound> scheduledSounds;
   std::array<std::array<bool,3>,2> weatherFrom{};
   std::array<std::array<bool,3>,2> weatherTo{};
   std::array<std::array<Uint32,3>,2> weatherChangedAt{};
@@ -226,6 +234,7 @@ struct App {
 };
 void animatePlayedCard(App& a,const gwent::Card& card,int player,int handIndex,int handSizeBefore);
 void queueTriggeredEffects(App& a,const gwent::Game& before,const gwent::Card& played,int player);
+void queueLeaderTransitionVisuals(App& a,const gwent::Game& before,const std::string& ability,int player);
 double sourceEase(double progress) {
   progress=std::clamp(progress,0.0,1.0);
   double low=0.0,high=1.0,t=progress;
@@ -261,6 +270,83 @@ SourceRowGeometry sourceRowGeometry(std::size_t cardCount) {
   const double pitch=cardWidth+2*sideMargin;
   const double total=n*pitch;
   return {areaX+(areaWidth-total)/2.0+sideMargin,pitch};
+}
+struct CardLocation {
+  gwent::Card card;
+  App::CardZone zone{App::CardZone::Board};
+  int owner{-1},row{-1},index{0};
+  std::size_t count{0};
+};
+std::vector<CardLocation> cardLocations(const gwent::Game& game) {
+  std::vector<CardLocation> locations;
+  for(int owner=0;owner<2;++owner) {
+    const auto add=[&](const std::vector<gwent::Card>& cards,App::CardZone zone,int row=-1) {
+      for(int i=0;i<static_cast<int>(cards.size());++i)
+        locations.push_back({cards[static_cast<std::size_t>(i)],zone,owner,row,i,cards.size()});
+    };
+    add(game.players[owner].deck,App::CardZone::Deck);
+    add(game.players[owner].hand,App::CardZone::Hand);
+    add(game.players[owner].graveyard,App::CardZone::Grave);
+    for(int row=0;row<3;++row)add(game.players[owner].board[static_cast<std::size_t>(row)],App::CardZone::Board,row);
+  }
+  for(int i=0;i<static_cast<int>(game.weatherCards.size());++i) {
+    const auto& weather=game.weatherCards[static_cast<std::size_t>(i)];
+    locations.push_back({weather.card,App::CardZone::Weather,weather.owner,-1,i,game.weatherCards.size()});
+  }
+  return locations;
+}
+std::pair<int,int> cardLocationPosition(const CardLocation& location) {
+  switch(location.zone) {
+    case App::CardZone::Board: {
+      const auto geometry=sourceRowGeometry(location.count);
+      return {static_cast<int>(std::lround(geometry.firstX+location.index*geometry.pitch)),
+              location.owner==0?143+location.row*45:5+(2-location.row)*45};
+    }
+    case App::CardZone::Weather:return {47+location.index*29,149};
+    case App::CardZone::Hand:
+      if(location.owner!=0)return {292,20};
+      return {194+(location.index-std::clamp(location.index-5,0,std::max(0,static_cast<int>(location.count)-11)))*29,277};
+    case App::CardZone::Deck:
+    case App::CardZone::Grave:return {location.zone==App::CardZone::Grave?514:572,location.owner==0?275:23};
+  }
+  return {0,0};
+}
+bool cardFlightHides(const App::CardFlight& flight,const gwent::Card& card,App::CardZone zone,int owner,int row=-1) {
+  return flight.active&&flight.card.id==card.id&&flight.destination==zone&&flight.owner==owner&&
+         (zone!=App::CardZone::Board||flight.row==row);
+}
+bool cardFlightHides(const App& app,const gwent::Card& card,App::CardZone zone,int owner,int row=-1) {
+  if(cardFlightHides(app.cardFlight,card,zone,owner,row))return true;
+  return std::any_of(app.triggeredCardFlights.begin(),app.triggeredCardFlights.end(),
+    [&](const App::CardFlight& flight){return cardFlightHides(flight,card,zone,owner,row);});
+}
+void queueCardTransitionFlights(App& app,const gwent::Game& before,const gwent::Card& played,int player) {
+  const auto oldLocations=cardLocations(before),newLocations=cardLocations(app.game);
+  const Uint32 now=SDL_GetTicks();
+  for(const auto& oldLocation:oldLocations) {
+    const auto current=std::find_if(newLocations.begin(),newLocations.end(),[&](const CardLocation& item){return item.card.id==oldLocation.card.id;});
+    if(current==newLocations.end()||
+       (oldLocation.zone==current->zone&&oldLocation.owner==current->owner&&oldLocation.row==current->row))continue;
+    if(current->zone==App::CardZone::Hand&&current->owner!=0)continue;
+    if(app.cardFlight.active&&app.cardFlight.card.id==oldLocation.card.id)continue;
+    Uint32 delay=0;
+    if(played.kind==gwent::Kind::Scorch&&oldLocation.card.id==played.id&&current->zone==App::CardZone::Grave)delay=1650;
+    else if(played.medic&&oldLocation.zone==App::CardZone::Grave&&current->zone==App::CardZone::Board)delay=2149;
+    else if(played.muster&&oldLocation.owner==player&&current->zone==App::CardZone::Board&&oldLocation.card.id!=played.id)delay=2149;
+    else if(played.spy&&oldLocation.zone==App::CardZone::Deck&&current->zone==App::CardZone::Hand)delay=2149;
+    else if((played.kind==gwent::Kind::Scorch||
+             std::find(played.abilities.begin(),played.abilities.end(),"scorch_c")!=played.abilities.end()||
+             std::find(played.abilities.begin(),played.abilities.end(),"scorch_r")!=played.abilities.end()||
+             std::find(played.abilities.begin(),played.abilities.end(),"scorch_s")!=played.abilities.end())&&
+            oldLocation.zone==App::CardZone::Board&&current->zone==App::CardZone::Grave)
+      delay=played.kind==gwent::Kind::Scorch?3799:1650;
+    const auto [fromX,fromY]=cardLocationPosition(oldLocation);
+    const auto [toX,toY]=cardLocationPosition(*current);
+    App::CardFlight flight;flight.active=true;flight.card=current->card;flight.destination=current->zone;
+    flight.owner=current->owner;flight.row=current->row;flight.fromX=fromX;flight.fromY=fromY;
+    flight.toX=toX;flight.toY=toY;flight.startedAt=now+delay;
+    app.triggeredCardFlights.push_back(std::move(flight));
+  }
 }
 SourceRowGeometry currentRowGeometry(const App::RowLayout& layout,std::size_t cardCount,Uint32 now) {
   if(!layout.initialized)return sourceRowGeometry(cardCount);
@@ -349,6 +435,20 @@ SDL_Texture* textureFor(SDL_Renderer* renderer,const App& app,const std::string&
 void drawImage(SDL_Renderer* renderer,const App& app,const std::string& relative,int x,int y,int w,int h) {
   if(auto* image=textureFor(renderer,app,relative)) { SDL_Rect destination{x,y,w,h};SDL_RenderCopy(renderer,image,nullptr,&destination); }
 }
+int cardPortraitHeight(int width) {
+  // The source card's painted portrait ends at the gold divider around 74.5%.
+  // Size the crop at its natural aspect ratio so faces are never vertically stretched.
+  return std::max(1,static_cast<int>(std::lround(width*0.745*775.0/410.0)));
+}
+void drawCardPortrait(SDL_Renderer* renderer,const App& app,const std::string& relative,int x,int y,int w,int h) {
+  if(auto* image=textureFor(renderer,app,relative)) {
+    int textureWidth=0,textureHeight=0;
+    if(SDL_QueryTexture(image,nullptr,nullptr,&textureWidth,&textureHeight)!=0||textureWidth<=0||textureHeight<=0)return;
+    SDL_Rect source{0,0,textureWidth,std::clamp(static_cast<int>(std::lround(textureHeight*0.745)),1,textureHeight)};
+    SDL_Rect destination{x,y,w,h};
+    SDL_RenderCopy(renderer,image,&source,&destination);
+  }
+}
 void drawImageAlpha(SDL_Renderer* renderer,const App& app,const std::string& relative,int x,int y,int w,int h,Uint8 alpha) {
   if(auto* image=textureFor(renderer,app,relative)) {
     SDL_SetTextureAlphaMod(image,alpha);
@@ -418,6 +518,7 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="card_details")return pl?"SZCZEGÓŁY KARTY":"CARD DETAILS";
   if(key=="leader_reveal")return pl?"KARTY Z REKI PRZECIWNIKA":"OPPONENT'S REVEALED CARDS";
   if(key=="leader_continue")return pl?"A / ENTER - KONTYNUUJ":"A / ENTER - CONTINUE";
+  if(key=="leader_unavailable")return pl?"ZDOLNOSC LIDERA NIEDOSTEPNA":"LEADER ABILITY UNAVAILABLE";
   if(key=="leader_choose_target")return pl?"WYBIERZ KARTE":"CHOOSE A CARD";
   if(key=="leader_choose_discard")return pl?"WYBIERZ KARTE DO ODRZUCENIA":"CHOOSE A CARD TO DISCARD";
   if(key=="leader_choose_draw")return pl?"WYBIERZ KARTE DO DOBRANIA":"CHOOSE A CARD TO DRAW";
@@ -432,6 +533,7 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="pause_load")return pl?"WCZYTAJ MECZ":"LOAD MATCH";
   if(key=="pause_language")return pl?"JEZYK":"LANGUAGE";
   if(key=="pause_sfx")return pl?"EFEKTY DZWIEKOWE":"SOUND EFFECTS";
+  if(key=="pause_music")return pl?"MUZYKA":"MUSIC";
   if(key=="pause_notifications")return pl?"POWIADOMIENIA":"NOTIFICATIONS";
   if(key=="pause_exit")return pl?"WRÓĆ DO MENU TALII":"RETURN TO DECK MENU";
   if(key=="pause_controls")return pl?"GÓRA/DÓŁ: WYBÓR  A: ZMIEŃ  B: WRÓĆ":"UP/DOWN: SELECT  A: CHANGE  B: BACK";
@@ -562,16 +664,19 @@ std::string userDeckPath(const App& a,int slot) {
 void saveSettings(const App& a) {
   if(a.dataDirectory.empty())return;
   std::ofstream settings(a.dataDirectory+"settings-v1.cfg",std::ios::trunc);
-  if(settings)settings<<"GWENT_SETTINGS_V2 "<<static_cast<int>(a.language)<<' '
-                     <<static_cast<int>(a.sfxEnabled)<<' '<<static_cast<int>(a.notificationsEnabled)<<'\n';
+  if(settings)settings<<"GWENT_SETTINGS_V3 "<<static_cast<int>(a.language)<<' '
+                     <<static_cast<int>(a.sfxEnabled)<<' '<<static_cast<int>(a.notificationsEnabled)<<' '
+                     <<static_cast<int>(a.musicEnabled)<<'\n';
 }
 void loadSettings(App& a) {
   if(a.dataDirectory.empty())return;
   std::ifstream settings(a.dataDirectory+"settings-v1.cfg");
   std::string first;
   if(!(settings>>first))return;
-  int language=0,sfx=1,notifications=1;
-  if(first=="GWENT_SETTINGS_V2") {
+  int language=0,sfx=1,notifications=1,music=1;
+  if(first=="GWENT_SETTINGS_V3") {
+    if(!(settings>>language>>sfx>>notifications>>music))return;
+  } else if(first=="GWENT_SETTINGS_V2") {
     if(!(settings>>language>>sfx>>notifications))return;
   } else {
     try { language=std::stoi(first); } catch(...) { return; }
@@ -582,6 +687,7 @@ void loadSettings(App& a) {
   if(language>=0&&language<=1)a.language=static_cast<Language>(language);
   a.sfxEnabled=sfx!=0;
   a.notificationsEnabled=notifications!=0;
+  a.musicEnabled=music!=0;
 }
 void playCardSound(App& a,const gwent::Card& card) {
   std::string key;
@@ -721,10 +827,13 @@ std::string leaderChoicePrompt(const App& a) {
   return tr(a,"leader_choose_grave");
 }
 void finishLeaderChoice(App& a) {
+  const auto before=a.game;
+  const std::string ability=activeLeaderAbility(a.game.players[0].leader);
   const bool okay=gwent::activateLeader(a.game,0,gwent::Row::None,a.leaderSelections);
   a.leaderSelectionMode=false;
   a.targetIndex=0;
   if(okay) {
+    queueLeaderTransitionVisuals(a,before,ability,0);
     a.status="LEADER ABILITY USED";
     if(!a.game.revealedCards[0].empty())a.leaderRevealOpen=true;
     if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+400;
@@ -733,11 +842,17 @@ void finishLeaderChoice(App& a) {
 }
 void beginLeaderChoice(App& a) {
   a.leaderSelections.clear();
+  if(!a.game.players[0].leaderAbilityAvailable||a.game.players[0].leaderAbilityCancelled) {
+    a.status=tr(a,"leader_unavailable");return;
+  }
   const auto ability=activeLeaderAbility(a.game.players[0].leader);
   const bool needsChoice=ability=="emhyr_relentless"||ability=="eredin_bringer_of_death"||
                          ability=="eredin_destroyer"||ability=="eredin_king";
   if(!needsChoice) {
+    a.audio.play("open");
+    const auto before=a.game;
     if(gwent::activateLeader(a.game,0)) {
+      queueLeaderTransitionVisuals(a,before,ability,0);
       a.status="LEADER ABILITY USED";
       if(!a.game.revealedCards[0].empty())a.leaderRevealOpen=true;
       if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+400;
@@ -787,7 +902,11 @@ void performAi(App& a) {
   bool success=false;
   if(action.pass) { success=gwent::pass(a.game,1);a.audio.play("pass");a.status=tr(a,"ai_turn")+" - PASS"; }
   else if(action.activateLeader) {
-    success=gwent::activateLeader(a.game,1,action.target,action.leaderSelection); a.status="OPPONENT USED LEADER";
+    const auto before=a.game;
+    const auto ability=activeLeaderAbility(a.game.players[1].leader);
+    success=gwent::activateLeader(a.game,1,action.target,action.leaderSelection);
+    if(success)queueLeaderTransitionVisuals(a,before,ability,1);
+    a.status="OPPONENT USED LEADER";
   } else {
     const auto& aiHand=a.game.players[1].hand;
     const auto it=std::find_if(aiHand.begin(),aiHand.end(),[&](const gwent::Card& item){return item.id==action.cardId;});
@@ -883,7 +1002,7 @@ void animatePlayedCard(App& a,const gwent::Card& card,int player,int handIndex,i
     const auto it=std::find_if(a.game.weatherCards.begin(),a.game.weatherCards.end(),[&](const gwent::ActiveWeather& item){return item.card.id==card.id;});
     if(it!=a.game.weatherCards.end()) {
       const int index=static_cast<int>(it-a.game.weatherCards.begin());
-      flight.owner=-1;flight.row=-1;flight.toX=47+index*29;flight.toY=149;found=true;
+      flight.owner=it->owner;flight.row=-1;flight.toX=47+index*29;flight.toY=149;found=true;
     } else if(card.kind==gwent::Kind::CommanderHorn) {
       // Source places Commander's Horn in its row's special slot. In this
       // renderer that slot is represented by the horn marker at row's left.
@@ -893,6 +1012,7 @@ void animatePlayedCard(App& a,const gwent::Card& card,int player,int handIndex,i
     }
   }
   if(found) {
+    flight.destination=flight.row==-1?App::CardZone::Weather:App::CardZone::Board;
     flight.active=true;flight.startedAt=SDL_GetTicks();a.cardFlight=std::move(flight);
     // Source Card.animate() attaches the matching anim_<ability> artwork to
     // the card: 50 ms setup, 300 ms fade in, 1000 ms hold, 300 ms fade out.
@@ -912,10 +1032,25 @@ void animatePlayedCard(App& a,const gwent::Card& card,int player,int handIndex,i
 }
 void queueTargetEffect(App& a,const std::string& icon,int x,int y,Uint32 delay=0) {
   App::CardEffect visual;visual.active=true;visual.icon=icon;visual.x=x;visual.y=y;
-  visual.startedAt=SDL_GetTicks()+delay;visual.duration=icon=="scorch"?1650:1650;
+  visual.startedAt=SDL_GetTicks()+delay;visual.duration=1650;
   a.cardEffects.push_back(std::move(visual));
+  a.scheduledSounds.push_back({icon,SDL_GetTicks()+delay});
 }
 void queueTriggeredEffects(App& a,const gwent::Game& before,const gwent::Card& played,int player) {
+  queueCardTransitionFlights(a,before,played,player);
+  if(played.kind==gwent::Kind::Scorch) {
+    const auto& hand=before.players[player].hand;
+    const auto it=std::find_if(hand.begin(),hand.end(),[&](const gwent::Card& item){return item.id==played.id;});
+    if(it!=hand.end()) {
+      const int index=static_cast<int>(it-hand.begin());
+      const int first=std::clamp(index-5,0,std::max(0,static_cast<int>(hand.size())-11));
+      queueTargetEffect(a,"scorch",194+(index-first)*29,277);
+    }
+  }
+  const bool scorchAction=played.kind==gwent::Kind::Scorch||
+    std::find(played.abilities.begin(),played.abilities.end(),"scorch_c")!=played.abilities.end()||
+    std::find(played.abilities.begin(),played.abilities.end(),"scorch_r")!=played.abilities.end()||
+    std::find(played.abilities.begin(),played.abilities.end(),"scorch_s")!=played.abilities.end();
   const auto boardPosition=[](int owner,int row,int index,std::size_t cardCount) {
     const auto geometry=sourceRowGeometry(cardCount);
     return std::pair<int,int>{static_cast<int>(std::lround(geometry.firstX+index*geometry.pitch)),
@@ -926,16 +1061,15 @@ void queueTriggeredEffects(App& a,const gwent::Game& before,const gwent::Card& p
   };
   // Scorch resolves its targets simultaneously in the reference game. Keep
   // the old row coordinates because the engine has already moved them to the grave.
-  if(played.kind==gwent::Kind::Scorch||
-     std::find(played.abilities.begin(),played.abilities.end(),"scorch_c")!=played.abilities.end()||
-     std::find(played.abilities.begin(),played.abilities.end(),"scorch_r")!=played.abilities.end()||
-     std::find(played.abilities.begin(),played.abilities.end(),"scorch_s")!=played.abilities.end()) {
+  if(scorchAction) {
     for(int owner=0;owner<2;++owner)for(int row=0;row<3;++row) {
       const auto& oldRow=before.players[owner].board[row];
       for(int index=0;index<static_cast<int>(oldRow.size());++index) {
         const auto& target=oldRow[index];
         if(containsId(a.game.players[owner].graveyard,target.id)) {
-          const auto [x,y]=boardPosition(owner,row,index,oldRow.size());queueTargetEffect(a,"scorch",x,y);
+          const auto [x,y]=boardPosition(owner,row,index,oldRow.size());
+          const Uint32 effectDelay=played.kind==gwent::Kind::Scorch?2149:0;
+          queueTargetEffect(a,"scorch",x,y,effectDelay);
         }
       }
     }
@@ -950,15 +1084,49 @@ void queueTriggeredEffects(App& a,const gwent::Game& before,const gwent::Card& p
       const auto [x,y]=boardPosition(owner,row,index,current.size());
       if(played.medic&&!existed&&containsId(before.players[player].graveyard,target.id))
         queueTargetEffect(a,"medic",x,y,499);
-      else if(played.muster&&!existed&&target.id!=played.id)
-        queueTargetEffect(a,"muster",x,y,499);
-      if(played.bond&&owner==player&&containsId(current,played.id)&&bondCount>1&&target.name==played.name)
+      if(played.bond&&owner==player&&containsId(current,played.id)&&target.id!=played.id&&bondCount>1&&target.name==played.name)
         queueTargetEffect(a,"bond",x,y,499);
     }
   }
 }
-void drawCardFlight(SDL_Renderer* r,const App& a) {
-  const auto& flight=a.cardFlight;if(!flight.active)return;
+void queueLeaderTransitionVisuals(App& a,const gwent::Game& before,const std::string& ability,int player) {
+  gwent::Card action;action.id="leader-action";
+  if(ability.rfind("foltest_steelforged",0)==0||ability=="foltest_son"||ability=="francesca_queen")
+    action.abilities={ability=="foltest_steelforged"?"scorch_s":ability=="foltest_son"?"scorch_r":"scorch_c"};
+  queueCardTransitionFlights(a,before,action,player);
+  if(!action.abilities.empty()) {
+    const int row=action.abilities.front()=="scorch_s"?2:action.abilities.front()=="scorch_r"?1:0;
+    const int owner=1-player;
+    const auto& oldRow=before.players[owner].board[static_cast<std::size_t>(row)];
+    const auto& grave=a.game.players[owner].graveyard;
+    for(int i=0;i<static_cast<int>(oldRow.size());++i) {
+      const auto& card=oldRow[static_cast<std::size_t>(i)];
+      if(std::any_of(grave.begin(),grave.end(),[&](const gwent::Card& item){return item.id==card.id;})) {
+        const auto geometry=sourceRowGeometry(oldRow.size());
+        queueTargetEffect(a,"scorch",static_cast<int>(std::lround(geometry.firstX+i*geometry.pitch)),
+                          owner==0?143+row*45:5+(2-row)*45);
+      }
+    }
+  }
+  if(ability=="foltest_siegemaster"||ability=="eredin_commander"||ability=="francesca_beautiful") {
+    const int row=ability=="foltest_siegemaster"?2:ability=="eredin_commander"?0:1;
+    App::CardEffect effect;effect.active=true;effect.icon="horn";effect.x=190;
+    effect.y=player==0?143+row*45:5+(2-row)*45;effect.startedAt=SDL_GetTicks();effect.duration=1650;
+    a.cardEffects.push_back(std::move(effect));
+  }
+  for(const auto& active:a.game.weatherCards) {
+    const bool existed=std::any_of(before.weatherCards.begin(),before.weatherCards.end(),[&](const gwent::ActiveWeather& old){return old.card.id==active.card.id;});
+    if(!existed)playCardSound(a,active.card);
+  }
+  if(ability=="crach_an_craite")a.audio.play("redraw");
+  else if(ability=="eredin_destroyer") { a.audio.play("discard");a.audio.play("discard");a.audio.play("draw"); }
+}
+void drawCardFlight(SDL_Renderer* r,const App& a,const App::CardFlight& flight) {
+  if(!flight.active)return;
+  if(!SDL_TICKS_PASSED(SDL_GetTicks(),flight.startedAt)) {
+    drawSourceCard(r,a,flight.fromX,flight.fromY,flight.card,true);
+    return;
+  }
   const float t=std::clamp(static_cast<float>(SDL_GetTicks()-flight.startedAt)/499.0f,0.0f,1.0f);
   const float eased=static_cast<float>(sourceEase(t));
   const int x=static_cast<int>(std::lround(flight.fromX+(flight.toX-flight.fromX)*eased));
@@ -983,54 +1151,17 @@ void drawCardEffect(SDL_Renderer* r,const App& a) {
 }
 std::vector<std::string> wrapDetailText(const std::string& value,std::size_t limit);
 void drawCardPreview(SDL_Renderer* r,const App& a,const gwent::Card& card) {
-  // CSS reference: .card-preview art at (80.3vw, 11.95vw), 16.1vw x 30.4vw.
-  // Give the enlarged card enough pixels for its printed name and flavor text
-  // to survive the Miyoo's 640x480 output without competing with board labels.
-  drawImage(r,a,"img/lg/"+gwent::referenceCardImage(card.referenceIndex),489,15,127,241);
-  const bool polish=a.language==Language::Polish;
-  const std::string& title=gwent::referenceCardAbilityTitle(card.referenceIndex,polish);
-  const std::string& description=gwent::referenceCardDescription(card.referenceIndex,polish);
-  const auto nameLines=wrapDetailText(displayCardName(a,card),19);
-  const int titleHeight=std::min(25,static_cast<int>(nameLines.size())*8+4);
-  box(r,489,15,127,titleHeight,Color{8,8,8,235});
+  constexpr int x=489,y=15,width=127;
+  const int portraitHeight=cardPortraitHeight(width);
+  drawCardPortrait(r,a,"img/lg/"+gwent::referenceCardImage(card.referenceIndex),x,y,width,portraitHeight);
+  box(r,x,y+portraitHeight,width,241-portraitHeight,Color{8,8,8,245});
+  frame(r,x,y,width,241,gold);
+  const auto nameLines=wrapDetailText(displayCardName(a,card),20);
   for(std::size_t i=0;i<nameLines.size()&&i<2;++i)
-    centeredTextInBox(r,491,16+static_cast<int>(i)*8,123,8,nameLines[i],paper,1);
-  if(title.empty()&&description.empty())return;
-  box(r,435,266,186,90,Color{12,12,12,255});
-  box(r,435,266,186,1,Color{255,255,255,110});
-  box(r,435,355,186,1,Color{255,255,255,87});
-  std::string icon;
-  if(card.kind!=gwent::Kind::Leader&&!card.abilities.empty()&&
-     !(card.hero&&card.abilities.size()==1&&card.abilities.front()=="hero")) {
-    icon=card.abilities.back();
-    if(icon=="cerys")icon="muster";
-    if(icon.rfind("avenger",0)==0)icon="avenger";
-    if(icon.rfind("scorch",0)==0)icon="scorch";
-    if(icon=="hero")icon.clear();
-  } else if(card.agile)icon="agile";
-  if(!icon.empty())drawImage(r,a,"img/icons/card_ability_"+icon+".png",441,271,14,14);
-  const auto titleLines=wrapDetailText(title,26);
-  int textY=271;
-  for(const auto& line:titleLines) { text(r,459,textY,line,Color{255,220,153},1);textY+=9; }
-  // The board preview is only 186x90 px on a 640x480 screen. Render fewer
-  // characters at 2x scale so the visible rules can be read on Miyoo; the
-  // fullscreen card inspector remains the place for the complete description.
-  const auto lines=wrapDetailText(description,14);
-  constexpr int descriptionLineHeight=14;
-  const std::size_t visibleLines=std::min<std::size_t>(4,lines.size());
-  for(std::size_t i=0;i<visibleLines;++i) {
-    const auto& line=lines[i];
-    const int lineY=textY+static_cast<int>(i)*descriptionLineHeight;
-    if(lineY+14>354)break;
-    const int lineX=435+(186-textWidth(line,2))/2;
-    text(r,lineX+1,lineY+1,line,Color{0,0,0,255},2);
-    text(r,lineX,lineY,line,Color{255,243,219,255},2);
-  }
-  if(lines.size()>visibleLines) {
-    const int hintY=textY+static_cast<int>(visibleLines)*descriptionLineHeight;
-    const std::string hint=a.language==Language::Polish?"I - PELNY OPIS":"I - FULL TEXT";
-    text(r,441,hintY,hint,Color{205,182,137,255},1);
-  }
+    centeredTextInBox(r,x+3,y+portraitHeight+3+static_cast<int>(i)*8,width-6,8,nameLines[i],paper,1);
+  const int statY=y+portraitHeight+22;
+  centeredTextInBox(r,x+3,statY,width-6,8,tr(a,"power")+" "+std::to_string(card.power)+"  "+tr(a,"row")+" "+
+    (card.row==gwent::Row::Melee?tr(a,"melee"):card.row==gwent::Row::Ranged?tr(a,"ranged"):card.row==gwent::Row::Siege?tr(a,"siege"):tr(a,"special")),gold,1);
 }
 std::vector<std::string> wrapDetailText(const std::string& value,std::size_t limit) {
   std::vector<std::string> lines;
@@ -1048,33 +1179,76 @@ std::vector<std::string> wrapDetailText(const std::string& value,std::size_t lim
   flush();if(!line.empty())lines.push_back(line);
   return lines;
 }
+void drawCardRulesPanel(SDL_Renderer* r,const App& a,const gwent::Card& card,int x,int y,int w,int h) {
+  const bool polish=a.language==Language::Polish;
+  const std::string& abilityTitle=gwent::referenceCardAbilityTitle(card.referenceIndex,polish);
+  const std::string& description=gwent::referenceCardDescription(card.referenceIndex,polish);
+  if(abilityTitle.empty()&&description.empty())return;
+  box(r,x,y,w,h,Color{9,8,7,246});
+  box(r,x,y,w,2,Color{151,111,49});
+  frame(r,x,y,w,h,Color{110,80,39});
+  const std::string heading=abilityTitle.empty()?displayCardName(a,card):abilityTitle;
+  const int innerWidth=w-20;
+  const int headingScale=textWidth(heading,2)<=innerWidth?2:1;
+  text(r,x+10,y+6,heading,Color{245,211,151},headingScale);
+  if(description.empty())return;
+  const int bodyY=y+(headingScale==2?24:17);
+  const int bodyHeight=y+h-5-bodyY;
+  int scale=2;
+  std::size_t columns=static_cast<std::size_t>(std::max(1,innerWidth/(6*scale)));
+  auto lines=wrapDetailText(description,columns);
+  int lineHeight=15;
+  if(lines.size()*static_cast<std::size_t>(lineHeight)>static_cast<std::size_t>(std::max(0,bodyHeight))) {
+    scale=1;lineHeight=9;
+    columns=static_cast<std::size_t>(std::max(1,innerWidth/(6*scale)));
+    lines=wrapDetailText(description,columns);
+  }
+  const std::size_t visible=std::min(lines.size(),static_cast<std::size_t>(std::max(0,bodyHeight)/lineHeight));
+  for(std::size_t i=0;i<visible;++i)
+    text(r,x+10,bodyY+static_cast<int>(i)*lineHeight,lines[i],Color{246,238,220},scale);
+}
 void drawCardDetails(SDL_Renderer* r,const App& a,const gwent::Card& card) {
   box(r,0,0,W,H,Color{0,0,0,255});
-  drawImage(r,a,"img/lg/"+gwent::referenceCardImage(card.referenceIndex),8,8,246,465);
-  box(r,12,12,238,24,Color{8,8,8,235});
-  centeredTextInBox(r,15,14,232,20,displayCardName(a,card),paper,1);
-  frame(r,7,7,248,467,gold);
+  constexpr int portraitX=8,portraitY=8,portraitW=246;
+  const int portraitH=cardPortraitHeight(portraitW);
+  drawCardPortrait(r,a,"img/lg/"+gwent::referenceCardImage(card.referenceIndex),portraitX,portraitY,portraitW,portraitH);
+  box(r,8,portraitY+portraitH,246,H-(portraitY+portraitH)-8,Color{12,11,9,255});
+  frame(r,7,7,248,H-14,gold);
+  const auto portraitName=wrapDetailText(displayCardName(a,card),38);
+  int portraitTextY=portraitY+portraitH+8;
+  for(std::size_t i=0;i<portraitName.size()&&i<2;++i) {
+    centeredTextInBox(r,14,portraitTextY,234,9,portraitName[i],Color{255,220,153},1);
+    portraitTextY+=11;
+  }
+  const auto& portraitAbility=gwent::referenceCardAbilityTitle(card.referenceIndex,a.language==Language::Polish);
+  const auto& portraitDescription=gwent::referenceCardDescription(card.referenceIndex,a.language==Language::Polish);
+  const std::string portraitCopy=portraitAbility.empty()?(portraitDescription.empty()?tr(a,"no_ability"):portraitDescription):
+    (portraitDescription.empty()?portraitAbility:portraitAbility+": "+portraitDescription);
+  const auto portraitLines=wrapDetailText(portraitCopy,38);
+  for(const auto& line:portraitLines) {
+    if(portraitTextY+9>H-10)break;
+    centeredTextInBox(r,13,portraitTextY,236,9,line,Color{240,233,214},1);
+    portraitTextY+=10;
+  }
   box(r,264,23,354,434,Color{20,20,20,250});
   frame(r,264,23,354,434,Color{143,108,54});
   text(r,280,40,tr(a,"card_details"),gold,2);
-  const auto nameLines=wrapDetailText(displayCardName(a,card),27);
-  int y=68;
-  for(const auto& line:nameLines) { text(r,280,y,line,paper,2);y+=18; }
+  int y=72;
   std::string row=card.row==gwent::Row::Ranged?tr(a,"ranged"):card.row==gwent::Row::Siege?tr(a,"siege"):card.row==gwent::Row::Melee?tr(a,"melee"):tr(a,"special");
-  text(r,280,y+4,tr(a,"power")+" "+std::to_string(card.power)+"  "+tr(a,"row")+" "+row,Color{235,207,164},1);
-  y+=28;
+  text(r,280,y,tr(a,"power")+" "+std::to_string(card.power)+"  "+tr(a,"row")+" "+row,Color{235,207,164},1);
+  y+=18;
   const bool polish=a.language==Language::Polish;
-  const auto& title=gwent::referenceCardAbilityTitle(card.referenceIndex,polish);
-  const auto& description=gwent::referenceCardDescription(card.referenceIndex,polish);
-  if(!title.empty()) {
-    for(const auto& line:wrapDetailText(title,27)) { text(r,280,y,line,gold,2);y+=18; }
-    y+=4;
-  }
-  const auto descriptionLines=wrapDetailText(description.empty()?tr(a,"no_ability"):description,28);
-  for(const auto& line:descriptionLines) {
-    if(y>414)break;
-    text(r,280,y,line,Color{242,234,218},2);y+=18;
-  }
+  const char* kindLabel=card.hero?(polish?"BOHATER":"HERO"):
+    card.kind==gwent::Kind::Unit?(polish?"JEDNOSTKA":"UNIT"):
+    card.kind==gwent::Kind::Leader?(polish?"DOWODCA":"LEADER"):
+    card.kind==gwent::Kind::Weather?(polish?"POGODA":"WEATHER"):
+    card.kind==gwent::Kind::ClearWeather?(polish?"CZYSTE NIEBO":"CLEAR WEATHER"):
+    card.kind==gwent::Kind::CommanderHorn?(polish?"RÓG DOWÓDCY":"COMMANDER'S HORN"):
+    card.kind==gwent::Kind::Scorch?(polish?"SPALENIE":"SCORCH"):
+    card.kind==gwent::Kind::Mardroeme?(polish?"MARDROEME":"MARDROEME"):(polish?"MANEKIN":"DECOY");
+  text(r,280,y,kindLabel,Color{242,234,218},1);
+  y+=18;
+  text(r,280,y,factionName(card.faction,polish),Color{195,172,129},1);
   text(r,280,433,tr(a,"close_card"),Color{185,185,185},1);
 }
 void drawChoiceCarousel(SDL_Renderer* r,const App& a,const std::vector<const gwent::Card*>& cards,
@@ -1103,7 +1277,8 @@ void drawChoiceCarousel(SDL_Renderer* r,const App& a,const std::vector<const gwe
       const double offset=static_cast<double>(a.carouselMotionDirection)*-0.6*6.4*(1.0-eased);
       x+=static_cast<int>(std::lround(offset));
     }
-    drawImage(r,a,"img/lg/"+gwent::referenceCardImage(card.referenceIndex),x,top,width,height);
+    const int portraitHeight=std::min(height,cardPortraitHeight(width));
+    drawCardPortrait(r,a,"img/lg/"+gwent::referenceCardImage(card.referenceIndex),x,top,width,portraitHeight);
     if(slot==2) {
       const Uint32 elapsed=SDL_GetTicks()-a.carouselMotionStartedAt;
       const int pulse=a.carouselMotionStartedAt&&elapsed<100?static_cast<int>((100-elapsed)*0.30):0;
@@ -1111,11 +1286,12 @@ void drawChoiceCarousel(SDL_Renderer* r,const App& a,const std::vector<const gwe
       frame(r,x-2,top-2,width+4,height+4,gold);
       frame(r,x-1,top-1,width+2,height+2,Color{245,215,139,220});
     }
+    const int nameY=top+portraitHeight;
+    box(r,x,nameY,width,height-portraitHeight,Color{8,8,8,244});
     const auto nameLines=wrapDetailText(displayCardName(a,card),std::max<std::size_t>(7,static_cast<std::size_t>(width/6)));
-    const int nameHeight=std::min(18,static_cast<int>(nameLines.size())*8+2);
-    box(r,x,top,width,nameHeight,Color{8,8,8,232});
+    const int nameStart=nameY+std::max(1,(height-portraitHeight-static_cast<int>(std::min<std::size_t>(nameLines.size(),2)*8))/2);
     for(std::size_t line=0;line<nameLines.size()&&line<2;++line)
-      centeredTextInBox(r,x+1,top+static_cast<int>(line)*8,width-2,8,nameLines[line],paper,1);
+      centeredTextInBox(r,x+1,nameStart+static_cast<int>(line)*8,width-2,8,nameLines[line],paper,1);
   }
   const auto& selectedCard=*cards[static_cast<std::size_t>(index)];
   box(r,226,277,188,51,Color{20,20,20,242});
@@ -1156,7 +1332,7 @@ void drawRow(SDL_Renderer* r,const App& a,int owner,int row,int y) {
   const auto geometry=currentRowGeometry(a.rowLayouts[owner][row],cards.size(),SDL_GetTicks());
   for(std::size_t i=0;i<cards.size();++i) {
     const auto& card=cards[i];
-    if(a.cardFlight.active&&a.cardFlight.owner==owner&&a.cardFlight.row==row&&a.cardFlight.card.id==card.id)continue;
+    if(cardFlightHides(a,card,App::CardZone::Board,owner,row))continue;
     drawSourceCard(r,a,static_cast<int>(std::lround(geometry.firstX+i*geometry.pitch)),y,card);
   }
   if(a.weatherTransition[owner][row]||a.game.weather[row]) {
@@ -1262,10 +1438,16 @@ void drawDeckBuilder(SDL_Renderer* r,const App& a) {
       const auto* card=source[static_cast<std::size_t>(i)];
       const int deckCount=deckCopies(a.editDeck,card->referenceIndex);
       const int count=pane==0?card->deckCopies-deckCount:deckCount;
-      drawImage(r,a,"img/lg/"+gwent::referenceCardImage(card->referenceIndex),cx,cy,63,118);
-      drawImage(r,a,"img/icons/preview_count.png",cx+45,cy+96,16,16);
+      const int portraitHeight=std::min(118,cardPortraitHeight(63));
+      drawCardPortrait(r,a,"img/lg/"+gwent::referenceCardImage(card->referenceIndex),cx,cy,63,portraitHeight);
+      box(r,cx,cy+portraitHeight,63,118-portraitHeight,Color{9,8,7,246});
+      drawImage(r,a,"img/icons/preview_count.png",cx+45,cy+3,16,16);
       const auto countLabel=std::to_string(count);
-      centeredTextInBox(r,cx+45,cy+96,16,16,countLabel,Color{95,73,35},1);
+      centeredTextInBox(r,cx+45,cy+3,16,16,countLabel,Color{95,73,35},1);
+      const auto cardNameLines=wrapDetailText(displayCardName(a,*card),10);
+      const int titleY=cy+portraitHeight+std::max(0,(118-portraitHeight-static_cast<int>(std::min<std::size_t>(cardNameLines.size(),2)*8))/2);
+      for(std::size_t line=0;line<cardNameLines.size()&&line<2;++line)
+        centeredTextInBox(r,cx+1,titleY+static_cast<int>(line)*8,61,8,cardNameLines[line],paper,1);
       if(pane==a.editorPane&&i==cursor)frame(r,cx-2,cy-2,67,122,paper);
     }
     const int trackX=x+210;
@@ -1310,12 +1492,14 @@ void drawDeckBuilder(SDL_Renderer* r,const App& a) {
   const int toggleY=290;
   drawImage(r,a,"img/icons/ui_music.png",299,toggleY,16,16);drawImage(r,a,"img/icons/ui_sfx.png",321,toggleY,16,16);
   drawImage(r,a,"img/icons/ui_notification.png",343,toggleY,16,16);
+  if(!a.musicEnabled) { color(r,gold);SDL_RenderDrawLine(r,299,toggleY,315,toggleY+16); }
   if(!a.audio.enabled()) { color(r,gold);SDL_RenderDrawLine(r,321,290,337,306); }
   if(!a.notificationsEnabled) { color(r,gold);SDL_RenderDrawLine(r,343,290,359,306); }
   if(!shownCards.empty()) {
     const auto& selected=*shownCards[static_cast<std::size_t>(cursor)];
     drawCardPreview(r,a,selected);
     if(a.cardDetailsOpen)drawCardDetails(r,a,selected);
+    else drawCardRulesPanel(r,a,selected,8,DECK_RULES_PANEL_Y,W-16,DECK_RULES_PANEL_H);
   }
 }
 void drawMatch(SDL_Renderer* r,const App& a) {
@@ -1355,13 +1539,16 @@ void drawMatch(SDL_Renderer* r,const App& a) {
   int weatherX=47;
   for(const auto& active:a.game.weatherCards) {
     if(weatherX>133)break;
-    if(!(a.cardFlight.active&&a.cardFlight.row==-1&&a.cardFlight.card.id==active.card.id))drawSourceCard(r,a,weatherX,149,active.card);
+    if(!cardFlightHides(a,active.card,App::CardZone::Weather,active.owner))drawSourceCard(r,a,weatherX,149,active.card);
     weatherX+=29;
   }
   const auto drawPile=[&](int owner,bool grave,int y) {
     const auto& pile=grave?a.game.players[owner].graveyard:a.game.players[owner].deck;
     const int x=grave?514:572;
-    if(grave&&!pile.empty())drawImage(r,a,"img/sm/"+gwent::referenceCardImage(pile.back().referenceIndex),x,y,28,43);
+    const auto visible=std::find_if(pile.rbegin(),pile.rend(),[&](const gwent::Card& card){
+      return !cardFlightHides(a,card,grave?App::CardZone::Grave:App::CardZone::Deck,owner);
+    });
+    if(grave&&visible!=pile.rend())drawImage(r,a,"img/sm/"+gwent::referenceCardImage(visible->referenceIndex),x,y,28,43);
     else drawImage(r,a,"img/icons/deck_back_"+std::string(factionKey(a.game.players[owner].faction))+".jpg",x,y,28,43);
     const std::string count=std::to_string(pile.size());
     centeredTextInBox(r,x,y+29,28,13,count,paper,1);
@@ -1371,6 +1558,7 @@ void drawMatch(SDL_Renderer* r,const App& a) {
   if(me.passed)text(r,110,282,tr(a,"passed"),paper,1);
   if(op.passed)text(r,110,80,tr(a,"passed"),paper,1);
   drawImage(r,a,"img/icons/ui_music.png",90,313,16,16);drawImage(r,a,"img/icons/ui_sfx.png",110,313,16,16);drawImage(r,a,"img/icons/ui_notification.png",128,313,16,16);
+  if(!a.musicEnabled) { color(r,gold);SDL_RenderDrawLine(r,90,313,106,329); }
   if(!a.audio.enabled()) { color(r,gold);SDL_RenderDrawLine(r,110,313,126,329); }
   if(!a.notificationsEnabled) { color(r,gold);SDL_RenderDrawLine(r,128,313,144,329); }
   const int count=static_cast<int>(me.hand.size());
@@ -1380,7 +1568,7 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     for(int i=0;i<shown;++i) {
       const int index=start+i,x=194+i*29;
       const bool marked=std::find(a.mulligan.begin(),a.mulligan.end(),me.hand[index].id)!=a.mulligan.end();
-      drawSourceCard(r,a,x,277,me.hand[index],index==a.handIndex);
+      if(!cardFlightHides(a,me.hand[index],App::CardZone::Hand,0))drawSourceCard(r,a,x,277,me.hand[index],index==a.handIndex);
       if(marked)drawImage(r,a,"img/icons/icon_gem_on.png",x+17,274,12,12);
     }
   }
@@ -1422,12 +1610,10 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     const int selected=std::clamp(a.handIndex,0,static_cast<int>(me.hand.size())-1);
     drawCardPreview(r,a,me.hand[static_cast<std::size_t>(selected)]);
   }
-  if(a.cardFlight.active)drawCardFlight(r,a);
+  if(a.cardFlight.active)drawCardFlight(r,a,a.cardFlight);
+  for(const auto& flight:a.triggeredCardFlights)drawCardFlight(r,a,flight);
   drawCardEffect(r,a);
-  if(a.cardDetailsOpen&&!me.hand.empty()&&showHand) {
-    const int selected=std::clamp(a.handIndex,0,static_cast<int>(me.hand.size())-1);
-    drawCardDetails(r,a,me.hand[static_cast<std::size_t>(selected)]);
-  }
+  // The full-screen inspector is drawn after the 16:9 viewport is removed.
   if(a.targetMode&&a.handIndex>=0&&a.handIndex<static_cast<int>(me.hand.size())&&
      me.hand[static_cast<std::size_t>(a.handIndex)].medic&&a.targetIndex>=0&&a.targetIndex<static_cast<int>(a.selectedTargets.size())) {
     const auto revived=std::find_if(me.graveyard.begin(),me.graveyard.end(),[&](const gwent::Card& c){return c.id==a.selectedTargets[static_cast<std::size_t>(a.targetIndex)];});
@@ -1498,14 +1684,15 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     frame(r,120,22,400,316,gold);
     box(r,122,24,396,312,panel);
     centeredTextInBox(r,142,35,356,20,tr(a,"pause"),gold,2);
-    const std::array<std::string,7> options={
+    const std::array<std::string,8> options={
       tr(a,"pause_resume"),tr(a,"pause_save"),tr(a,"pause_load"),
       tr(a,"pause_language")+": "+(a.language==Language::Polish?"POLSKI":"ENGLISH"),
       tr(a,"pause_sfx")+": "+tr(a,a.sfxEnabled?"on":"off"),
+      tr(a,"pause_music")+": "+tr(a,a.musicEnabled?"on":"off"),
       tr(a,"pause_notifications")+": "+tr(a,a.notificationsEnabled?"on":"off"),tr(a,"pause_exit")
     };
     for(std::size_t i=0;i<options.size();++i) {
-      const int y=76+static_cast<int>(i)*31;
+      const int y=68+static_cast<int>(i)*28;
       if(static_cast<int>(i)==a.pauseIndex) {
         box(r,146,y-4,348,24,panelLight);
         frame(r,146,y-4,348,24,gold);
@@ -1523,10 +1710,18 @@ void drawMatchOnScreen(SDL_Renderer* r,const App& a) {
   drawMatch(r,a);
   drawNotification(r,a);
   SDL_RenderSetViewport(r,nullptr);
+  if(a.cardDetailsOpen) {
+    const auto& hand=a.game.players[0].hand;
+    if(!hand.empty())drawCardDetails(r,a,hand[static_cast<std::size_t>(std::clamp(a.handIndex,0,static_cast<int>(hand.size())-1))]);
+  } else if(!a.game.players[0].hand.empty()&&
+            a.game.phase!=gwent::Phase::RoundResult&&a.game.phase!=gwent::Phase::MatchResult) {
+    const auto& hand=a.game.players[0].hand;
+    drawCardRulesPanel(r,a,hand[static_cast<std::size_t>(std::clamp(a.handIndex,0,static_cast<int>(hand.size())-1))],6,MATCH_RULES_PANEL_Y,W-12,MATCH_RULES_PANEL_H);
+  }
 }
 void handleMatchKey(App& a,SDL_Keycode key) {
   if(a.pauseOpen) {
-    constexpr int optionCount=7;
+    constexpr int optionCount=8;
     if(key==SDLK_ESCAPE||key==SDLK_z||key==SDLK_BACKSPACE) { a.pauseOpen=false;return; }
     if(key==SDLK_UP||key==SDLK_LEFT) { a.pauseIndex=(a.pauseIndex+optionCount-1)%optionCount;return; }
     if(key==SDLK_DOWN||key==SDLK_RIGHT) { a.pauseIndex=(a.pauseIndex+1)%optionCount;return; }
@@ -1537,8 +1732,9 @@ void handleMatchKey(App& a,SDL_Keycode key) {
         case 2:a.pauseOpen=false;loadSavedMatch(a);break;
         case 3:a.language=a.language==Language::Polish?Language::English:Language::Polish;saveSettings(a);break;
         case 4:a.sfxEnabled=!a.sfxEnabled;a.audio.setEnabled(a.sfxEnabled);saveSettings(a);break;
-        case 5:a.notificationsEnabled=!a.notificationsEnabled;saveSettings(a);break;
-        case 6:saveCurrentMatch(a);a.pauseOpen=false;a.screen=Screen::DeckSelect;break;
+      case 5:a.musicEnabled=!a.musicEnabled;a.audio.setMusicEnabled(a.musicEnabled);saveSettings(a);break;
+      case 6:a.notificationsEnabled=!a.notificationsEnabled;saveSettings(a);break;
+      case 7:saveCurrentMatch(a);a.pauseOpen=false;a.screen=Screen::DeckSelect;break;
       }
     }
     return;
@@ -1709,6 +1905,7 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
   }
   if(key==SDLK_i&&(a.screen==Screen::DeckBuilder||a.screen==Screen::Match)) { a.cardDetailsOpen=true;a.audio.play("open");return; }
   if(key==SDLK_v) { a.audio.setEnabled(!a.audio.enabled());if(a.audio.enabled())a.audio.play("ui_card");return; }
+  if(key==SDLK_m) { a.musicEnabled=!a.musicEnabled;a.audio.setMusicEnabled(a.musicEnabled);saveSettings(a);return; }
   if(key==SDLK_n) { a.notificationsEnabled=!a.notificationsEnabled;saveSettings(a);return; }
   if(a.screen==Screen::DeckSelect) {
     if(key==SDLK_ESCAPE) { openDeckEditor(a); return; }
@@ -1884,7 +2081,16 @@ int main(int argc,char** argv) {
       if(!app.audio.available())std::cerr<<"Could not open SDL audio device: "<<SDL_GetError()<<"\n";
     } else {
       app.audio.playMusic("menu");SDL_Delay(80);app.audio.playMusic("match");SDL_Delay(80);
-      std::cout<<"Decoded all reference SFX and both background music tracks; playback switched successfully.\n";
+      app.audio.setMusicEnabled(false);
+      const bool stopped=!app.audio.musicEnabled();
+      app.audio.playMusic("menu");SDL_Delay(40);
+      app.audio.setMusicEnabled(true);app.audio.playMusic("menu");SDL_Delay(80);
+      app.audio.playMusic("match");SDL_Delay(80);
+      if(!stopped||!app.audio.musicEnabled()) {
+        std::cerr<<"Background music enable/disable state did not switch correctly.\n";
+        app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 5;
+      }
+      std::cout<<"Decoded all 35 reference SFX and both background tracks; music looping/switch and mute controls initialized.\n";
     }
     app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return okay?0:5;
   }
@@ -1955,6 +2161,32 @@ int main(int argc,char** argv) {
     okay=okay&&std::string(sourceWeatherOverlayForRow(0))=="frost"&&
          std::string(sourceWeatherOverlayForRow(1))=="fog"&&
          std::string(sourceWeatherOverlayForRow(2))=="rain";
+    App settingsProbe;
+    settingsProbe.pauseOpen=true;settingsProbe.pauseIndex=5;
+    handleMatchKey(settingsProbe,SDLK_x);
+    okay=okay&&!settingsProbe.musicEnabled&&!settingsProbe.audio.musicEnabled()&&
+         MATCH_RULES_PANEL_Y>=(H+STAGE_H)/2&&MATCH_RULES_PANEL_Y+MATCH_RULES_PANEL_H<=H&&
+         DECK_RULES_PANEL_Y>=STAGE_H&&DECK_RULES_PANEL_Y+DECK_RULES_PANEL_H<=H;
+    App movementProbe;
+    gwent::Card musterA;musterA.id="muster-flight-a";musterA.kind=gwent::Kind::Unit;musterA.row=gwent::Row::Melee;
+    gwent::Card musterB=musterA;musterB.id="muster-flight-b";
+    gwent::Game movementBefore;movementBefore.players[1].deck={musterA,musterB};movementProbe.game=movementBefore;
+    movementProbe.game.players[1].deck.clear();movementProbe.game.players[1].board[0]={musterA,musterB};
+    gwent::Card musterAction;musterAction.id="muster-action";musterAction.muster=true;
+    queueCardTransitionFlights(movementProbe,movementBefore,musterAction,1);
+    okay=okay&&movementProbe.triggeredCardFlights.size()==2&&
+         std::all_of(movementProbe.triggeredCardFlights.begin(),movementProbe.triggeredCardFlights.end(),[](const App::CardFlight& flight) {
+           return flight.destination==App::CardZone::Board&&flight.startedAt-SDL_GetTicks()<2500;
+         });
+    movementProbe.triggeredCardFlights.clear();
+    movementBefore={};movementBefore.players[0].board[0]={musterA,musterB};movementProbe.game=movementBefore;
+    movementProbe.game.players[0].board[0].clear();movementProbe.game.players[0].graveyard={musterA,musterB};
+    gwent::Card scorchAction;scorchAction.kind=gwent::Kind::Scorch;scorchAction.id="scorch-action";
+    queueCardTransitionFlights(movementProbe,movementBefore,scorchAction,0);
+    okay=okay&&movementProbe.triggeredCardFlights.size()==2&&
+         std::all_of(movementProbe.triggeredCardFlights.begin(),movementProbe.triggeredCardFlights.end(),[](const App::CardFlight& flight) {
+           return flight.destination==App::CardZone::Grave&&flight.startedAt-SDL_GetTicks()<4200;
+         });
     const auto oneCardRow=sourceRowGeometry(1),nineCardRow=sourceRowGeometry(9),tenCardRow=sourceRowGeometry(10),
                twentyCardRow=sourceRowGeometry(20);
     okay=okay&&oneCardRow.firstX>356&&oneCardRow.firstX<358&&nineCardRow.firstX>238&&nineCardRow.firstX<240&&
@@ -2048,6 +2280,7 @@ int main(int argc,char** argv) {
     app.dataDirectory=directory;app.savePath=app.dataDirectory+"match-v1.gws";
     loadSettings(app);
     app.audio.setEnabled(app.sfxEnabled);
+    app.audio.setMusicEnabled(app.musicEnabled);
     if(gwent::loadUserDeck(userDeckPath(app,app.deckSlot),app.editDeck))app.userDeckSelected=true;
     else if(!recipes().empty()) { const auto& recipe=recipes().front();app.editDeck={"Deck 1",recipe.faction,recipe.leaderReferenceIndex,recipe.cardCounts};app.userDeckSelected=true; }
     SDL_free(directory);
@@ -2112,7 +2345,7 @@ int main(int argc,char** argv) {
       App settingsProbe;settingsProbe.dataDirectory=app.dataDirectory;loadSettings(settingsProbe);
       if(app.language!=Language::English ||
          (!app.dataDirectory.empty() &&
-          (settingsProbe.language!=app.language||settingsProbe.notificationsEnabled))) {
+          (settingsProbe.language!=app.language||settingsProbe.notificationsEnabled||settingsProbe.musicEnabled!=app.musicEnabled))) {
         app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 6;
       }
       app.status.clear();
@@ -2184,7 +2417,7 @@ int main(int argc,char** argv) {
       app.screen=Screen::Match;app.game=gwent::Game{};app.game.phase=gwent::Phase::MatchResult;
       app.game.matchWinner=0;app.game.players[0].score=42;app.game.players[1].score=37;
       app.pauseOpen=false;app.cardDetailsOpen=false;app.activeNotification.clear();
-      app.cardFlight.active=false;app.cardEffects.clear();
+      app.cardFlight.active=false;app.triggeredCardFlights.clear();app.cardEffects.clear();
       app.endScreenStartedAt=SDL_GetTicks()-150;
       clearFrame();drawMatchOnScreen(renderer,app);presentFrame();
       if(!saveFrame(argv[13])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
@@ -2195,7 +2428,7 @@ int main(int argc,char** argv) {
         [](const gwent::Card& card){return card.kind==gwent::Kind::Unit&&!card.hero;});
       app.game.players[0].board[0].push_back(effectCard);
       app.game.players[0].board[0].back().id+="-effect-smoke";
-      app.cardFlight.active=false;app.cardEffects={{true,"morale",235,143,SDL_GetTicks()-175,1650}};
+      app.cardFlight.active=false;app.triggeredCardFlights.clear();app.cardEffects={{true,"morale",235,143,SDL_GetTicks()-175,1650}};
       app.activeNotification.clear();app.pauseOpen=false;app.cardDetailsOpen=false;
       clearFrame();drawMatchOnScreen(renderer,app);presentFrame();
       if(!saveFrame(argv[14])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
@@ -2209,12 +2442,12 @@ int main(int argc,char** argv) {
       for(int i=0;i<10;++i) { auto card=*sourceUnit;card.id+="-row-layout-"+std::to_string(i);app.game.players[0].board[0].push_back(std::move(card)); }
       const auto from=sourceRowGeometry(9),to=sourceRowGeometry(10);auto& layout=app.rowLayouts[0][0];
       layout={true,10,from.firstX,from.pitch,to.firstX,to.pitch,SDL_GetTicks()-125};
-      app.cardFlight.active=false;app.cardEffects.clear();app.activeNotification.clear();
+      app.cardFlight.active=false;app.triggeredCardFlights.clear();app.cardEffects.clear();app.activeNotification.clear();
       app.pauseOpen=false;app.cardDetailsOpen=false;
       clearFrame();drawMatchOnScreen(renderer,app);presentFrame();
       if(!saveFrame(argv[15])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
     }
-    if(argc>16) {
+    if(argc>17) {
       app.screen=Screen::Match;app.game=gwent::Game{};app.game.phase=gwent::Phase::PlayerTurn;
       app.language=Language::Polish;app.targetMode=true;app.targetIndex=2;app.handIndex=-1;
       app.selectedTargets.clear();
@@ -2225,10 +2458,10 @@ int main(int argc,char** argv) {
         if(app.selectedTargets.size()==5)break;
       }
       if(app.selectedTargets.size()!=5) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 5; }
-      app.cardFlight.active=false;app.cardEffects.clear();app.activeNotification.clear();
+      app.cardFlight.active=false;app.triggeredCardFlights.clear();app.cardEffects.clear();app.activeNotification.clear();
       app.pauseOpen=false;app.cardDetailsOpen=false;app.carouselMotionStartedAt=SDL_GetTicks()-75;app.carouselMotionDirection=1;
       clearFrame();drawMatchOnScreen(renderer,app);presentFrame();
-      if(!saveFrame(argv[16])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
+      if(!saveFrame(argv[17])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
     }
     presentFrame();
     for(auto& image:app.textures)if(image.second)SDL_DestroyTexture(image.second);
@@ -2274,9 +2507,17 @@ int main(int argc,char** argv) {
     }
     if(app.cardFlight.active&&SDL_TICKS_PASSED(SDL_GetTicks(),app.cardFlight.startedAt+499))app.cardFlight.active=false;
     const Uint32 now=SDL_GetTicks();
+    app.triggeredCardFlights.erase(std::remove_if(app.triggeredCardFlights.begin(),app.triggeredCardFlights.end(),[&](const App::CardFlight& flight) {
+      return SDL_TICKS_PASSED(now,flight.startedAt+499);
+    }),app.triggeredCardFlights.end());
     app.cardEffects.erase(std::remove_if(app.cardEffects.begin(),app.cardEffects.end(),[&](const App::CardEffect& effect) {
       return SDL_TICKS_PASSED(now,effect.startedAt+effect.duration);
     }),app.cardEffects.end());
+    for(auto& sound:app.scheduledSounds)
+      if(SDL_TICKS_PASSED(now,sound.startedAt))app.audio.play(sound.key);
+    app.scheduledSounds.erase(std::remove_if(app.scheduledSounds.begin(),app.scheduledSounds.end(),[&](const App::ScheduledSound& sound) {
+      return SDL_TICKS_PASSED(now,sound.startedAt);
+    }),app.scheduledSounds.end());
     updateWeatherTransitions(app);
     updateRowLayouts(app,now);
     const auto previousPhase=observedPhase;

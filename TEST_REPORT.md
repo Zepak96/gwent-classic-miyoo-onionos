@@ -177,3 +177,22 @@ Ported the reference `Player.canPlay()`, `Player.endTurn()`, and `Game.startRoun
 
 - Ported `Row.resize()` card spacing and `.card`'s 250 ms margin transition, including centered rows and source overlap for larger unit counts. Card flight/effect target coordinates now use that row layout.
 - Added test coverage for row geometry at 1/9/10/20 cards and mid-transition interpolation; added a 10-card half-transition SDL smoke frame. Desktop build, CTest 2/2, `--input-test`, and full SDL smoke passed; the 640×480 frame was visually inspected. ARM GCC 8.2 produced a 32-bit ARM hard-float ELF, and the OnionOS ZIP passed `unzip -t` with SHA-256 `3dc8fc01a09a3c6d418f57fbac3862d595392ede2d57574040c15a2f6b646f44`; packaged binary hash matches ARM build `a0d2d056205cb0ba380365317f5400656797b347606c0254f2a7f7ca1196f8d3`. No SD install or physical Miyoo test was performed.
+
+## Card caption legibility and Release test configuration — 16.11.2026
+
+- Cropped the large source-card artwork at its printed gold divider and render
+  localized card names, power/row labels and ability text as SDL text. Applied
+  to the inspector, hand preview, card carousel and deck collection so the
+  original miniature English flavor text no longer competes with readable UI.
+- Visually inspected the 640×480 inspector, collection and target-carousel
+  frames at `artifacts/qa/card-details-polish.png`,
+  `artifacts/qa/deck-builder-card-preview.png` and
+  `artifacts/qa/target-carousel.png`.
+- Fixed the Release test configuration: `NDEBUG` had removed state-changing
+  expressions embedded in `assert`, causing a false Release-only crash. The
+  engine test target now keeps assertions enabled.
+- SDL2 Release build succeeded; CTest passed 2/2; `--input-test` passed for
+  Miyoo controls, mulligan, guarded pass and Agile Medic row choice; `--audio-test`
+  decoded all 35 SFX and both music tracks and exercised music switch/mute.
+  These dummy-device checks do not verify actual speaker output or gameplay on
+  physical Miyoo hardware. ARM/package/SD/device checks remain open.

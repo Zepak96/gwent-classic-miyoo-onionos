@@ -73,6 +73,14 @@ endif()
 if(GWENT_BUILD_TESTS)
   enable_testing()
   add_executable(gwent_engine_tests tests/engine_tests.cpp)
+  # The regression suite currently uses assert expressions for both setup and
+  # checks. Keep those expressions live in Release builds as well; otherwise
+  # NDEBUG removes setup calls and makes the test binary crash for the wrong reason.
+  if(MSVC)
+    target_compile_options(gwent_engine_tests PRIVATE /UNDEBUG)
+  else()
+    target_compile_options(gwent_engine_tests PRIVATE -UNDEBUG)
+  endif()
   target_link_libraries(gwent_engine_tests PRIVATE gwent_engine)
   add_test(NAME engine_rules COMMAND gwent_engine_tests)
   add_test(NAME card_catalog COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/validate_catalog.py ${CMAKE_SOURCE_DIR}/data)
