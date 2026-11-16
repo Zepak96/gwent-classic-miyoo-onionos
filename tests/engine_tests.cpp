@@ -1150,6 +1150,11 @@ static void randomNestedMedicKeepsTarget() {
   std::string error;Game restored;
   assert(saveGame(path,game,&error)&&loadGame(path,restored,&error));std::filesystem::remove(path);
   assert(restored.pendingRandomMedicId==agile.id);
+  auto invalid=restored;invalid.pendingRandomMedicId="missing-random-target";
+  assert(saveGame(path,invalid,&error));
+  assert(!loadGame(path,restored,&error));
+  std::filesystem::remove(path);
+  assert(restored.pendingRandomMedicId==agile.id); // failed load preserves the live game
   const auto state=restored.rngState;
   const auto action=chooseAiAction(restored,1);
   assert(action.resolveMedic&&action.selectedCardId==agile.id);
