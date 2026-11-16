@@ -33,7 +33,7 @@ int main(int argc,char** argv) {
         int actions=0;
         while(game.phase!=Phase::MatchResult&&actions++<600) {
           if(game.phase==Phase::RoundResult){if(!startNextRound(game))throw std::runtime_error("Round setup");continue;}
-          if(game.phase==Phase::RoundSetup) {
+          if(game.phase==Phase::RoundSetup&&game.pendingMedicPlayer<0) {
             const int owner=game.skelligeRevivePlayer;
             const auto& grave=game.players[owner].graveyard;
             const auto c=std::find_if(grave.begin(),grave.end(),[&](const Card& c){return std::find(game.skelligeAgileReviveIds.begin(),game.skelligeAgileReviveIds.end(),c.id)!=game.skelligeAgileReviveIds.end();});
