@@ -156,7 +156,7 @@ void powerBadgeNumber(SDL_Renderer* r,int x,int y,int width,int height,const std
   static constexpr unsigned digits[10][5]={
     {7,5,5,5,7},{2,6,2,2,7},{7,1,7,4,7},{7,1,7,1,7},{5,5,7,1,1},
     {7,4,7,1,7},{7,4,7,5,7},{7,1,2,2,2},{7,5,7,5,7},{7,5,7,1,7}};
-  constexpr int glyphWidth=6,glyphHeight=10,advance=7;
+  constexpr int glyphHeight=10,advance=7;
   const int total=value.empty()?0:static_cast<int>(value.size())*advance-1;
   const int x0=x+(width-total)/2,y0=y+(height-glyphHeight)/2;
   auto draw=[&](int ox,int oy,Color inkColor) {
