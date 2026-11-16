@@ -2022,8 +2022,8 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     const int selected=std::clamp(a.targetIndex,0,std::max(0,static_cast<int>(candidates.size())-1));
     const bool agile=!candidates.empty()&&candidates[static_cast<std::size_t>(selected)]->agile;
     const std::string controls=a.language==Language::Polish?
-      (agile?"LEWO/PRAWO: KARTA   GORA/DOL: RZAD   B: WYBIERZ":"LEWO/PRAWO: KARTA   B: WYBIERZ"):
-      (agile?"LEFT/RIGHT: CARD   UP/DOWN: ROW   B: SELECT":"LEFT/RIGHT: CARD   B: SELECT");
+      (agile?"LEWO/PRAWO: KARTA   GORA/DOL: RZAD   B: WYBIERZ   A: ANULUJ":"LEWO/PRAWO: KARTA   B: WYBIERZ"):
+      (agile?"LEFT/RIGHT: CARD   UP/DOWN: ROW   B: SELECT   A: CANCEL":"LEFT/RIGHT: CARD   B: SELECT");
     drawChoiceCarousel(r,a,candidates,a.targetIndex,tr(a,"skellige_revival"),controls);
     if(agile)centeredTextInBox(r,180,252,280,15,tr(a,a.rowIndex==0?"melee":"ranged"),gold,1);
   }
@@ -2305,7 +2305,7 @@ void handleMatchKey(App& a,SDL_Keycode key) {
     if(a.game.phase==gwent::Phase::PlayerTurn)beginHumanPlayConfirmation(a);
     return;
   }
-  if(key==SDLK_ESCAPE&&a.game.pendingMedicPlayer<0) {
+  if(key==SDLK_ESCAPE&&a.game.pendingMedicPlayer<0&&a.game.phase!=gwent::Phase::RoundSetup) {
     if(a.targetMode) { a.targetMode=false;a.selectedTargets.clear();a.status=tr(a,"your_turn");return; }
     saveCurrentMatch(a);a.screen=Screen::DeckBuilder;return;
   }
@@ -2367,7 +2367,14 @@ void handleMatchKey(App& a,SDL_Keycode key) {
     for(const auto& card:a.game.players[0].graveyard)if(std::find(a.game.skelligeAgileReviveIds.begin(),a.game.skelligeAgileReviveIds.end(),card.id)!=a.game.skelligeAgileReviveIds.end())candidates.push_back(&card);
     if(candidates.empty())return;
     a.targetIndex=std::clamp(a.targetIndex,0,static_cast<int>(candidates.size())-1);
-    if(key==SDLK_LEFT||key==SDLK_a) { const int old=a.targetIndex;a.targetIndex=std::max(0,a.targetIndex-1);a.audio.play("ui_card");if(old!=a.targetIndex)noteCarouselMove(a,-1); }
+    if(key==SDLK_x||key==SDLK_z||key==SDLK_ESCAPE) {
+      const auto id=candidates[static_cast<std::size_t>(a.targetIndex)]->id;
+      if(gwent::cancelSkelligeRevive(a.game,0,id)) {
+        a.targetIndex=0;a.rowIndex=0;
+        if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+450;
+      }
+    }
+    else if(key==SDLK_LEFT||key==SDLK_a) { const int old=a.targetIndex;a.targetIndex=std::max(0,a.targetIndex-1);a.audio.play("ui_card");if(old!=a.targetIndex)noteCarouselMove(a,-1); }
     else if(key==SDLK_RIGHT||key==SDLK_d) { const int old=a.targetIndex;a.targetIndex=std::min(static_cast<int>(candidates.size())-1,a.targetIndex+1);a.audio.play("ui_card");if(old!=a.targetIndex)noteCarouselMove(a,1); }
     else if((key==SDLK_UP||key==SDLK_DOWN)&&candidates[static_cast<std::size_t>(a.targetIndex)]->agile)a.rowIndex=1-a.rowIndex;
     else if(key==SDLK_AC_BACK||key==SDLK_RETURN||key==SDLK_KP_ENTER) {
@@ -2812,6 +2819,24 @@ int main(int argc,char** argv) {
       handleMatchKey(chainProbe,normalizeMiyooKey(chainProbe,SDLK_LALT));
       okay=okay&&chainProbe.game.pendingMedicPlayer==-1&&chainProbe.game.players[0].board[1].size()==1&&
         chainProbe.game.players[0].board[1][0].id==revived.id;
+    }
+    {
+      App setupProbe;setupProbe.screen=Screen::Match;setupProbe.miyooControls=true;
+      setupProbe.game.phase=gwent::Phase::RoundResult;setupProbe.game.round=2;
+      setupProbe.game.firstPlayer=1;setupProbe.game.rngState=2;
+      setupProbe.game.players[0].faction=gwent::Faction::Skellige;
+      auto medic=gwent::Card{};medic.id="setup-ui-medic";medic.kind=gwent::Kind::Unit;
+      medic.row=gwent::Row::Melee;medic.power=5;medic.medic=true;
+      auto target=medic;target.id="setup-ui-agile";target.medic=false;target.agile=true;target.power=7;
+      auto spare=target;spare.id="setup-ui-spare";spare.agile=false;
+      setupProbe.game.players[0].hand={spare};spare.id="setup-ui-opponent-spare";
+      setupProbe.game.players[1].hand={spare};setupProbe.game.players[0].graveyard={medic,target};
+      const bool started=gwent::startNextRound(setupProbe.game);
+      okay=okay&&started&&setupProbe.game.phase==gwent::Phase::RoundSetup&&setupProbe.game.pendingMedicPlayer==0;
+      handleMatchKey(setupProbe,SDLK_AC_BACK);handleMatchKey(setupProbe,SDLK_DOWN);
+      handleMatchKey(setupProbe,normalizeMiyooKey(setupProbe,SDLK_LALT));
+      okay=okay&&setupProbe.game.pendingMedicPlayer==-1&&setupProbe.game.players[0].board[1].size()==1&&
+        setupProbe.game.phase==gwent::Phase::OpponentTurn&&setupProbe.game.currentPlayer==1;
     }
     const bool startsInDeckMaker=app.screen==Screen::DeckBuilder;
     app.miyooControls=true;
