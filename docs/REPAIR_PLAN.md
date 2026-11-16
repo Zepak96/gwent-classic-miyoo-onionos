@@ -95,6 +95,14 @@ objawy, dopóki nie da się ich odtworzyć w kodzie lub logu.
     `GwentClassic.port`. To mogło sprawić, że aktualizacja nie pojawiała się
     jako poprawny port w menu; nazwa źródła i walidacja archiwum zostały
     poprawione.
+15. **Karty w rzędach były dopisywane zamiast układane jak w źródle.** Oryginalny
+    `Row.addCard()` wstawia kartę przez `CardContainer.addCardSorted()`:
+    najpierw typ karty, potem siła bazowa, a następnie nazwa. Port dopisywał
+    większość zagrań na końcu wektora. Jedna karta wywołująca Muster lub kilka
+    równoczesnych lotów mogły więc wizualnie przestawiać układ. Dodano wspólne
+    źródłowe wstawianie dla zwykłych zagrań, Muster, Szpiega, Medyka, Manekina,
+    Avengera i odrodzeń Skellige; regresja sprawdza posortowane trzy karty
+    Muster z ręki i talii.
 
 ## Kolejność naprawy i kryteria odbioru
 
@@ -203,6 +211,12 @@ rodzajami kart; pełny test na urządzeniu opisany wersją binarium i wynikiem.
   który zostawiał kartę na planszy oraz rozjeżdżał kolejkę odrodzenia Skellige.
 - [x] Naprawiono zatwierdzanie lidera: Miyoo A (`SDLK_x`) kończy wybór, a
   strzałki służą wyłącznie do przechodzenia między liderami.
+- [x] Rzędy walki wstawiają karty według kolejności `Card.compare` ze źródła;
+  test sprawdza porządek po efekcie Muster.
+- [x] Pakiet ARM z tą zmianą zainstalowano na wykrytej karcie SD; 603 pliki
+  gry mają identyczne sumy SHA-256 jak zweryfikowany artefakt. Poprzedni folder
+  gry i launcher zachowano jako kopie `.previous-9e74bb8`. Test na samym Miyoo
+  pozostaje do wykonania.
 - [x] Poprawiono nazwę skrótu w paczce OnionOS z `.notfound` na `.port` i
   dodano kontrolę tej ścieżki do walidacji archiwum.
 - [x] Desktop CI dla silnika i frontendu przeszło: testy reguł, testy wejścia,
