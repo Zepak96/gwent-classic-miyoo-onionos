@@ -2212,7 +2212,10 @@ int main(int argc,char** argv) {
     app.assetDirectory=path.string();
     SDL_free(base);
   }
-  app.audio.initialize(app.assetDirectory);
+  if(app.audio.initialize(app.assetDirectory))
+    std::cerr<<"Startup: audio device opened.\n";
+  else
+    std::cerr<<"Startup: audio unavailable: "<<SDL_GetError()<<"\n";
   if(argc>1&&std::string(argv[1])=="--audio-test") {
     std::vector<std::string> failures,musicFailures;
     const bool okay=app.audio.available()&&app.audio.validateAllSfx(failures)&&app.audio.validateBackgroundMusic(musicFailures);
