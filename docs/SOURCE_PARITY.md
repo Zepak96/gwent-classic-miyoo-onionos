@@ -311,3 +311,8 @@ The source leader ability opens a non-cancellable hand carousel for up to two ca
 ## Board-wide card counts in source AI — 16.11.2026
 
 `ControllerAI.getBoardData()` collects on-board abilities from `board.row[0..2]`, the AI-controlled side in the pinned source layout. Native AI retains board-wide counts for other decisions, while Decoy weighting and target selection use only its own three rows. Seeded regressions compare 256 decisions with and without an opposing Spy and verify that the AI returns its own Spy when both sides have one. This corrects an earlier parity note that incorrectly described the source as scanning all six rows.
+
+Francesca Hope's exhaustive Agile assignment uses the same sorted row insertion
+as the pinned source's `Row.addCard()` / `CardContainer.addCardSorted()` path.
+Engine regression checks that both combat rows remain sorted after activating
+the Leader.

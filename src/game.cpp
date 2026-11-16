@@ -673,7 +673,8 @@ bool activateLeader(Game& g, int who, Row target, const std::vector<std::string>
       const std::uint64_t arrangements=std::uint64_t{1}<<agile.size();
       for(std::uint64_t mask=0;mask<arrangements;++mask) {
         Player virtualPlayer=player; virtualPlayer.board[0]=base[0]; virtualPlayer.board[1]=base[1];
-        for(std::size_t n=0;n<agile.size();++n) virtualPlayer.board[(mask>>n)&1].push_back(agile[n]);
+        for(std::size_t n=0;n<agile.size();++n)
+          insertSourceBoardCard(virtualPlayer.board[(mask>>n)&1],agile[n]);
         const int score=calculateScore(virtualPlayer,g.weather,g.horn[who]);
         if(score>bestScore) { bestScore=score; bestRows={virtualPlayer.board[0],virtualPlayer.board[1]}; }
       }

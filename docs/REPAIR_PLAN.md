@@ -310,3 +310,10 @@ rodzajami kart; pełny test na urządzeniu opisany wersją binarium i wynikiem.
   Potwierdzenie na urządzeniu pozostaje otwarte.
 - [ ] Dokończyć poprawki i testy opisane w etapach 1–5.
 - [ ] Potwierdzić uruchomienie, sterowanie i pełny mecz na fizycznym Miyoo.
+
+## Dodatkowa poprawka mechaniki
+
+- [x] Francesca Hope wstawia przeniesione jednostki Agile zgodnie z porządkiem
+  rzędów źródłowego `Row.addCard()`. Wcześniej symulacja optymalnego układu
+  używała `push_back`, przez co karty po aktywacji mogły pozostać poza
+  kolejnością. Regresja sprawdza posortowanie obu rzędów po zdolności.

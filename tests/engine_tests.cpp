@@ -1322,6 +1322,20 @@ static void leaderAbilities() {
   assert(activateLeader(francescaHope,0));
   assert(francescaHope.players[0].board[0].empty()&&francescaHope.players[0].board[1].size()==1&&francescaHope.players[0].score==5);
 
+  Game francescaHopeSort;
+  francescaHopeSort.players[0].leader=leader("francesca_hope");
+  francescaHopeSort.players[0].leaderAbilityAvailable=true;
+  auto agileTen=unit("hope-agile-ten",10,Row::Melee);agileTen.agile=true;
+  auto agileOne=unit("hope-agile-one",1,Row::Ranged);agileOne.agile=true;
+  francescaHopeSort.players[0].board[0]={unit("hope-melee-two",2),agileTen};
+  francescaHopeSort.players[0].board[1]={agileOne,unit("hope-ranged-three",3)};
+  assert(activateLeader(francescaHopeSort,0));
+  for(const auto& row:francescaHopeSort.players[0].board) {
+    for(std::size_t i=1;i<row.size();++i)
+      assert(row[i-1].power<row[i].power ||
+             (row[i-1].power==row[i].power&&row[i-1].name<=row[i].name));
+  }
+
   Game randomRespawn;
   beginMatchWithLeaders(randomRespawn,deck,leader("emhyr_invader"),deck,leader("foltest_lord"),0x9812,0);
   assert(randomRespawn.randomRespawn);
