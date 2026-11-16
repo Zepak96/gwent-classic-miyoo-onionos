@@ -949,6 +949,14 @@ void startMatch(App& a,std::uint64_t fixtureSeed=0) {
     std::cerr<<"Match startup failed: not enough memory to create the match.\n";
   }
 }
+std::vector<const gwent::Card*> pendingMedicChoices(const App& a) {
+  std::vector<const gwent::Card*> cards;
+  const auto random=a.game.randomRespawn?gwent::previewRandomMedicTargetId(a.game,0):std::string{};
+  for(const auto& c:a.game.players[0].graveyard)
+    if(c.kind==gwent::Kind::Unit&&!c.hero&&(c.row!=gwent::Row::None||c.agile)&&
+       (!a.game.randomRespawn||c.id==random))cards.push_back(&c);
+  return cards;
+}
 std::vector<std::string> legalCardTargets(const App& a,const gwent::Card& card) {
   std::vector<std::string> ids;
   const auto& p=a.game.players[0];
@@ -1954,6 +1962,16 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     drawChoiceCarousel(r,a,candidates,a.targetIndex,tr(a,"skellige_revival"),controls);
     if(agile)centeredTextInBox(r,180,252,280,15,tr(a,a.rowIndex==0?"melee":"ranged"),gold,1);
   }
+  if(a.game.pendingMedicPlayer==0) {
+    const auto choices=pendingMedicChoices(a);
+    box(r,0,0,W,STAGE_H,Color{0,0,0,195});
+    drawChoiceCarousel(r,a,choices,a.targetIndex,
+      a.language==Language::Polish?"MEDYK: WYBIERZ KARTE":"MEDIC: CHOOSE CARD",
+      a.language==Language::Polish?"LEWO/PRAWO: KARTA  GORA/DOL: RZAD  B: WYBIERZ":"LEFT/RIGHT: CARD  UP/DOWN: ROW  B: SELECT");
+    const int index=std::clamp(a.targetIndex,0,std::max(0,static_cast<int>(choices.size())-1));
+    if(!choices.empty()&&choices[index]->agile)
+      centeredTextInBox(r,180,252,280,15,tr(a,a.rowIndex==0?"melee":"ranged"),gold,1);
+  }
   if(a.game.phase==gwent::Phase::RoundResult || a.game.phase==gwent::Phase::MatchResult) {
     const Uint8 alpha=endScreenAlpha(SDL_GetTicks()-a.endScreenStartedAt);
     box(r,0,0,W,STAGE_H,Color{10,10,10,static_cast<Uint8>(242u*alpha/255)});
@@ -2226,6 +2244,23 @@ void handleMatchKey(App& a,SDL_Keycode key) {
       gwent::startNextRound(a.game); a.handIndex=0; a.rowIndex=0; a.targetIndex=0; a.status=tr(a,"your_turn");
       if(a.game.phase==gwent::Phase::RoundSetup)a.audio.play("open");
       if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+400;
+    }
+    return;
+  }
+  if(a.game.pendingMedicPlayer==0) {
+    const auto choices=pendingMedicChoices(a);
+    if(choices.empty())return;
+    a.targetIndex=std::clamp(a.targetIndex,0,static_cast<int>(choices.size())-1);
+    if(key==SDLK_LEFT)a.targetIndex=(a.targetIndex+static_cast<int>(choices.size())-1)%static_cast<int>(choices.size());
+    else if(key==SDLK_RIGHT)a.targetIndex=(a.targetIndex+1)%static_cast<int>(choices.size());
+    else if((key==SDLK_UP||key==SDLK_DOWN)&&choices[a.targetIndex]->agile)a.rowIndex=1-a.rowIndex;
+    else if(key==SDLK_AC_BACK||key==SDLK_RETURN||key==SDLK_KP_ENTER) {
+      const auto id=choices[a.targetIndex]->id;
+      const auto row=choices[a.targetIndex]->agile?static_cast<gwent::Row>(a.rowIndex):gwent::Row::None;
+      if(gwent::chooseMedicRevive(a.game,0,id,row)) {
+        a.targetIndex=0;a.audio.play("medic");
+        if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+450;
+      }
     }
     return;
   }
