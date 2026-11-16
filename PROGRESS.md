@@ -5,7 +5,8 @@
 Publiczna gałąź `codex/full-source-parity` zawiera niezmienione pliki źródłowe
 `asundr/gwent-classic` przypięte do `08592d847f2573440a34deb9f32bc855b2544cdd`.
 Mapa pełnego audytu źródło→port znajduje się w `docs/SOURCE_PARITY.md`. Port
-nadal nie spełnia kryterium 1:1 i nie jest wydaniem do instalacji.
+nadal nie spełnia kryterium 1:1; paczka na SD jest wersją testową, nie
+końcowym wydaniem.
 
 - Katalog `data/cards.json` porównuje się teraz rekord po rekordzie z JSON-em
   osadzonym w upstreamowym `cards.js`: 216/216 zgodnych, pola i kolejność bez
@@ -17,21 +18,23 @@ nadal nie spełnia kryterium 1:1 i nie jest wydaniem do instalacji.
 - Release CTest przechodzi 2/2, `--input-test` przechodzi, a `--audio-test`
   dekoduje 35 SFX i oba utwory. Test audio z SDL dummy nie potwierdza głośnika
   fizycznego Miyoo.
-- Zmiany źródłowe i README są opublikowane na publicznej gałęzi; ta aktualizacja
-  zawiera poprawkę źródłowego AI mulliganu i 100-meczową regresję. Nowy ARM
+- Zmiany źródłowe i README są opublikowane na publicznej gałęzi; ostatnie
+  poprawki obejmują źródłowy AI mulligan, 100-meczową regresję oraz dźwięk
+  przemienionego Vildkaarla. Nowy ARM
   hard-float build oraz paczka OnionOS przeszły lokalnie; paczkę zainstalowano
   na karcie `E:` w `Roms/PORTS/Games/GwentClassic`, ale nie uruchomiono jej
   jeszcze na urządzeniu.
 - Skrypt builda OnionOS jest uruchamialny z checkoutu Windows dzięki regule LF
   dla skryptów `.sh`. Paczka `GwentClassic-OnionOS.zip` zawiera 618 wpisów,
-  SHA-256 `d7dcdcf96659f7f6471b39941e36d284bfc9b8129cef0a255e4ae8055cc9e9ee`;
+  SHA-256 `d627df61a6cf23be02e9e6ad59038ed965851f614b4cd85ae1b119e109912c42`;
   `readelf` potwierdził ELF32 ARM i hard-float ABI. Lokalna paczka leży w
-  `.work/miyoo-7fca1da/` i nie jest jeszcze wydaniem GitHub Release.
+  `.work/miyoo-b04f2d0-final/` i nie jest jeszcze wydaniem GitHub Release.
 - Po instalacji zweryfikowano 602/602 plików gry porównaniem SHA-256;
   skrót binarki na SD to
-  `bd39bce6cea109319359d78d5b2eac9b4650a194d60338486662ee9cee5a2332`.
-  Poprzedni katalog gry zachowano jako kopię
-  `.work/sd-backup-7fca1da/GwentClassic`; istniejący skrót `.port` OnionOS
+  `38f36429aa62529dc87a60557db2b3f3561b864b601b73a398ed2f64fb34cdcd`.
+  Kopie poprzednich katalogów gry zachowano w
+  `.work/sd-backup-7fca1da/GwentClassic` i `.work/sd-backup-b04f2d0/GwentClassic`;
+  istniejący skrót `.port` OnionOS
   nie był zmieniany.
 - Poprawiono błąd mulliganu AI: źródłowe `ControllerAI.redraw()` podejmuje dwie
   kolejne decyzje, każdorazowo po natychmiastowej wymianie z wierzchem talii;
