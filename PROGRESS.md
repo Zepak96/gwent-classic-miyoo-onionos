@@ -66,6 +66,12 @@ końcowym wydaniem.
   wyłącza ona pasywne zdolności obu liderów, w tym dodatkową kartę Franceski,
   połowę pogody Brana, losowe wskrzeszanie Invadera i podwójne punkty szpiegów
   Zdrajcy. Cztery regresje potwierdzają brak tych efektów przy Białym Płomieniu.
+- Tokeny Avengera tworzone przez Krowę/Kambiego są oznaczane prefiksem
+  `summoned_`; po zniszczeniu nie pozostają w trwałym cmentarzu portu. Źródło
+  usuwa Bovine Defense Force/Hemdalla z cmentarza po 1001 ms, zanim gracz może
+  wykonać kolejną akcję, dlatego silnik rozstrzyga sprzątanie atomowo. Regresja
+  Cow → Bovine Defense Force → Scorch potwierdza, że token nie może zostać
+  wskrzeszony przez Medyka. CTest przechodzi 2/2.
 - Przetłumaczono statusy polskiej wersji dla błędów i akcji meczu (zapis,
   mulligan, pas, cel, lider, Skellige oraz odrzucony ruch AI). CTest 2/2,
   `--input-test` i `--audio-test assets` przechodzą; pełna lokalizacja menu,

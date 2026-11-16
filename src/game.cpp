@@ -99,7 +99,13 @@ void removeBoardCard(Game& g, int owner, int row, int index) {
   auto& cards=g.players[owner].board[row];
   Card removed=cards[index];
   cards.erase(cards.begin()+index);
-  g.players[owner].graveyard.push_back(removed);
+  // Avenger tokens (Bovine Defense Force / Hemdall) schedule their own
+  // removal from the graveyard 1001 ms after they are destroyed in the
+  // reference game. The native rules engine resolves actions atomically, so
+  // omit these generated-only cards from the graveyard rather than exposing
+  // a token that Medic could revive on a later turn.
+  const bool temporaryAvengerToken=removed.id.rfind("summoned_",0)==0;
+  if(!temporaryAvengerToken)g.players[owner].graveyard.push_back(removed);
   triggerAvenger(g,owner,removed);
 }
 void finishRound(Game& g) {

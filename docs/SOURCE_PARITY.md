@@ -96,6 +96,12 @@ items above:
   occupancy, Ermion activation, Berserker transformation on later plays and
   Muster summons, round reset, and save/load state.
 - Decoy fallback considers each own row's maximum units as `ControllerAI` does.
+- Generated Avenger tokens use `summoned_` IDs and are omitted from the
+  persistent graveyard when destroyed. The reference removes Bovine Defense
+  Force/Hemdall from the graveyard 1001 ms later, before another turn can use
+  Medic on them; the engine resolves this timer-backed cleanup atomically. A
+  Cow → Bovine Defense Force → Scorch regression confirms the token is not
+  left as a revive target.
 - Transformed Vildkaarl cards tagged `vildkarrl` now play the source Mardroeme
   sound and suppress the ordinary row-placement sound, matching the placed
   audio handler in `abilities.js`.

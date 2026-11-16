@@ -615,6 +615,20 @@ static void avengerCards() {
   assert(pass(roundEnd,0)); assert(pass(roundEnd,1));
   assert(roundEnd.phase==Phase::RoundResult && startNextRound(roundEnd));
   assert(std::any_of(roundEnd.players[0].board[0].begin(),roundEnd.players[0].board[0].end(),[](const Card& card){return card.name=="Hemdall";}));
+
+  Game temporaryAvenger;
+  Card cow=referenceCard("Cow");cow.id="temporary-cow";
+  temporaryAvenger.players[1].board[0].push_back(cow);
+  Card firstScorch;firstScorch.id="temporary-scorch-1";firstScorch.kind=Kind::Scorch;
+  Card secondScorch=firstScorch;secondScorch.id="temporary-scorch-2";
+  temporaryAvenger.players[0].hand={firstScorch,secondScorch};
+  assert(playCard(temporaryAvenger,0,firstScorch.id));
+  assert(std::any_of(temporaryAvenger.players[1].board[0].begin(),temporaryAvenger.players[1].board[0].end(),
+                     [](const Card& card){return card.name=="Bovine Defense Force";}));
+  temporaryAvenger.currentPlayer=0;temporaryAvenger.phase=Phase::PlayerTurn;
+  assert(playCard(temporaryAvenger,0,secondScorch.id));
+  assert(std::none_of(temporaryAvenger.players[1].graveyard.begin(),temporaryAvenger.players[1].graveyard.end(),
+                      [](const Card& card){return card.id.rfind("summoned_",0)==0;}));
 }
 static void leaderAbilities() {
   std::vector<Card> deck;
