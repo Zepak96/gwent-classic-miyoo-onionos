@@ -2652,11 +2652,12 @@ int main(int argc,char** argv) {
          MATCH_RULES_PANEL_Y>=(H+STAGE_H)/2&&MATCH_RULES_PANEL_Y+MATCH_RULES_PANEL_H<=H&&
          DECK_RULES_PANEL_Y>=STAGE_H&&DECK_RULES_PANEL_Y+DECK_RULES_PANEL_H<=H;
     App movementProbe;
-    gwent::Card musterA;musterA.id="muster-flight-a";musterA.kind=gwent::Kind::Unit;musterA.row=gwent::Row::Melee;
+    gwent::Card musterA;musterA.id="muster-flight-a";musterA.name="Test Group A";
+    musterA.kind=gwent::Kind::Unit;musterA.row=gwent::Row::Melee;
     gwent::Card musterB=musterA;musterB.id="muster-flight-b";
     gwent::Game movementBefore;movementBefore.players[1].deck={musterA,musterB};movementProbe.game=movementBefore;
     movementProbe.game.players[1].deck.clear();movementProbe.game.players[1].board[0]={musterA,musterB};
-    gwent::Card musterAction;musterAction.id="muster-action";musterAction.muster=true;
+    gwent::Card musterAction;musterAction.id="muster-action";musterAction.muster=true;musterAction.group="Test Group";
     queueCardTransitionFlights(movementProbe,movementBefore,musterAction,1);
     okay=okay&&movementProbe.triggeredCardFlights.size()==2&&
          std::all_of(movementProbe.triggeredCardFlights.begin(),movementProbe.triggeredCardFlights.end(),[](const App::CardFlight& flight) {
