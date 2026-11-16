@@ -30,10 +30,9 @@ GNU GCC runtime libraries
 
 The package includes the pinned reference artwork, SVG icons, and SFX under
 assets/gwent-classic/. It also includes two MP3 background tracks supplied by
-the project owner. Asset origins, CDPR authorization as reported by the
-project owner, and the upstream RandomPianist SFX credit are documented in
-assets/gwent-classic/ASSET_ORIGIN.md. The card catalog and deck data are
-covered by the notices in the source repository's LICENSES.md and
-third_party/gwent-classic/NOTICE.md.
-See docs/ASSET_RIGHTS.md for the public provenance and redistribution record,
-including the distinction between the upstream code license and bundled media.
+the project owner. Asset origins and the upstream RandomPianist SFX credit are
+documented in assets/gwent-classic/ASSET_ORIGIN.md. The card catalog and deck
+data are covered by the notices in the source repository's LICENSES.md and
+third_party/gwent-classic/NOTICE.md. See docs/ASSET_RIGHTS.md for the
+provenance record and the distinction between the upstream code license and
+bundled media.

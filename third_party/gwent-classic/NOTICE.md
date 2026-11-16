@@ -4,4 +4,4 @@ The card metadata in `data/cards.json` and ability names/descriptions in `data/a
 
 Upstream repository: https://github.com/asundr/gwent-classic
 
-The port bundles the pinned upstream `img/`, `sfx/`, and `svg/` directories under `assets/gwent-classic/`. See `assets/gwent-classic/ASSET_ORIGIN.md` for the complete inventory and attribution. The project owner reports non-commercial CD PROJEKT RED authorization for CDPR game assets in this Miyoo mod. The reference README credits RandomPianist for many edited sound effects; that third-party attribution is preserved separately.
+The port bundles the pinned upstream `img/`, `sfx/`, and `svg/` directories under `assets/gwent-classic/`. See `assets/gwent-classic/ASSET_ORIGIN.md` for the inventory and source attribution. The reference README credits RandomPianist for many edited sound effects; that third-party attribution is preserved separately. The pinned repository does not specify per-file media licensing terms.
