@@ -33,14 +33,24 @@ source behavior. A build or screenshot alone does not count as parity.
 
 ## Card rules — `abilities.js`, `Row`, `Weather`, `Card`
 
-- [ ] Base score, Hero immunity, weather floor/half-weather, horn and Dandelion.
-- [ ] Tight Bond by printed name; Morale boosts other row units.
-- [ ] Spy placement and up-to-two draws; Medic selection and Agile row choice.
+- [x] Base score, Hero immunity, weather floor/half-weather, horn and
+  Dandelion. `scoreRules()` checks weather floor, horn, Hero immunity,
+  Dandelion's row horn and Morale; King Bran regressions check floor-half
+  rounding (including odd power) and holder-only scope.
+- [x] Tight Bond is counted by printed name, multiplies each matching card by
+  the number of Bond-bearing copies, and Morale boosts other row units.
+  Regressions cover one and three copies, same name across different metadata
+  groups, different names sharing metadata, and non-Bond same-name cards.
+- [x] Spy placement and up-to-two draws; Medic selection, random Emhyr revive,
+  Hero/noncombat rejection and Agile row choice. Engine tests cover explicit
+  targets and RNG-preserving target preview; SDL tests cover Agile selection.
 - [x] Decoy uses the specifically selected own non-Hero combat unit, returns
   that same card, and leaves the Decoy in the selected row. Engine regressions
   cover exact target identity, returned hand card, row replacement, and rejection
   of noncombat or opponent-owned targets; Cow removal also exercises Avenger.
-- [ ] Muster from hand/deck; next-gen Geralt/Ciri muster and Roach Avenger.
+- [x] Muster pulls matching cards from hand and deck using the source name
+  prefix. Regressions cover Arachas hand/deck copies and next-gen Geralt/Ciri
+  summoning Roach while leaving the other hero in hand.
 - [ ] Berserker/Mardroeme transformations and Vildkaarl lifecycle.
 - [x] Berserker/Mardroeme transformation ordering now re-sorts the transformed
   Vildkaarl by the source row comparator (base power, then name); engine
@@ -55,7 +65,8 @@ source behavior. A build or screenshot alone does not count as parity.
   global ties/Hero immunity.
 - [ ] Clear Weather, each individual weather type, Skellige Storm, duplicate
   weather behavior and weather-card ownership/discard.
-- [ ] Bovine Defense Force and Kambi/Hemdall Avenger triggers.
+- [x] Cow removal summons Bovine Defense Force; Kambi removal summons Hemdall
+  both during Scorch and round cleanup. Regression cases cover each path.
 - [ ] Every leader ability in the source catalog: all Foltest, Emhyr, Eredin,
   Francesca, Crach an Craite and King Bran variants.
 
