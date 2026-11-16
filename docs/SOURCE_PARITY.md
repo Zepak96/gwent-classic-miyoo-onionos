@@ -112,6 +112,22 @@ items above:
   make card-flight/selection positions appear to shift. A three-card Muster
   regression checks ordering across cards deployed from hand and deck. Full
   animation timing and physical-device verification remain open.
+- Fixed-row unit audio now uses the card's printed row when callers have no row
+  choice; Agile units still use the selected row. This also makes Berserker /
+  Mardroeme detection and the placement-audio wait inspect the actual row. A
+  frontend input regression checks that a fixed Ranged unit schedules the
+  source `common_ranged` cue.
+- The match renderer no longer stops weather-card drawing before the fourth
+  distinct active weather card. Weather flight destinations and the layout
+  share the same source slot calculation; the frontend regression checks slot
+  four's board coordinate. The source catalog permits Frost, Fog, Rain, and
+  Skellige Storm at once.
+- Physical Commander's Horn and Mardroeme cards now remain in explicit row
+  special slots until round cleanup, are serialized in save version 5, render
+  and animate into the special slot, then move to the graveyard at round end.
+  This prevents Crach from returning a still-active special card to the deck.
+  Engine/save regressions cover active-card identity, Crach exclusion and the
+  eventual graveyard move. Physical Miyoo placement visuals remain to verify.
 - Decoy now returns the specifically selected unit, restores its source base
   power, runs Avenger removal effects, inserts the returned card using the
   correct human/AI hand rules, and leaves Decoy in the chosen combat row in its

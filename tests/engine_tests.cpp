@@ -15,6 +15,7 @@ static Card unit(std::string id, int power, Row row = Row::Melee) {
   Card c; c.id = std::move(id); c.kind = Kind::Unit; c.power = power; c.row = row; return c;
 }
 static Card referenceCard(const std::string& name);
+static Card leader(std::string id);
 static std::uint32_t expectedRandom(std::uint64_t& state) {
   auto x=static_cast<std::uint32_t>(state);
   x^=x<<13;x^=x>>17;x^=x<<5;state=x;return x;
@@ -283,6 +284,7 @@ static void saveRoundTripAndCorruptionHandling() {
   original.skelligeRevivesRemaining=1; original.skelligeRevivePlayer=0; original.skelligeAgileReviveIds={"save-agile"}; original.factionAbilitiesInitialized=true;
   original.players[1].mardroeme[2]=true;
   original.players[1].specialOccupied[1]=true;
+  original.players[1].specialCards[1]=referenceCard("Mardroeme");
   original.rngState=0x12345678; original.lastError="persisted diagnostic";
   auto card=unit("save-card",9,Row::None); card.agile=true; card.spy=true; card.group="save-group";
   card.abilities={"spy","agile","morale"}; card.referenceIndex=42; card.deckCopies=3;
@@ -307,6 +309,7 @@ static void saveRoundTripAndCorruptionHandling() {
   assert(restored.skelligeRevivesRemaining==1 && restored.skelligeRevivePlayer==0 && restored.skelligeAgileReviveIds==original.skelligeAgileReviveIds && restored.rngState==original.rngState);
   assert(restored.players[1].mardroeme[2]);
   assert(restored.players[1].specialOccupied[1]);
+  assert(restored.players[1].specialCards[1].name=="Mardroeme");
   {
     std::fstream file(path,std::ios::binary|std::ios::in|std::ios::out);
     file.seekg(-1,std::ios::end);char byte=0;file.read(&byte,1);byte=static_cast<char>(byte^0x5a);file.seekp(-1,std::ios::end);file.write(&byte,1);
@@ -450,6 +453,22 @@ static void abilitiesAndValidation() {
   horns.players[1].board[0].push_back(unit("enemy",5));
   assert(playCard(horns,0,"horn",Row::Melee));
   assert(horns.players[0].score==8 && horns.players[1].score==5);
+  assert(horns.players[0].graveyard.empty()&&horns.players[0].specialCards[0].id=="horn");
+
+  Game specialCrach;auto activeHorn=referenceCard("Commander's Horn");activeHorn.id="active-horn";
+  specialCrach.players[0].hand={activeHorn};specialCrach.players[0].graveyard={unit("old-grave-unit",3)};
+  assert(playCard(specialCrach,0,activeHorn.id,Row::Melee));
+  assert(specialCrach.players[0].specialCards[0].id==activeHorn.id&&specialCrach.players[0].graveyard.size()==1);
+  specialCrach.currentPlayer=0;specialCrach.phase=Phase::PlayerTurn;
+  specialCrach.players[0].leader=leader("crach_an_craite");specialCrach.players[0].leaderAbilityAvailable=true;
+  assert(activateLeader(specialCrach,0));
+  assert(specialCrach.players[0].deck.size()==1&&specialCrach.players[0].deck[0].id=="old-grave-unit");
+  assert(specialCrach.players[0].specialCards[0].id==activeHorn.id);
+  specialCrach.phase=Phase::RoundResult;
+  assert(startNextRound(specialCrach));
+  assert(specialCrach.players[0].specialCards[0].id.empty()&&
+         std::any_of(specialCrach.players[0].graveyard.begin(),specialCrach.players[0].graveyard.end(),
+                     [&](const Card& card){return card.id==activeHorn.id;}));
 
   Game rowScorch; auto scorcher=unit("scorcher",4); scorcher.abilities={"scorch_c"}; rowScorch.players[0].hand.push_back(scorcher);
   rowScorch.players[1].board[0]={unit("target-6",6),unit("target-4",4)};
@@ -592,6 +611,7 @@ static void referenceCatalog() {
   ermion.players[0].hand.push_back(rowMardroeme);ermion.currentPlayer=0;ermion.phase=Phase::PlayerTurn;
   assert(playCard(ermion,0,"row-mardroeme",Row::Ranged));
   assert(ermion.players[0].mardroeme[1]&&ermion.players[0].specialOccupied[1]);
+  assert(ermion.players[0].specialCards[1].id=="row-mardroeme"&&ermion.players[0].graveyard.empty());
   Card rowHorn;rowHorn.id="row-horn";rowHorn.kind=Kind::CommanderHorn;ermion.players[0].hand.push_back(rowHorn);
   ermion.currentPlayer=0;ermion.phase=Phase::PlayerTurn;
   assert(!playCard(ermion,0,"row-horn",Row::Ranged));

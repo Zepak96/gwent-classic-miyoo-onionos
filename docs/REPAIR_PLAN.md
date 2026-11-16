@@ -103,6 +103,26 @@ objawy, dopóki nie da się ich odtworzyć w kodzie lub logu.
     źródłowe wstawianie dla zwykłych zagrań, Muster, Szpiega, Medyka, Manekina,
     Avengera i odrodzeń Skellige; regresja sprawdza posortowane trzy karty
     Muster z ręki i talii.
+16. **Dźwięk stałych kart z rzędów był wybierany z pustego celu.** Interfejs
+    przekazuje brak celu rzędu dla kart, które nie pozwalają go wybierać, więc
+    Ranged i Siege dostawały dźwięk zwarcia. Wspólny wybór audio i blokady
+    animacji odczytuje teraz wydrukowany rząd karty; Agile nadal używa rzędu
+    wybranego przez gracza. Test SDL sprawdza dźwięk `common_ranged`.
+17. **Czwarta różna karta pogody była ukrywana.** Pętla zatrzymywała rysowanie
+    przed slotem x=134, chociaż oryginał może mieć jednocześnie Frost, Fog,
+    Rain i Skellige Storm. Usunięto limit; obliczanie slotu lotu i rysowanie
+    używają teraz tej samej funkcji, a test sprawdza pozycję czwartej karty.
+18. **Karty specjalne trafiały do cmentarza za wcześnie.** Źródło trzyma Róg
+    Dowódcy i Mardroeme w slocie rzędu do końca rundy; port wcześniej trzymał
+    wyłącznie flagę efektu. Crach mógł odzyskać aktywną kartę, a Mardroeme
+    znikało z animacji. Dodano osobne karty slotów, zapis v5 z odczytem starszych
+    zapisów, lot i rysowanie do pola specjalnego oraz przeniesienie karty do
+    cmentarza przy końcu rundy. Testy sprawdzają tożsamość, Crach i cleanup.
+19. **Losowe wskrzeszanie nie może udawać wyboru Medyka.** Przy Emhyrze
+    Najeźdźcy silnik losuje jednostkę z cmentarza, ale picker nadal pokazuje
+    konkretne cele. Dla losowego Agile dodatkowo potrzebna jest zgodna ścieżka
+    wyboru rzędu po ujawnieniu wylosowanej karty. Wymaga etapowego testu UI i
+    silnika.
 
 ## Kolejność naprawy i kryteria odbioru
 
@@ -213,6 +233,11 @@ rodzajami kart; pełny test na urządzeniu opisany wersją binarium i wynikiem.
   strzałki służą wyłącznie do przechodzenia między liderami.
 - [x] Rzędy walki wstawiają karty według kolejności `Card.compare` ze źródła;
   test sprawdza porządek po efekcie Muster.
+- [x] Róg Dowódcy i Mardroeme zostają w specjalnym polu do końca rundy; nowy
+  format zapisu przechowuje te karty, a regresja potwierdza, że Crach nie może
+  pobrać aktywnego Rogu.
+- [x] Dźwięk stałych kart z rzędów wybiera się z ich faktycznego rzędu; czwarta
+  karta pogody nie jest już ukrywana przez limit rysowania.
 - [x] Pakiet ARM z tą zmianą zainstalowano na wykrytej karcie SD; 603 pliki
   gry mają identyczne sumy SHA-256 jak zweryfikowany artefakt. Poprzedni folder
   gry i launcher zachowano jako kopie `.previous-9e74bb8`. Test na samym Miyoo

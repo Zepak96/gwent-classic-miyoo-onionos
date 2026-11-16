@@ -45,6 +45,9 @@ struct Player {
   bool doubleSpyPower{false};
   std::array<bool, 3> mardroeme{false, false, false};
   std::array<bool, 3> specialOccupied{false, false, false};
+  // Physical cards occupying the row's special slot. Leader Horn abilities
+  // only set their effects and therefore leave this slot empty.
+  std::array<Card, 3> specialCards{};
   int score{0};
   int roundWins{0};
   int roundLosses{0};

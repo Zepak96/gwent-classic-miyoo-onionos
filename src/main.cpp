@@ -169,7 +169,7 @@ constexpr Uint32 SOURCE_CARD_FLIGHT_MS=499;
 constexpr Uint32 SOURCE_ROW_PLACEMENT_AUDIO_WAIT_MS=1000;
 constexpr Uint32 SOURCE_ABILITY_ANIMATION_MS=1650;
 struct App {
-  enum class CardZone { Board, Weather, Hand, Deck, Grave };
+  enum class CardZone { Board, Special, Weather, Hand, Deck, Grave };
   struct CardFlight {
     bool active{false};
     gwent::Card card;
@@ -299,6 +299,7 @@ struct CardLocation {
   int owner{-1},row{-1},index{0};
   std::size_t count{0};
 };
+constexpr int sourceWeatherCardX(int index) { return 47+index*29; }
 std::vector<CardLocation> cardLocations(const gwent::Game& game) {
   std::vector<CardLocation> locations;
   for(int owner=0;owner<2;++owner) {
@@ -310,6 +311,10 @@ std::vector<CardLocation> cardLocations(const gwent::Game& game) {
     add(game.players[owner].hand,App::CardZone::Hand);
     add(game.players[owner].graveyard,App::CardZone::Grave);
     for(int row=0;row<3;++row)add(game.players[owner].board[static_cast<std::size_t>(row)],App::CardZone::Board,row);
+    for(int row=0;row<3;++row) {
+      const auto& special=game.players[owner].specialCards[static_cast<std::size_t>(row)];
+      if(!special.id.empty())locations.push_back({special,App::CardZone::Special,owner,row,0,1});
+    }
   }
   for(int i=0;i<static_cast<int>(game.weatherCards.size());++i) {
     const auto& weather=game.weatherCards[static_cast<std::size_t>(i)];
@@ -324,7 +329,9 @@ std::pair<int,int> cardLocationPosition(const CardLocation& location) {
       return {static_cast<int>(std::lround(geometry.firstX+location.index*geometry.pitch)),
               location.owner==0?143+location.row*45:5+(2-location.row)*45};
     }
-    case App::CardZone::Weather:return {47+location.index*29,149};
+    case App::CardZone::Special:
+      return {190,location.owner==0?143+location.row*45:5+(2-location.row)*45};
+    case App::CardZone::Weather:return {sourceWeatherCardX(location.index),149};
     case App::CardZone::Hand:
       if(location.owner!=0)return {292,20};
       return {194+(location.index-std::clamp(location.index-5,0,std::max(0,static_cast<int>(location.count)-11)))*29,277};
@@ -335,7 +342,7 @@ std::pair<int,int> cardLocationPosition(const CardLocation& location) {
 }
 bool cardFlightHides(const App::CardFlight& flight,const gwent::Card& card,App::CardZone zone,int owner,int row=-1) {
   return flight.active&&flight.card.id==card.id&&flight.destination==zone&&flight.owner==owner&&
-         (zone!=App::CardZone::Board||flight.row==row);
+         ((zone!=App::CardZone::Board&&zone!=App::CardZone::Special)||flight.row==row);
 }
 bool cardFlightHides(const App& app,const gwent::Card& card,App::CardZone zone,int owner,int row=-1) {
   if(cardFlightHides(app.cardFlight,card,zone,owner,row))return true;
@@ -346,7 +353,8 @@ bool sourceWaitsForRowPlacementAudio(const gwent::Card& card,const gwent::Game& 
   const auto hasAbility=[&](const char* key) {
     return std::find(card.abilities.begin(),card.abilities.end(),key)!=card.abilities.end();
   };
-  const int row=static_cast<int>(targetRow);
+  const auto placedRow=card.agile&&(targetRow==gwent::Row::Melee||targetRow==gwent::Row::Ranged)?targetRow:card.row;
+  const int row=static_cast<int>(placedRow);
   const bool rowHasMardroeme=row>=0&&row<3&&before.players[player].mardroeme[static_cast<std::size_t>(row)];
   return card.kind==gwent::Kind::Unit&&
     !card.spy&&!hasAbility("spy")&&!hasAbility("vildkarrl")&&
@@ -411,7 +419,9 @@ void queueCardTransitionFlights(App& app,const gwent::Game& before,const gwent::
       startsAt=previewEnd+SOURCE_ABILITY_ANIMATION_MS;
     else if(played.medic&&oldLocation.zone==App::CardZone::Grave&&current->zone==App::CardZone::Board)
       startsAt=placedEffectsStart+SOURCE_ABILITY_ANIMATION_MS;
-    else if(played.muster&&oldLocation.owner==player&&current->zone==App::CardZone::Board&&oldLocation.card.id!=played.id)
+    else if(played.muster&&!played.group.empty()&&oldLocation.owner==player&&
+            (oldLocation.zone==App::CardZone::Hand||oldLocation.zone==App::CardZone::Deck)&&
+            oldLocation.card.name.rfind(played.group,0)==0&&current->zone==App::CardZone::Board&&oldLocation.card.id!=played.id)
       startsAt=placedEffectsStart+SOURCE_ABILITY_ANIMATION_MS;
     else if(played.spy&&oldLocation.zone==App::CardZone::Deck&&current->zone==App::CardZone::Hand)
       startsAt=cardArrival+SOURCE_ABILITY_ANIMATION_MS;
@@ -773,7 +783,8 @@ void playCardSound(App& a,const gwent::Card& card,const gwent::Game& before,int 
     return;
   }
 
-  const int row=static_cast<int>(targetRow);
+  const auto placedRow=card.agile&&(targetRow==gwent::Row::Melee||targetRow==gwent::Row::Ranged)?targetRow:card.row;
+  const int row=static_cast<int>(placedRow);
   const bool rowHasMardroeme=row>=0&&row<3&&before.players[player].mardroeme[static_cast<std::size_t>(row)];
   const int transformedCount=row>=0&&row<3?static_cast<int>(std::count_if(
     before.players[player].board[static_cast<std::size_t>(row)].begin(),
@@ -793,8 +804,8 @@ void playCardSound(App& a,const gwent::Card& card,const gwent::Game& before,int 
     if(berserker&&rowHasMardroeme)a.scheduledSounds.push_back({"mardroeme",arrivalAt});
     return;
   }
-  const char* placement=card.hero?"hero":targetRow==gwent::Row::Ranged?"common_ranged":
-    targetRow==gwent::Row::Siege?"common_siege":"common_close";
+  const char* placement=card.hero?"hero":placedRow==gwent::Row::Ranged?"common_ranged":
+    placedRow==gwent::Row::Siege?"common_siege":"common_close";
   a.scheduledSounds.push_back({placement,arrivalAt});
 
   // A unit card carrying Mardroeme (Ermion) still gets its ordinary row
@@ -1115,7 +1126,7 @@ void animatePlayedCard(App& a,const gwent::Card& card,int player,int handIndex,i
     const int first=std::clamp(handIndex-5,0,std::max(0,handSizeBefore-11));
     flight.fromX=194+(handIndex-first)*29;flight.fromY=277;
   } else { flight.fromX=292;flight.fromY=20; }
-  bool found=false;
+  bool found=false,specialTarget=false;
   for(int owner=0;owner<2&&!found;++owner)for(int row=0;row<3&&!found;++row) {
     const auto& cards=a.game.players[owner].board[row];
     const auto it=std::find_if(cards.begin(),cards.end(),[&](const gwent::Card& item){return item.id==card.id;});
@@ -1129,17 +1140,18 @@ void animatePlayedCard(App& a,const gwent::Card& card,int player,int handIndex,i
     const auto it=std::find_if(a.game.weatherCards.begin(),a.game.weatherCards.end(),[&](const gwent::ActiveWeather& item){return item.card.id==card.id;});
     if(it!=a.game.weatherCards.end()) {
       const int index=static_cast<int>(it-a.game.weatherCards.begin());
-      flight.owner=it->owner;flight.row=-1;flight.toX=47+index*29;flight.toY=149;found=true;
-    } else if(card.kind==gwent::Kind::CommanderHorn) {
-      // Source places Commander's Horn in its row's special slot. In this
-      // renderer that slot is represented by the horn marker at row's left.
-      int targetRow=player==0?a.rowIndex:0;
-      if(player==1)for(int row=0;row<3;++row)if(a.game.horn[player][row]){targetRow=row;break;}
-      flight.owner=player;flight.row=targetRow;flight.toX=190;flight.toY=player==0?143+targetRow*45:5+(2-targetRow)*45;found=true;
+      flight.owner=it->owner;flight.row=-1;flight.toX=sourceWeatherCardX(index);flight.toY=149;found=true;
+    } else if(card.kind==gwent::Kind::CommanderHorn||card.kind==gwent::Kind::Mardroeme) {
+      for(int owner=0;owner<2&&!found;++owner)for(int row=0;row<3&&!found;++row) {
+        if(a.game.players[owner].specialCards[static_cast<std::size_t>(row)].id!=card.id)continue;
+        flight.owner=owner;flight.row=row;flight.toX=190;
+        flight.toY=owner==0?143+row*45:5+(2-row)*45;found=true;specialTarget=true;
+      }
     }
   }
   if(found) {
-    flight.destination=flight.row==-1?App::CardZone::Weather:App::CardZone::Board;
+    flight.destination=specialTarget?App::CardZone::Special:
+      flight.row==-1?App::CardZone::Weather:App::CardZone::Board;
     flight.active=true;flight.startedAt=SDL_GetTicks()+SOURCE_CARD_PREVIEW_MS;a.cardFlight=std::move(flight);
     // Source Card.animate() attaches the matching anim_<ability> artwork to
     // the card: 50 ms setup, 300 ms fade in, 1000 ms hold, 300 ms fade out.
@@ -1485,7 +1497,10 @@ void drawRow(SDL_Renderer* r,const App& a,int owner,int row,int y) {
   // The source row score occupies a centered 5.1% column; high-score laurels
   // belong to the overall score medallion, not to every populated row.
   rowScoreText(r,left,y,std::to_string(total));
-  if(a.game.horn[owner][row])drawImage(r,a,"img/icons/power_horn.png",left+20,y+8,27,28);
+  const auto& special=a.game.players[owner].specialCards[static_cast<std::size_t>(row)];
+  if(!special.id.empty()) {
+    if(!cardFlightHides(a,special,App::CardZone::Special,owner,row))drawSourceCard(r,a,190,y,special);
+  } else if(a.game.horn[owner][row])drawImage(r,a,"img/icons/power_horn.png",left+20,y+8,27,28);
   const auto& cards=a.game.players[owner].board[row];
   const auto geometry=currentRowGeometry(a.rowLayouts[owner][row],cards.size(),SDL_GetTicks());
   for(std::size_t i=0;i<cards.size();++i) {
@@ -1704,11 +1719,10 @@ void drawMatch(SDL_Renderer* r,const App& a) {
   // with a 4% inset. At the reference 640x360 stage that maps to ~45px rows.
   for(int i=0;i<3;++i)drawRow(r,a,1,2-i,5+i*45);
   for(int i=0;i<3;++i)drawRow(r,a,0,i,143+i*45);
-  int weatherX=47;
-  for(const auto& active:a.game.weatherCards) {
-    if(weatherX>133)break;
-    if(!cardFlightHides(a,active.card,App::CardZone::Weather,active.owner))drawSourceCard(r,a,weatherX,149,active.card);
-    weatherX+=29;
+  for(int index=0;index<static_cast<int>(a.game.weatherCards.size());++index) {
+    const auto& active=a.game.weatherCards[static_cast<std::size_t>(index)];
+    if(!cardFlightHides(a,active.card,App::CardZone::Weather,active.owner))
+      drawSourceCard(r,a,sourceWeatherCardX(index),149,active.card);
   }
   const auto drawPile=[&](int owner,bool grave,int y) {
     const auto& pile=grave?a.game.players[owner].graveyard:a.game.players[owner].deck;
@@ -2608,6 +2622,19 @@ int main(int argc,char** argv) {
          !actionAnimationLocked(timingProbe,lockUntil)&&timingProbe.handIndex==0&&
          static_cast<Sint32>(lockUntil-(timingProbe.cardEffects.front().startedAt+
            timingProbe.cardEffects.front().duration+600))>=0;
+    App fixedRowSoundProbe;gwent::Card rangedSound;rangedSound.id="fixed-row-ranged-sound";
+    rangedSound.kind=gwent::Kind::Unit;rangedSound.row=gwent::Row::Ranged;
+    playCardSound(fixedRowSoundProbe,rangedSound,gwent::Game{},0,gwent::Row::None);
+    okay=okay&&fixedRowSoundProbe.scheduledSounds.size()==1&&
+         fixedRowSoundProbe.scheduledSounds.front().key=="common_ranged";
+    gwent::Game weatherBefore;weatherBefore.weatherCards.resize(4);
+    weatherBefore.weatherCards[3].card.id="weather-slot-four";
+    const auto weatherLocations=cardLocations(weatherBefore);
+    const auto fourthWeather=std::find_if(weatherLocations.begin(),weatherLocations.end(),[](const CardLocation& location) {
+      return location.card.id=="weather-slot-four";
+    });
+    okay=okay&&sourceWeatherCardX(3)==134&&fourthWeather!=weatherLocations.end()&&
+         cardLocationPosition(*fourthWeather).first==134;
     App weatherLockProbe;gwent::Card frostTiming;frostTiming.id="source-timing-frost";
     frostTiming.kind=gwent::Kind::Weather;frostTiming.abilities={"frost"};
     weatherLockProbe.cardFlight.active=true;weatherLockProbe.cardFlight.destination=App::CardZone::Weather;

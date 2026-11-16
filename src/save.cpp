@@ -15,7 +15,7 @@
 namespace gwent {
 namespace {
 constexpr std::array<std::uint8_t,8> kMagic{{'G','W','N','T','M','Y','S','V'}};
-constexpr std::uint32_t kVersion=4;
+constexpr std::uint32_t kVersion=5;
 constexpr std::size_t kMaxSaveBytes=4*1024*1024;
 constexpr std::uint32_t kMaxItems=4096;
 constexpr std::uint32_t kMaxString=8192;
@@ -75,6 +75,7 @@ void writePlayer(Writer& w,const Player& p){
   const bool values[]={p.passed,p.mulliganDone,p.leaderAbilityAvailable,p.leaderAbilityCancelled,p.leaderPassivesApplied,p.halfWeather,p.doubleSpyPower,p.mardroeme[0],p.mardroeme[1],p.mardroeme[2],p.specialOccupied[0],p.specialOccupied[1],p.specialOccupied[2]};
   std::uint16_t flags=0;for(unsigned i=0;i<13;++i)if(values[i])flags|=static_cast<std::uint16_t>(1u<<i);w.u32(flags);
   w.i32(p.score);w.i32(p.roundWins);w.i32(p.roundLosses);enumWrite(w,p.faction);
+  for(const auto& card:p.specialCards)writeCard(w,card);
 }
 bool readPlayer(Reader& r,Player& p,std::uint32_t version){
   if(!readCards(r,p.deck)||!readCards(r,p.hand)||!readCards(r,p.graveyard))return false;for(auto& row:p.board)if(!readCards(r,row))return false;
@@ -84,6 +85,7 @@ bool readPlayer(Reader& r,Player& p,std::uint32_t version){
   if(version>=3)for(unsigned row=0;row<3;++row)p.mardroeme[row]=(flags&(1u<<(7+row)))!=0;
   if(version>=4)for(unsigned row=0;row<3;++row)p.specialOccupied[row]=(flags&(1u<<(10+row)))!=0;
   p.score=r.i32();p.roundWins=r.i32();p.roundLosses=r.i32();enumRead(r,p.faction,static_cast<std::uint8_t>(Faction::Neutral));
+  if(version>=5)for(auto& card:p.specialCards)if(!readCard(r,card))return false;
   return r.good&&p.roundWins>=0&&p.roundLosses>=0&&p.roundWins<=2&&p.roundLosses<=2;
 }
 void encodeGame(Writer& w,const Game& g){

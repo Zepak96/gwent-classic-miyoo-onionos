@@ -468,7 +468,8 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
       clearWeather(g); p.graveyard.push_back(c); break;
     case Kind::Mardroeme:
       p.specialOccupied[rowIndex(target)]=true; p.mardroeme[rowIndex(target)]=true;
-      transformBerserkers(p, rowIndex(target)); p.graveyard.push_back(c); break;
+      p.specialCards[rowIndex(target)]=c;
+      transformBerserkers(p, rowIndex(target)); break;
     case Kind::Scorch: {
       int strongest = -1;
       std::array<std::array<std::vector<int>, 3>, 2> remove;
@@ -491,7 +492,8 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
       p.graveyard.push_back(c); break;
     }
     case Kind::CommanderHorn:
-      p.specialOccupied[rowIndex(target)]=true; g.horn[who][rowIndex(target)] = true; p.graveyard.push_back(c); break;
+      p.specialOccupied[rowIndex(target)]=true;g.horn[who][rowIndex(target)]=true;
+      p.specialCards[rowIndex(target)]=c;break;
     case Kind::Decoy: {
       Card returned=*boardTarget;
       returned.power=sourceBasePower(returned); // Row.removeCard() resets transformed cards before returning them.
@@ -697,6 +699,10 @@ bool startNextRound(Game& g) {
     player.passed = false;
     player.mardroeme.fill(false);
     player.specialOccupied.fill(false);
+    for(auto& special:player.specialCards)if(!special.id.empty()) {
+      player.graveyard.push_back(std::move(special));
+      special=Card{};
+    }
     // Monsters keep one random unit from their side; all other units go to their owner's graveyard.
     int keepRow = -1, keepIndex = -1;
     if (player.faction == Faction::Monsters) {
