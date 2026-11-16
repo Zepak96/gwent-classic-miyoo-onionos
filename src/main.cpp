@@ -175,7 +175,7 @@ void powerBadgeNumber(SDL_Renderer* r,int x,int y,int width,int height,const std
   draw(0,0,Color{255,247,225,255});
 }
 
-enum class Screen { DeckBuilder, Match };
+enum class Screen { DeckBuilder, Match, MainMenu };
 enum class Language { Polish, English };
 constexpr Uint32 SOURCE_CARD_PREVIEW_MS=1000;
 constexpr Uint32 SOURCE_CARD_FLIGHT_MS=499;
@@ -208,6 +208,8 @@ struct App {
     Uint32 startedAt{0};
   };
   Screen screen{Screen::DeckBuilder};
+  bool mainMenuEnabled{false};
+  int menuIndex{0};
   Language language{Language::Polish};
   std::size_t deckIndex{0};
   int deckSlot{1};
@@ -1724,6 +1726,31 @@ std::vector<const gwent::Card*> editorLeaders(const App& a) {
   for(const auto& card:gwent::referenceCardCatalog())if(card.kind==gwent::Kind::Leader&&card.faction==a.editDeck.faction)leaders.push_back(&card);
   return leaders;
 }
+void drawMainMenu(SDL_Renderer* r,const App& a) {
+  drawImage(r,a,"img/menu/woodland-shrine-v1.png",0,0,W,H);
+  box(r,0,0,W,70,Color{0,0,0,110});
+  centeredTextInBox(r,30,16,W-60,24,"GWENT CLASSIC",gold,2);
+  centeredTextInBox(r,30,45,W-60,16,"MIYOO MINI PLUS",paper,1);
+  const bool pl=a.language==Language::Polish;
+  const char* names[]={"Geralt of Rivia","Cirilla Fiona Elen Riannon","Yennefer of Vengerberg"};
+  const char* labelsPL[]={"GRA KLASYCZNA","MOJE TALIE","WZNOW PARTIE"};
+  const char* labelsEN[]={"CLASSIC MATCH","MY DECKS","RESUME MATCH"};
+  for(int i=0;i<3;++i) {
+    const bool selected=a.menuIndex==i;
+    const int x=48+i*186,y=selected?104:118,w=172,h=selected?272:248;
+    box(r,x-4,y-4,w+8,h+8,selected?Color{27,139,151,200}:Color{10,9,7,230});
+    const auto& catalog=gwent::referenceCardCatalog();
+    const auto card=std::find_if(catalog.begin(),catalog.end(),[&](const auto& c){return c.name==names[i];});
+    if(card!=catalog.end())drawCardPortrait(r,a,"img/lg/"+gwent::referenceCardImage(card->referenceIndex),x,y,w,h-44);
+    box(r,x,y+h-44,w,44,Color{13,10,8,245});
+    frame(r,x,y,w,h,selected?Color{107,243,244,255}:gold);
+    centeredTextInBox(r,x+4,y+h-38,w-8,31,pl?labelsPL[i]:labelsEN[i],paper,1);
+  }
+  box(r,22,402,W-44,57,Color{0,0,0,180});
+  centeredTextInBox(r,28,412,W-56,18,pl?"LEWO/PRAWO: WYBOR   B: POTWIERDZ":"LEFT/RIGHT: SELECT   B: CONFIRM",paper,1);
+  centeredTextInBox(r,28,434,W-56,16,a.status.empty()?(pl?"A: WYJSCIE":"A: EXIT"):a.status,gold,1);
+}
+
 void drawDeckBuilder(SDL_Renderer* r,const App& a) {
   const bool pl=a.language==Language::Polish;
   drawImage(r,a,"img/board.jpg",0,0,W,STAGE_H);
@@ -2408,6 +2435,17 @@ void handleMatchKey(App& a,SDL_Keycode key) {
   else if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x) beginHumanPlayConfirmation(a);
 }
 void handleKey(App& a,SDL_Keycode key,bool& running) {
+  if(a.screen==Screen::MainMenu) {
+    if(key==SDLK_LEFT||key==SDLK_UP)a.menuIndex=(a.menuIndex+2)%3;
+    else if(key==SDLK_RIGHT||key==SDLK_DOWN)a.menuIndex=(a.menuIndex+1)%3;
+    else if(key==SDLK_AC_BACK||key==SDLK_RETURN||key==SDLK_KP_ENTER) {
+      a.status.clear();a.audio.play("ui_card");
+      if(a.menuIndex==0)startMatch(a);
+      else if(a.menuIndex==1)a.screen=Screen::DeckBuilder;
+      else loadSavedMatch(a);
+    } else if(key==SDLK_x||key==SDLK_ESCAPE||key==SDLK_HOME)running=false;
+    return;
+  }
   if(key==SDLK_HOME) {
     if(a.screen==Screen::Match)saveCurrentMatch(a);
     running=false;return;
@@ -2424,7 +2462,7 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
   if(key==SDLK_m) { a.musicEnabled=!a.musicEnabled;a.audio.setMusicEnabled(a.musicEnabled);saveSettings(a);return; }
   if(key==SDLK_n) { a.notificationsEnabled=!a.notificationsEnabled;saveSettings(a);return; }
   if(a.screen==Screen::DeckBuilder) {
-    if(key==SDLK_ESCAPE) { running=false;return; }
+    if(key==SDLK_ESCAPE) { if(a.mainMenuEnabled)a.screen=Screen::MainMenu;else running=false;return; }
     if(key==SDLK_AC_BACK) {
       if(a.editingLeader) {
         a.editDeck.leaderReferenceIndex=a.leaderSelectionOriginalReference;
@@ -3447,6 +3485,7 @@ int main(int argc,char** argv) {
     for(auto& image:app.textures)if(image.second)SDL_DestroyTexture(image.second);
     app.audio.shutdown();destroyRenderers(); SDL_DestroyWindow(window); SDL_Quit(); return 0;
   }
+  app.mainMenuEnabled=true;app.screen=Screen::MainMenu;app.status.clear();
   auto observedPhase=app.game.phase;
   int observedRound=app.game.round;
   int observedCurrentPlayer=app.game.currentPlayer;
@@ -3544,7 +3583,8 @@ int main(int argc,char** argv) {
        app.game.phase==gwent::Phase::OpponentTurn&&!actionAnimationLocked(app,now)&&SDL_GetTicks()>=app.aiAt)performAi(app);
     app.audio.playMusic(app.screen==Screen::Match?"match":"menu");
     SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);
-    if(app.screen==Screen::DeckBuilder)drawDeckBuilder(renderer,app);
+    if(app.screen==Screen::MainMenu)drawMainMenu(renderer,app);
+    else if(app.screen==Screen::DeckBuilder)drawDeckBuilder(renderer,app);
     else drawMatchOnScreen(renderer,app);
     presentFrame(); SDL_Delay(8);
   }
