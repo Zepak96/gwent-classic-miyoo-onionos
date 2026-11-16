@@ -137,6 +137,11 @@ items above:
   of the full English name and resolves the accented source key for Eredin
   Bréacc Glas's Treacherous card. Catalog validation locks both mappings;
   full Polish title/ability/UI review is still open.
+- Crach an Craite now returns graveyard cards using the source Deck's random
+  insertion operation, preserving the existing deck when a graveyard is empty
+  instead of shuffling all remaining cards. Seeded regressions cover both
+  players' added cards and the empty-grave case; source animation and exact
+  asynchronous random interleaving remain outside this engine-state check.
 - Emhyr White Flame's source initialization suppresses both players' leader
   initialization when either side uses it, including passive Invader,
   Treacherous, Daisy, and King Bran effects; each passive suppression case now

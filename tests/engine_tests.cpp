@@ -863,10 +863,42 @@ static void leaderAbilities() {
 
   Game crach;
   crach.players[0].leader=leader("crach_an_craite"); crach.players[0].leaderAbilityAvailable=true;
-  crach.players[0].graveyard.push_back(unit("own-grave",1));
-  crach.players[1].graveyard.push_back(unit("enemy-grave",1));
+  crach.rngState=0x12345678;
+  for(int owner=0;owner<2;++owner) {
+    auto& player=crach.players[owner];
+    for(int i=0;i<5;++i)player.deck.push_back(unit("crach-deck-"+std::to_string(owner)+"-"+std::to_string(i),i+1));
+    for(int i=0;i<3;++i)player.graveyard.push_back(unit("crach-grave-"+std::to_string(owner)+"-"+std::to_string(i),i+1));
+  }
+  auto expectedRandomState=crach.rngState;
+  auto nextExpected=[&]() {
+    auto x=static_cast<std::uint32_t>(expectedRandomState);
+    x^=x<<13;x^=x>>17;x^=x<<5;expectedRandomState=x;return x;
+  };
+  std::array<std::vector<std::string>,2> expectedDecks;
+  for(int owner=0;owner<2;++owner) {
+    auto& expected=expectedDecks[owner];
+    for(const auto& card:crach.players[owner].deck)expected.push_back(card.id);
+    for(const auto& card:crach.players[owner].graveyard) {
+      expected.push_back(card.id);
+      const auto index=nextExpected()%expected.size();
+      std::swap(expected[index],expected.back());
+    }
+  }
   assert(activateLeader(crach,0));
-  assert(crach.players[0].deck.size()==1 && crach.players[1].deck.size()==1);
+  for(int owner=0;owner<2;++owner) {
+    assert(crach.players[owner].deck.size()==expectedDecks[owner].size());
+    for(std::size_t i=0;i<expectedDecks[owner].size();++i)assert(crach.players[owner].deck[i].id==expectedDecks[owner][i]);
+  }
   assert(crach.players[0].graveyard.empty() && crach.players[1].graveyard.empty());
+
+  Game emptyCrach;
+  emptyCrach.players[0].leader=leader("crach_an_craite");emptyCrach.players[0].leaderAbilityAvailable=true;
+  for(int owner=0;owner<2;++owner)
+    for(int i=0;i<5;++i)emptyCrach.players[owner].deck.push_back(unit("empty-crach-"+std::to_string(owner)+"-"+std::to_string(i),i+1));
+  std::array<std::vector<std::string>,2> untouchedDecks;
+  for(int owner=0;owner<2;++owner)for(const auto& card:emptyCrach.players[owner].deck)untouchedDecks[owner].push_back(card.id);
+  assert(activateLeader(emptyCrach,0));
+  for(int owner=0;owner<2;++owner)
+    for(std::size_t i=0;i<untouchedDecks[owner].size();++i)assert(emptyCrach.players[owner].deck[i].id==untouchedDecks[owner][i]);
 }
 int main() { scoreRules(); duplicateWeatherIsDiscarded(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }

@@ -27,6 +27,11 @@ void shuffleDeck(Game& g, std::vector<Card>& deck) {
     std::swap(deck[n - 1], deck[other]);
   }
 }
+void addCardRandom(Game& g,std::vector<Card>& deck,const Card& card) {
+  deck.push_back(card);
+  const std::size_t index=nextRandom(g)%deck.size();
+  std::swap(deck[index],deck.back());
+}
 int cardPower(const Card& c, const std::vector<Card>& row, bool weather, bool horn,
               bool halfWeather = false, bool doubleSpyPower = false) {
   if (c.hero) return c.power; // Heroes ignore all row effects.
@@ -564,7 +569,13 @@ bool activateLeader(Game& g, int who, Row target, const std::vector<std::string>
   }
   else if (id=="francesca_daisy" || id=="king_bran") canActivate=false;
   else if (id=="crach_an_craite") {
-    for(auto& p:g.players) { p.deck.insert(p.deck.end(),p.graveyard.begin(),p.graveyard.end()); p.graveyard.clear(); shuffleDeck(g,p.deck); }
+    // Source Board.toDeck() calls Deck.addCardRandom() for each grave card.
+    // This leaves the deck untouched when a grave is empty and randomizes
+    // each returned card as it is added instead of reshuffling the whole deck.
+    for(auto& p:g.players) {
+      for(const auto& card:p.graveyard)addCardRandom(g,p.deck,card);
+      p.graveyard.clear();
+    }
   } else canActivate=false;
 
   if (!canActivate) return false;
