@@ -2186,11 +2186,14 @@ SDL_Keycode normalizeMiyooKey(const App& app,SDL_Keycode key) {
 }
 
 int main(int argc,char** argv) {
-  if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO|SDL_INIT_EVENTS|SDL_INIT_TIMER|SDL_INIT_GAMECONTROLLER)!=0)return 1;
+  if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO|SDL_INIT_EVENTS|SDL_INIT_TIMER|SDL_INIT_GAMECONTROLLER)!=0) {
+    std::cerr<<"Startup failed in SDL_Init: "<<SDL_GetError()<<"\n";
+    return 1;
+  }
   SDL_GameControllerEventState(SDL_ENABLE);
   for(int index=0;index<SDL_NumJoysticks();++index)if(SDL_IsGameController(index))SDL_GameControllerOpen(index);
   SDL_Window* window=SDL_CreateWindow("Gwent Classic - Witcher 3",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,W,H,SDL_WINDOW_SHOWN);
-  if(!window){SDL_Quit();return 2;}
+  if(!window){std::cerr<<"Startup failed in SDL_CreateWindow: "<<SDL_GetError()<<"\n";SDL_Quit();return 2;}
   SDL_Renderer* presentationRenderer=SDL_CreateRenderer(window,-1,SDL_RENDERER_ACCELERATED|SDL_RENDERER_PRESENTVSYNC);
   if(!presentationRenderer)presentationRenderer=SDL_CreateRenderer(window,-1,SDL_RENDERER_SOFTWARE);
   if(!presentationRenderer){std::cerr<<"Could not create SDL renderer: "<<SDL_GetError()<<"\n";SDL_DestroyWindow(window);SDL_Quit();return 3;}
