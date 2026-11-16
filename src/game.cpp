@@ -22,10 +22,43 @@ bool hasAbility(const Card& card, const std::string& ability) {
   return std::find(card.abilities.begin(), card.abilities.end(), ability) != card.abilities.end();
 }
 void shuffleDeck(Game& g, std::vector<Card>& deck) {
-  for (std::size_t n = deck.size(); n > 1; --n) {
-    const std::size_t other = nextRandom(g) % n;
-    std::swap(deck[n - 1], deck[other]);
+  // Deck.initialize() builds the reference deck by inserting each card at a
+  // random position. Keep that order and RNG consumption instead of applying
+  // a conventional Fisher-Yates shuffle after the entire vector is built.
+  std::vector<Card> source=std::move(deck);
+  deck.clear();
+  deck.reserve(source.size());
+  for(auto& card:source) {
+    deck.push_back(std::move(card));
+    const std::size_t index=nextRandom(g)%deck.size();
+    std::swap(deck[index],deck.back());
   }
+}
+void addCardRandom(Game& g,std::vector<Card>& deck,const Card& card) {
+  deck.push_back(card);
+  const std::size_t index=nextRandom(g)%deck.size();
+  std::swap(deck[index],deck.back());
+}
+int sourceHandFactionRank(const Card& card) {
+  if(card.kind==Kind::Weather)return -1;
+  if(card.kind==Kind::ClearWeather||card.kind==Kind::Decoy||card.kind==Kind::Scorch||
+     card.kind==Kind::CommanderHorn||card.kind==Kind::Mardroeme)return -2;
+  return 0;
+}
+int sourceBasePower(const Card& card) {
+  if(card.referenceIndex>=0) {
+    const auto& catalog=referenceCardCatalog();
+    const auto found=std::find_if(catalog.begin(),catalog.end(),[&](const Card& item){return item.referenceIndex==card.referenceIndex;});
+    if(found!=catalog.end())return found->power;
+  }
+  return card.power;
+}
+bool sourceHandCardBefore(const Card& left,const Card& right) {
+  const int leftRank=sourceHandFactionRank(left),rightRank=sourceHandFactionRank(right);
+  if(leftRank!=rightRank)return leftRank<rightRank;
+  const int leftPower=sourceBasePower(left),rightPower=sourceBasePower(right);
+  if(leftPower!=rightPower)return leftPower<rightPower;
+  return left.name<right.name;
 }
 int cardPower(const Card& c, const std::vector<Card>& row, bool weather, bool horn,
               bool halfWeather = false, bool doubleSpyPower = false) {
@@ -33,13 +66,12 @@ int cardPower(const Card& c, const std::vector<Card>& row, bool weather, bool ho
   const int weatherFloor = halfWeather ? c.power / 2 : 1;
   int power = weather ? std::min(c.power, weatherFloor) : c.power;
   if (doubleSpyPower && c.spy) power *= 2;
-  if (c.bond) {
-    // Tight Bond is a binary multiplier: two or more cards with the same
-    // printed name double each other's strength. Extra copies do not turn
-    // this into x3/x4, and catalog grouping metadata is not part of the rule.
-    const auto copies = std::count_if(row.begin(), row.end(), [&](const Card& x) { return x.name == c.name; });
-    if (copies > 1) power *= 2;
-  }
+  // Source Row.updateState() counts Bond-bearing cards by printed name;
+  // Row.calcCardScore() multiplies every card with that name by that count.
+  const auto bondCount = std::count_if(row.begin(), row.end(), [&](const Card& x) {
+    return x.name == c.name && (x.bond || hasAbility(x, "bond"));
+  });
+  if (bondCount > 1) power *= static_cast<int>(bondCount);
   const int moraleCount = static_cast<int>(std::count_if(row.begin(), row.end(), [](const Card& x) { return x.morale || hasAbility(x, "morale"); }));
   power += std::max(0, moraleCount - ((c.morale || hasAbility(c, "morale")) ? 1 : 0));
   const int hornSources = static_cast<int>(horn) + static_cast<int>(std::count_if(row.begin(), row.end(), [](const Card& x) { return hasAbility(x, "horn"); }));
@@ -94,13 +126,21 @@ void triggerAvenger(Game& g, int owner, const Card& removed) {
   if(summoned==catalog.end()) return;
   Card unit=*summoned;
   unit.id="summoned_"+removed.id;
-  g.players[owner].board[rowIndex(unit.row)].push_back(std::move(unit));
+  auto& row=g.players[owner].board[rowIndex(unit.row)];
+  const auto insertion=std::upper_bound(row.begin(),row.end(),unit,sourceHandCardBefore);
+  row.insert(insertion,std::move(unit));
 }
 void removeBoardCard(Game& g, int owner, int row, int index) {
   auto& cards=g.players[owner].board[row];
   Card removed=cards[index];
   cards.erase(cards.begin()+index);
-  g.players[owner].graveyard.push_back(removed);
+  // Avenger tokens (Bovine Defense Force / Hemdall) schedule their own
+  // removal from the graveyard 1001 ms after they are destroyed in the
+  // reference game. The native rules engine resolves actions atomically, so
+  // omit these generated-only cards from the graveyard rather than exposing
+  // a token that Medic could revive on a later turn.
+  const bool temporaryAvengerToken=removed.id.rfind("summoned_",0)==0;
+  if(!temporaryAvengerToken)g.players[owner].graveyard.push_back(removed);
   triggerAvenger(g,owner,removed);
 }
 void finishRound(Game& g) {
@@ -134,6 +174,20 @@ void endTurn(Game& g) {
   g.currentPlayer = g.players[other].passed ? acted : other;
   g.phase = g.currentPlayer == 0 ? Phase::PlayerTurn : Phase::OpponentTurn;
   recompute(g);
+}
+bool canAct(const Player& player) {
+  return !player.hand.empty() || player.leaderAbilityAvailable;
+}
+void startRoundTurn(Game& g) {
+  for(auto& player:g.players)if(!canAct(player))player.passed=true;
+  if(g.players[0].passed&&g.players[1].passed){finishRound(g);return;}
+  if(g.players[g.currentPlayer].passed)g.currentPlayer=1-g.currentPlayer;
+  g.phase=g.currentPlayer==0?Phase::PlayerTurn:Phase::OpponentTurn;
+}
+void finishActionTurn(Game& g) {
+  auto& player=g.players[g.currentPlayer];
+  if(!player.passed&&!canAct(player))player.passed=true;
+  endTurn(g);
 }
 void applyMuster(Player& player, const Card& played) {
   if ((!played.muster && !hasAbility(played, "muster")) || played.group.empty()) return;
@@ -192,6 +246,19 @@ void transformBerserkers(Player& player, int rowNumber) {
 }
 }
 
+void insertSourceHandCard(Player& player,Card card,int ownerIndex,int requestedIndex) {
+  auto position=player.hand.begin();
+  if(ownerIndex==0 && (requestedIndex<0||requestedIndex==0)) {
+    position=std::upper_bound(player.hand.begin(),player.hand.end(),card,sourceHandCardBefore);
+  } else if(ownerIndex==1 && requestedIndex<0) {
+    position=player.hand.begin(); // HandAI inherits CardContainer.addCard(), whose default index is zero.
+  } else {
+    const auto index=std::clamp(requestedIndex<0?0:requestedIndex,0,static_cast<int>(player.hand.size()));
+    position=player.hand.begin()+index;
+  }
+  player.hand.insert(position,std::move(card));
+}
+
 int calculateScore(const Player& p, const std::array<bool, 3>& weather,
                    const std::array<bool, 3>& horn) {
   int total = 0;
@@ -206,23 +273,46 @@ int calculateCardPower(const Card& card, const std::vector<Card>& row, bool weat
   return cardPower(card,row,weather,horn,halfWeather,doubleSpyPower);
 }
 
-void beginMatch(Game& g, std::vector<Card> playerDeck, Faction playerFaction,
-                std::vector<Card> opponentDeck, Faction opponentFaction,
-                std::uint64_t seed, int firstPlayer) {
+namespace {
+void beginMatchImpl(Game& g,std::vector<Card> playerDeck,Faction playerFaction,
+                    std::vector<Card> opponentDeck,Faction opponentFaction,
+                    const Card* playerLeader,const Card* opponentLeader,
+                    std::uint64_t seed,int firstPlayer) {
   g = Game{};
   g.rngState = seed ? seed : 1;
-  g.firstPlayer = (firstPlayer == 0 || firstPlayer == 1) ? firstPlayer : static_cast<int>(nextRandom(g) % 2);
+  g.firstPlayer = (firstPlayer == 0 || firstPlayer == 1) ? firstPlayer : 0;
   for (int i = 0; i < 2; ++i) {
     auto& p = g.players[i];
     p.deck = i == 0 ? std::move(playerDeck) : std::move(opponentDeck);
     p.faction = i == 0 ? playerFaction : opponentFaction;
+    if(i==0&&playerLeader)p.leader=*playerLeader;
+    if(i==1&&opponentLeader)p.leader=*opponentLeader;
     shuffleDeck(g, p.deck);
-    for (int n = 0; n < 10 && !p.deck.empty(); ++n) {
-      p.hand.push_back(p.deck.back()); p.deck.pop_back();
-    }
+  }
+
+  // Game.startGame() runs initPlayers and gameStart faction/leader effects
+  // before the coin toss and before the alternating ten-card deal. In
+  // particular Francesca Daisy draws the first card before the opening deal.
+  g.phase=Phase::Mulligan;
+  resolveLeaderPassives(g);
+  const bool scoiataelChooses=(playerFaction==Faction::Scoiatael)!=(opponentFaction==Faction::Scoiatael);
+  if(firstPlayer!=0&&firstPlayer!=1&&!scoiataelChooses)
+    g.firstPlayer=static_cast<int>(nextRandom(g)%2);
+  for(int n=0;n<10;++n)for(int i=0;i<2;++i) {
+    auto& deck=g.players[i].deck;
+    if(deck.empty())continue;
+    insertSourceHandCard(g.players[i],std::move(deck.front()),i);
+    deck.erase(deck.begin());
   }
   g.currentPlayer = g.firstPlayer;
-  g.phase = Phase::Mulligan;
+}
+}
+
+void beginMatch(Game& g, std::vector<Card> playerDeck, Faction playerFaction,
+                std::vector<Card> opponentDeck, Faction opponentFaction,
+                std::uint64_t seed, int firstPlayer) {
+  beginMatchImpl(g,std::move(playerDeck),playerFaction,std::move(opponentDeck),opponentFaction,
+                 nullptr,nullptr,seed,firstPlayer);
 }
 
 bool replaceMulliganCards(Game& g, int who, const std::vector<std::string>& ids) {
@@ -237,19 +327,23 @@ bool replaceMulliganCards(Game& g, int who, const std::vector<std::string>& ids)
     if (card == player.hand.end()) return false;
     replacements.push_back(*card);
   }
-  // Validate the whole selection before changing any state.
-  for (const auto& card : replacements) {
-    auto found = findCard(player.hand, card.id);
+  // Match Deck.swap(): return one selected card through Deck.addCardRandom(),
+  // draw the deck's front card, and put it back at the same hand index before
+  // processing the next selection.
+  for (const auto& selected : replacements) {
+    auto found=findCard(player.hand,selected.id);
+    const auto handIndex=static_cast<std::size_t>(found-player.hand.begin());
+    Card discarded=*found;
     player.hand.erase(found);
-    player.deck.insert(player.deck.begin(), card);
-  }
-  for (std::size_t i = 0; i < replacements.size() && !player.deck.empty(); ++i) {
-    player.hand.push_back(player.deck.back()); player.deck.pop_back();
+    addCardRandom(g,player.deck,discarded);
+    Card drawn=std::move(player.deck.front());
+    player.deck.erase(player.deck.begin());
+    insertSourceHandCard(player,std::move(drawn),who,static_cast<int>(handIndex));
   }
   player.mulliganDone = true;
   if (g.players[0].mulliganDone && g.players[1].mulliganDone) {
     g.currentPlayer = g.firstPlayer;
-    g.phase = g.currentPlayer == 0 ? Phase::PlayerTurn : Phase::OpponentTurn;
+    startRoundTurn(g);
   }
   return true;
 }
@@ -272,7 +366,7 @@ void resolveLeaderPassives(Game& g) {
       for (auto& affected : g.players) affected.doubleSpyPower=true;
     if (hasAbility(player.leader,"king_bran")) player.halfWeather=true;
     if (hasAbility(player.leader,"francesca_daisy") && !player.deck.empty()) {
-      player.hand.push_back(player.deck.back()); player.deck.pop_back();
+      insertSourceHandCard(player,std::move(player.deck.front()),who); player.deck.erase(player.deck.begin());
     }
   }
   if(!g.factionAbilitiesInitialized) {
@@ -310,9 +404,8 @@ bool assignLeader(Game& g, int who, const Card& leader) {
 void beginMatchWithLeaders(Game& g, std::vector<Card> playerDeck, Card playerLeader,
                            std::vector<Card> opponentDeck, Card opponentLeader,
                            std::uint64_t seed, int firstPlayer) {
-  beginMatch(g,std::move(playerDeck),playerLeader.faction,std::move(opponentDeck),opponentLeader.faction,seed,firstPlayer);
-  assignLeader(g,0,playerLeader);
-  assignLeader(g,1,opponentLeader);
+  beginMatchImpl(g,std::move(playerDeck),playerLeader.faction,std::move(opponentDeck),opponentLeader.faction,
+                 &playerLeader,&opponentLeader,seed,firstPlayer);
 }
 
 bool playCard(Game& g, int who, const std::string& id, Row target, const std::string& selectedId) {
@@ -327,7 +420,8 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
   if (c.agile && (target == Row::Melee || target == Row::Ranged)) deployRow = target;
   if (c.kind == Kind::Unit && !validRow(deployRow)) return false;
   if (c.kind == Kind::CommanderHorn && !validRow(target)) return false;
-  if (c.kind == Kind::Mardroeme && !validRow(target)) return false;
+  if (c.kind == Kind::CommanderHorn && p.specialOccupied[rowIndex(target)]) return false;
+  if (c.kind == Kind::Mardroeme && (!validRow(target) || p.specialOccupied[rowIndex(target)])) return false;
   const bool typedWeather = hasAbility(c, "frost") || hasAbility(c, "fog") || hasAbility(c, "rain") || hasAbility(c, "storm");
   if (c.kind == Kind::Weather && !typedWeather && !validRow(target)) return false;
 
@@ -338,20 +432,25 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
       auto found = findCard(p.board[r], selectedId);
       if (found != p.board[r].end()) { boardTarget = found; targetRow = r; break; }
     }
-    if (selectedId.empty() || targetRow < 0 || boardTarget->kind != Kind::Unit || boardTarget->hero) return false;
+    if (selectedId.empty() || targetRow < 0 || !isCombatUnit(*boardTarget)) return false;
   }
   int medicIndex = -1;
+  int medicReviveRow = -1;
   if (c.kind == Kind::Unit && c.medic) {
     if (g.randomRespawn) {
       std::vector<int> units;
       for (int i=0;i<static_cast<int>(p.graveyard.size());++i)
-        if (p.graveyard[i].kind==Kind::Unit && !p.graveyard[i].hero) units.push_back(i);
+        if (isCombatUnit(p.graveyard[i])) units.push_back(i);
       if (!units.empty()) medicIndex=units[nextRandom(g)%units.size()];
     } else if (!selectedId.empty()) {
       const auto found=findCard(p.graveyard,selectedId);
-      if(found==p.graveyard.end() || found->kind!=Kind::Unit || found->hero) return false;
+      if(found==p.graveyard.end() || !isCombatUnit(*found)) return false;
       medicIndex=static_cast<int>(found-p.graveyard.begin());
-    } else if(std::any_of(p.graveyard.begin(),p.graveyard.end(),[](const Card& card){return card.kind==Kind::Unit && !card.hero;})) return false;
+    } else if(std::any_of(p.graveyard.begin(),p.graveyard.end(),isCombatUnit)) return false;
+    if(medicIndex>=0 && p.graveyard[static_cast<std::size_t>(medicIndex)].agile) {
+      if(target!=Row::Melee && target!=Row::Ranged)return false;
+      medicReviveRow=rowIndex(target);
+    }
   }
 
   p.hand.erase(it);
@@ -361,6 +460,7 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
     case Kind::ClearWeather:
       clearWeather(g); p.graveyard.push_back(c); break;
     case Kind::Mardroeme:
+      p.specialOccupied[rowIndex(target)]=true; p.mardroeme[rowIndex(target)]=true;
       transformBerserkers(p, rowIndex(target)); p.graveyard.push_back(c); break;
     case Kind::Scorch: {
       int strongest = -1;
@@ -384,38 +484,48 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
       p.graveyard.push_back(c); break;
     }
     case Kind::CommanderHorn:
-      if (g.horn[who][rowIndex(target)]) { p.hand.push_back(c); return false; }
-      g.horn[who][rowIndex(target)] = true; p.graveyard.push_back(c); break;
+      p.specialOccupied[rowIndex(target)]=true; g.horn[who][rowIndex(target)] = true; p.graveyard.push_back(c); break;
     case Kind::Decoy: {
-      const Card returned=*boardTarget;
-      p.hand.push_back(returned);
-      *boardTarget = c; // The zero-strength Decoy stays in the replaced unit's battlefield slot.
+      Card returned=*boardTarget;
+      returned.power=sourceBasePower(returned); // Row.removeCard() resets transformed cards before returning them.
+      auto& row=p.board[targetRow];
+      row.erase(boardTarget);
       triggerAvenger(g,who,returned);
+      insertSourceHandCard(p,std::move(returned),who);
+      const auto insertion=std::upper_bound(row.begin(),row.end(),c,sourceHandCardBefore);
+      row.insert(insertion,c); // Decoy is a zero-strength row card, sorted by its special-faction rank.
       break;
     }
     case Kind::Unit:
       if (c.spy) {
         g.players[1 - who].board[rowIndex(deployRow)].push_back(c);
-        for (int i = 0; i < 2 && !p.deck.empty(); ++i) { p.hand.push_back(p.deck.back()); p.deck.pop_back(); }
+        for (int i = 0; i < 2 && !p.deck.empty(); ++i) { insertSourceHandCard(p,std::move(p.deck.front()),who); p.deck.erase(p.deck.begin()); }
       } else p.board[rowIndex(deployRow)].push_back(c);
-      if (c.muster) applyMuster(p, c);
+      if (c.muster) {
+        applyMuster(p, c);
+        for(int row=0;row<3;++row)if(p.mardroeme[row])transformBerserkers(p,row);
+      }
       if (medicIndex >= 0) {
         const Card revived = p.graveyard[medicIndex];
         p.graveyard.erase(p.graveyard.begin()+medicIndex);
-        int reviveRow = rowIndex(revived.row);
-        if (revived.agile && !validRow(revived.row)) reviveRow = 0;
+        int reviveRow = revived.agile ? medicReviveRow : rowIndex(revived.row);
+        if (revived.agile && reviveRow < 0) reviveRow = 0;
         if (reviveRow >= 0 && reviveRow < 3) p.board[reviveRow].push_back(revived);
       }
       if (hasAbility(c, "scorch_c")) scorchEnemyRow(g, who, 0);
       if (hasAbility(c, "scorch_r")) scorchEnemyRow(g, who, 1);
       if (hasAbility(c, "scorch_s")) scorchEnemyRow(g, who, 2);
-      if (hasAbility(c, "mardroeme")) transformBerserkers(p, rowIndex(deployRow));
+      if (hasAbility(c, "mardroeme")) {
+        p.mardroeme[rowIndex(deployRow)]=true;
+        transformBerserkers(p, rowIndex(deployRow));
+      }
+      if (g.players[who].mardroeme[rowIndex(deployRow)]) transformBerserkers(g.players[who], rowIndex(deployRow));
       break;
     case Kind::Leader:
       p.hand.push_back(c);
       return false;
   }
-  endTurn(g);
+  finishActionTurn(g);
   return true;
 }
 
@@ -452,7 +562,7 @@ bool activateLeader(Game& g, int who, Row target, const std::vector<std::string>
   };
   if (id=="foltest_king") playWeatherFromDeck("Impenetrable Fog",false);
   else if (id=="foltest_lord") clearWeather(g);
-  else if (id=="foltest_siegemaster") { if(g.horn[who][2]) canActivate=false; else g.horn[who][2]=true; }
+  else if (id=="foltest_siegemaster") { if(player.specialOccupied[2]) canActivate=false; else {player.specialOccupied[2]=true;g.horn[who][2]=true;} }
   else if (id=="foltest_steelforged") scorchEnemyRow(g,who,2);
   else if (id=="foltest_son") scorchEnemyRow(g,who,1);
   else if (id=="emhyr_imperial") playWeatherFromDeck("Torrential Rain",false);
@@ -469,36 +579,51 @@ bool activateLeader(Game& g, int who, Row target, const std::vector<std::string>
   else if (id=="emhyr_relentless") {
     auto& grave=g.players[1-who].graveyard;
     auto found=selected.empty()?grave.end():findCard(grave,selected);
-    if(found==grave.end() || found->kind!=Kind::Unit) canActivate=false;
-    else { player.hand.push_back(*found); grave.erase(found); }
+    if(found==grave.end() || !isCombatUnit(*found)) canActivate=false;
+    else { insertSourceHandCard(player,*found,who); grave.erase(found); }
   }
   else if (id=="emhyr_whiteflame" || id=="emhyr_invader" || id=="eredin_treacherous" || id=="francesca_daisy" || id=="king_bran") canActivate=false;
-  else if (id=="eredin_commander") { if(g.horn[who][0]) canActivate=false; else g.horn[who][0]=true; }
+  else if (id=="eredin_commander") { if(player.specialOccupied[0]) canActivate=false; else {player.specialOccupied[0]=true;g.horn[who][0]=true;} }
   else if (id=="eredin_bringer_of_death") {
     auto& grave=player.graveyard;
     auto found=selected.empty()?grave.end():findCard(grave,selected);
-    if(found==grave.end() || found->kind!=Kind::Unit) canActivate=false;
-    else { player.hand.push_back(*found); grave.erase(found); }
+    if(found==grave.end() || !isCombatUnit(*found)) canActivate=false;
+    else { insertSourceHandCard(player,*found,who); grave.erase(found); }
   }
   else if (id=="eredin_destroyer") {
-    if(player.hand.size()<2 || player.deck.empty()) canActivate=false;
-    else {
-      std::vector<std::string> discardIds;
-      if(selectedIds.size()>=3) discardIds={selectedIds[0],selectedIds[1]};
-      else canActivate=false;
+    std::vector<std::string> discardIds;
+    std::string drawId;
+    for(const auto& selectedId:selectedIds) {
+      const auto inHand=findCard(player.hand,selectedId);
+      const auto inDeck=findCard(player.deck,selectedId);
+      if(inHand!=player.hand.end() && discardIds.size()<2 && drawId.empty())
+        discardIds.push_back(selectedId);
+      else if(inDeck!=player.deck.end() && drawId.empty())
+        drawId=selectedId;
+      else { canActivate=false; break; }
+    }
+    const std::size_t requiredDiscards=std::min<std::size_t>(2,player.hand.size());
+    if(discardIds.size()!=requiredDiscards || (selectedIds.empty() && requiredDiscards>0))
+      canActivate=false;
+    if(canActivate) {
+      std::vector<Card> discarded;
+      for(const auto& discardId:discardIds) {
+        auto found=findCard(player.hand,discardId);
+        if(found==player.hand.end()) { canActivate=false; break; }
+        discarded.push_back(*found);
+      }
+      auto draw=drawId.empty()?player.deck.end():findCard(player.deck,drawId);
+      if(!drawId.empty() && draw==player.deck.end())canActivate=false;
       if(canActivate) {
-        auto first=findCard(player.hand,discardIds[0]); auto second=findCard(player.hand,discardIds[1]);
-        if(first==player.hand.end() || second==player.hand.end() || first==second) canActivate=false;
-        else {
-          auto draw=findCard(player.deck,selectedIds[2]);
-          if(draw==player.deck.end()) canActivate=false;
-          else {
-            Card a=*first, b=*second;
-            Card drawn=*draw;
-            player.hand.erase(std::remove_if(player.hand.begin(),player.hand.end(),[&](const Card& c){return c.id==a.id||c.id==b.id;}),player.hand.end());
-            player.graveyard.push_back(a); player.graveyard.push_back(b);
-            player.hand.push_back(std::move(drawn)); player.deck.erase(draw);
-          }
+        for(const auto& card:discarded) {
+          auto found=findCard(player.hand,card.id);
+          player.hand.erase(found);
+          player.graveyard.push_back(card);
+        }
+        if(draw!=player.deck.end()) {
+          Card drawn=*draw;
+          insertSourceHandCard(player,std::move(drawn),who);
+          player.deck.erase(draw);
         }
       }
     }
@@ -509,7 +634,7 @@ bool activateLeader(Game& g, int who, Row target, const std::vector<std::string>
   }
   else if (id=="eredin_treacherous") canActivate=false;
   else if (id=="francesca_queen") scorchEnemyRow(g,who,0);
-  else if (id=="francesca_beautiful") { if(g.horn[who][1]) canActivate=false; else g.horn[who][1]=true; }
+  else if (id=="francesca_beautiful") { if(player.specialOccupied[1]) canActivate=false; else {player.specialOccupied[1]=true;g.horn[who][1]=true;} }
   else if (id=="francesca_pureblood") playWeatherFromDeck("Biting Frost",false);
   else if (id=="francesca_hope") {
     std::vector<Card> agile;
@@ -532,12 +657,18 @@ bool activateLeader(Game& g, int who, Row target, const std::vector<std::string>
   }
   else if (id=="francesca_daisy" || id=="king_bran") canActivate=false;
   else if (id=="crach_an_craite") {
-    for(auto& p:g.players) { p.deck.insert(p.deck.end(),p.graveyard.begin(),p.graveyard.end()); p.graveyard.clear(); shuffleDeck(g,p.deck); }
+    // Source Board.toDeck() calls Deck.addCardRandom() for each grave card.
+    // This leaves the deck untouched when a grave is empty and randomizes
+    // each returned card as it is added instead of reshuffling the whole deck.
+    for(auto& p:g.players) {
+      for(const auto& card:p.graveyard)addCardRandom(g,p.deck,card);
+      p.graveyard.clear();
+    }
   } else canActivate=false;
 
   if (!canActivate) return false;
   player.leaderAbilityAvailable=false;
-  endTurn(g);
+  finishActionTurn(g);
   return true;
 }
 
@@ -557,6 +688,8 @@ bool startNextRound(Game& g) {
   for (int owner = 0; owner < 2; ++owner) {
     auto& player = g.players[owner];
     player.passed = false;
+    player.mardroeme.fill(false);
+    player.specialOccupied.fill(false);
     // Monsters keep one random unit from their side; all other units go to their owner's graveyard.
     int keepRow = -1, keepIndex = -1;
     if (player.faction == Faction::Monsters) {
@@ -576,7 +709,7 @@ bool startNextRound(Game& g) {
       }
     }
     if (winner >= 0 && owner == winner && player.faction == Faction::NorthernRealms && !player.deck.empty()) {
-      player.hand.push_back(player.deck.back()); player.deck.pop_back();
+      insertSourceHandCard(player,std::move(player.deck.front()),owner); player.deck.erase(player.deck.begin());
     }
   }
   g.skelligeRevivesRemaining=0;
@@ -611,8 +744,8 @@ bool startNextRound(Game& g) {
     g.skelligeRevivePlayer=0;
   }
   g.currentPlayer = g.firstPlayer;
-  g.phase = g.skelligeRevivesRemaining>0 ? Phase::RoundSetup :
-            g.currentPlayer == 0 ? Phase::PlayerTurn : Phase::OpponentTurn;
+  if(g.skelligeRevivesRemaining>0)g.phase=Phase::RoundSetup;
+  else startRoundTurn(g);
   recompute(g);
   return true;
 }
@@ -637,7 +770,7 @@ bool chooseSkelligeRevive(Game& g,int who,const std::string& cardId,Row target) 
   if(g.skelligeRevivesRemaining==0) {
     g.skelligeRevivePlayer=-1;
     g.skelligeAgileReviveIds.clear();
-    g.phase=g.currentPlayer==0?Phase::PlayerTurn:Phase::OpponentTurn;
+    startRoundTurn(g);
   }
   recompute(g);
   return true;

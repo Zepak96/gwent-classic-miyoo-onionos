@@ -19,7 +19,9 @@ public:
   void play(const std::string& key);
   void playMusic(const std::string& key);
   void setEnabled(bool enabled);
+  void setMusicEnabled(bool enabled);
   bool enabled() const { return enabled_; }
+  bool musicEnabled() const { return musicEnabled_; }
   bool available() const { return device_ != 0; }
   void shutdown();
 
@@ -43,5 +45,6 @@ private:
   std::string musicKey_;
   std::size_t nextVoice_{0};
   bool enabled_{true};
+  bool musicEnabled_{true};
 };
 }

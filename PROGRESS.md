@@ -1,5 +1,118 @@
 # Postęp projektu
 
+## Aktualny audyt zgodności — 16.11.2026
+
+Publiczna gałąź `codex/full-source-parity` zawiera niezmienione pliki źródłowe
+`asundr/gwent-classic` przypięte do `08592d847f2573440a34deb9f32bc855b2544cdd`.
+Mapa pełnego audytu źródło→port znajduje się w `docs/SOURCE_PARITY.md`. Port
+nadal nie spełnia kryterium 1:1; paczka na SD jest wersją testową, nie
+końcowym wydaniem.
+
+- Katalog `data/cards.json` porównuje się teraz rekord po rekordzie z JSON-em
+  osadzonym w upstreamowym `cards.js`: 216/216 zgodnych, pola i kolejność bez
+  różnic. Ten test potwierdza zawartość katalogu, nie kompletność implementacji
+  wszystkich zdolności.
+- W 640×480 podglądach karty tekst oryginalnego obrazka jest oddzielony od
+  portretu; nazwy i opisy są rysowane jako tekst PL/EN. Klatki inspektora,
+  edytora i karuzeli obejrzano po wygenerowaniu przez SDL dummy smoke.
+- Release CTest przechodzi 2/2, `--input-test` przechodzi, a `--audio-test`
+  dekoduje 35 SFX i oba utwory. Test audio z SDL dummy nie potwierdza głośnika
+  fizycznego Miyoo.
+- Zmiany źródłowe i README są opublikowane na publicznej gałęzi; ostatnie
+  poprawki obejmują źródłowy AI mulligan, 100-meczową regresję, dźwięk
+  przemienionego Vildkaarla i polskie statusy meczu. Nowy ARM
+  hard-float build oraz paczka OnionOS przeszły lokalnie; paczkę zainstalowano
+  na karcie `E:` w `Roms/PORTS/Games/GwentClassic`, ale nie uruchomiono jej
+  jeszcze na urządzeniu.
+- Skrypt builda OnionOS jest uruchamialny z checkoutu Windows dzięki regule LF
+  dla skryptów `.sh`. Paczka `GwentClassic-OnionOS.zip` zawiera 618 wpisów,
+  SHA-256 `52cfe7b8fe18b196c8df6b516ee6eb98b4929405c6aed373856b7bd7f278045e`;
+  `readelf` potwierdził ELF32 ARM i hard-float ABI. Lokalna paczka leży w
+  `.work/miyoo-b9a67e8/` i nie jest jeszcze wydaniem GitHub Release.
+- Po instalacji zweryfikowano 602/602 plików gry porównaniem SHA-256;
+  skrót binarki na SD to
+  `9b87b32b9c05d52fa6feafffe1b1d7cbad68ab8d23bf0668a09c7c37031b2a12`.
+  Kopie poprzednich katalogów gry zachowano w
+  `.work/sd-backup-7fca1da/GwentClassic`, `.work/sd-backup-b04f2d0/GwentClassic`
+  i `.work/sd-backup-b9a67e8/GwentClassic`;
+  istniejący skrót `.port` OnionOS
+  nie był zmieniany.
+- Poprawiono błąd mulliganu AI: źródłowe `ControllerAI.redraw()` podejmuje dwie
+  kolejne decyzje, każdorazowo po natychmiastowej wymianie z wierzchem talii;
+  wcześniej druga decyzja mogła wskazywać kartę już dobraną. Teraz port wykonuje
+  dwie rzeczywiste podmiany w kolejności źródłowej. CTest przechodzi 2/2, w tym
+  100 deterministycznych pełnych meczów z taliami i liderami źródłowymi.
+- Przemienione karty Vildkaarl z tagiem `vildkarrl` odtwarzają teraz źródłowy
+  efekt dźwiękowy Mardroeme zamiast standardowego dźwięku rzędu. Desktop build,
+  CTest 2/2, test sterowania i dekodowanie wszystkich 37 plików audio przechodzą.
+- Rozdzielono dźwięki zagrania i zdolności zgodnie z `Row.playPlacementAudio()`,
+  `Weather.addCard()` oraz `Card.animate()` w źródle. Port stosuje dźwięki
+  `hero`/`common_*`, wyjątki dla szpiegów, Decoya i Berserkera pod Mardroeme,
+  tagi dźwięków pogody oraz osobne zaplanowane SFX animacji Horn/Spy/Morale,
+  transformacji Mardroeme i wyzwolonych efektów Medic/Bond/Muster. Build i CTest
+  przechodzą; fizyczny odsłuch i synchronizacja na Miyoo nadal niezweryfikowane.
+- Commit `c8fb50d` zbudowano jako ELF32 ARM hard-float, a archiwum OnionOS
+  zawiera 618 wpisów (SHA-256
+  `ddd30aa2730122f7e2b88152a1bdd17551722938c0a3b31d0cf98fe2dc9b4dc0`).
+  Zaktualizowano `E:\Roms\PORTS\Games\GwentClassic`; audyt SHA-256 potwierdził
+  602/602 pliki. Hash binarki: `ff33832ddad11d9b77b26e5b3562a92d4fc160949b889994333c78419ab12ee9`.
+  Poprzednie katalogi zachowano na SD i w `.work/sd-backup-c8fb50d/`; uruchomienie
+  i odsłuch na urządzeniu wciąż wymagają testu fizycznego.
+- Rozszerzono testy zdolności liderów z repo referencyjnego o oczyszczenie
+  pogody, Torrential Rain, ranged/melee Scorch, Biting Frost, Ranged Horn,
+  Hope of the Aen Seidhe i Invader of the North. Pełne pokrycie wszystkich
+  zdolności i wyborów lidera pozostaje otwarte.
+- Dodano regresję aktywacji Eredina Dowódcy w rzędzie wręczowym oraz odrzucenia
+  aktywacji, gdy slot specjalny jest już zajęty.
+- Zweryfikowano też szczególną inicjalizację źródłowego Emhyra Białego Płomienia:
+  wyłącza ona pasywne zdolności obu liderów, w tym dodatkową kartę Franceski,
+  połowę pogody Brana, losowe wskrzeszanie Invadera i podwójne punkty szpiegów
+  Zdrajcy. Cztery regresje potwierdzają brak tych efektów przy Białym Płomieniu.
+- Tokeny Avengera tworzone przez Krowę/Kambiego są oznaczane prefiksem
+  `summoned_`; po zniszczeniu nie pozostają w trwałym cmentarzu portu. Źródło
+  usuwa Bovine Defense Force/Hemdalla z cmentarza po 1001 ms, zanim gracz może
+  wykonać kolejną akcję, dlatego silnik rozstrzyga sprzątanie atomowo. Regresja
+  Cow → Bovine Defense Force → Scorch potwierdza, że token nie może zostać
+  wskrzeszony przez Medyka. CTest przechodzi 2/2.
+- Porównanie wag Mardroeme AI z `ControllerAI.weightMardroemeRow()` nie
+  wykazało błędu w istniejącym wzorze. Dodano deterministyczny test, który przy
+  dwóch Berserkerach w wręcz i dwóch Młodych Berserkerach w dystansowym wybiera
+  dystansowy zgodnie z wagami `10*n` oraz `8*n²-2*n`; CTest przechodzi 2/2.
+- Aktualny commit `bd1e346` zbudowano jako ELF32 ARM hard-float; archiwum OnionOS
+  ma 618 wpisów i SHA-256
+  `6a55d9a0a2e58206f91ae01ec1797bb711f36585954cc66be49365493000af49`.
+  Zainstalowano je w `E:\Roms\PORTS\Games\GwentClassic`; audyt porównał
+  SHA-256 wszystkich 602/602 plików. Hash binarki:
+  `52b8c386502084492648974af8aeff67d16525601caebe73f55c8254fb3a1542`.
+  Poprzedni katalog gry zachowano na SD i w `.work/sd-backup-bd1e346/`.
+- Przetłumaczono statusy polskiej wersji dla błędów i akcji meczu (zapis,
+  mulligan, pas, cel, lider, Skellige oraz odrzucony ruch AI). CTest 2/2,
+  `--input-test` i `--audio-test assets` przechodzą; pełna lokalizacja menu,
+  podpowiedzi i kart pozostaje otwarta.
+
+- Naprawiono mapowanie własnych maksimów w wyborze celu AI dla Manekina:
+  wariant źródłowy losuje spośród maksimum każdego własnego rzędu, nie tylko
+  globalnego maksimum planszy.
+- Usunięto odzyskiwanie błędnego ruchu AI przez automatyczne pasowanie. Odrzucony
+  ruch zostawia stan tury bez zmian i pokazuje diagnostykę zamiast fałszować
+  zachowanie oryginalnego przeciwnika.
+- Medyk wskrzeszający kartę Zręczną wymaga teraz wskazania rzędu wręcz albo
+  dystansowego; wejście SDL pozwala przełączać rząd góra/dół przed zatwierdzeniem.
+  Test sprawdza również odrzucenie niekompletnego wyboru bez częściowej zmiany
+  stanu.
+- Zachowano oddzielnie efekt Mardroeme oraz zajętość slotu specjalnego dla
+  każdego rzędu. Mardroeme z Ermiona nie zajmuje slotu; specjalna karta
+  Mardroeme i zdolności Rogu zajmują go. Berserker zagrany, przywołany Zbiórką
+  lub obecny przy aktywacji jest transformowany. Zapis ma wersję 4 i czyta
+  starsze formaty 2 oraz 3.
+- Weryfikacja lokalna w kontenerze: kompilacja SDL2, CTest 2/2 oraz
+  `gwent --input-test` z SDL dummy. Nie jest to test urządzenia Miyoo; nie
+  zbudowano ani nie wgrano nowej paczki ARM/SD w tej gałęzi.
+
+AI jest teraz porównywany do pojedynczego `ControllerAI` z przypiętego źródła;
+trzy poziomy trudności opisane w starszym wpisie są rozbieżnością względem
+aktualnie przyjętego wymagania 1:1 i zostały usunięte z tej gałęzi.
+
 ## Status: aktywna implementacja — 15.11.2026
 
 Repozytorium wejściowe było puste. Powstał szkielet C++17/CMake, model silnika i prosty frontend SDL2. To nie jest ukończona gra ani wydanie dla Miyoo.
@@ -93,3 +206,76 @@ Funkcja pozostaje nieukończona, dopóki nie ma implementacji i testu. Kompatybi
 - Punktowanie zmieniono na mnożnik ×2 niezależny od liczby nadmiarowych kopii; dopasowanie odbywa się po nazwie karty. Test korzysta z prawdziwego katalogowego „Blue Stripes Commando”: 3 egzemplarze mają razem 24 punkty (3 × 4 × 2), różne nazwy ze wspólną grupą nie łączą się, a ta sama nazwa działa przy różnych grupach metadanych. Kolejność Więzi przed Morale pozostaje pokryta osobnym przypadkiem.
 - Desktop build, CTest (2/2), smoke translacji wejścia, dekodowanie 35 SFX, cross-build zmodyfikowanego SDL i aplikacji ARM hard-float zakończone powodzeniem. Paczka SHA-256 `08c7643b372f57e46e389712ed0677888aa3734c5408605777c24cbf57a5bce4` została skopiowana na kartę `E:`; 599/599 plików zgodnych, skrót OnionOS zachowany, hash gry `f37d866471e5f8d66ba2724dd290bea24fca48fe479eae1d7e5b990365afb5fb`, hash SDL `8eebe8969a25997265b35175c132fc72e66b16615a096af1cf71ec8d91db2053`.
 - To naprawia jeden rozpoznany błąd zasad. Pełne porównanie wszystkich efektów, sekwencji i rozszerzeń next-gen oraz test fizyczny nadal są otwarte.
+
+## Animacje komunikatów z repo źródłowego — 15.11.2026
+
+- Przeniesiono cykl powiadomień z `ui.notification()` wraz z oryginalnymi ikonami `notif_*.png`: kolejka zdarzeń, baner na środku planszy oraz 150 ms wygaszania, 900 ms ekspozycji i 150 ms zanikania (łącznie 1200 ms).
+- Podłączono komunikat rzutu monetą, początek rundy, zmianę tury, spasowanie i wynik rundy; dodano tekst PL/EN oraz zapamiętywany przełącznik powiadomień.
+- Desktop build, CTest (2/2), `--input-test` oraz SDL smoke test przeszły; kadr komunikatu sprawdzono wizualnie. Nie budowano ARM i nie zapisywano tej zmiany na SD.
+- To nadal częściowy port animacji. Karuzela kart, fade podglądu i ekranu końca gry, dokładna kolejność wszystkich animacji oraz test fizyczny pozostają do zrobienia.
+
+## Animacja ekranu wyniku — 15.11.2026
+
+- Zgodnie z `showEndScreen()` w źródłowym `gwent.js` ekran końca rundy/meczu pojawia się przez fade-in 300 ms. Przeniesiono animację na przyciemnienie planszy, grafikę wyniku i tekst; czas startuje przy wejściu w fazę wyniku i przy wczytaniu zapisu z takim ekranem.
+- Dodano test alpha dla 0/150/300/600 ms oraz osobny kadr smoke w połowie przejścia. Build desktop, CTest (2/2), `--input-test` i pełny SDL smoke przechodzą; kadr sprawdzono wizualnie.
+- Pozostałe animacje źródłowe nadal są otwarte; animacja wyniku nie zamyka audytu 1:1.
+
+## Krzywa skalowania nakładek zdolności — 15.11.2026
+
+- Porównanie `Card.animate()` z `.card > div:nth-child(4)` wykazało, że SDL zmieniał rozmiar grafiki skokowo. Dodano źródłową krzywą CSS `ease` i przejścia tła 250 ms: 40→100%, 100→80% i 80→40%, przy zachowaniu fade-in/out oraz hold.
+- `--input-test` sprawdza granice faz i wartości skali; smoke generuje klatkę Morale w trakcie pierwszego przejścia. Desktop build, CTest (2/2), `--input-test`, pełny smoke, ARM GCC 8.2 hard-float i ZIP OnionOS przeszły. ZIP SHA-256: `e9b8fbebbc730a58fa94e87e41caebdb6bc7bdedb235db9af6d9dfd78cca1046`. Nie skopiowano go na SD ani nie testowano na urządzeniu.
+
+## Układ rzędów i animacja odstępów — 15.11.2026
+
+- Wyrównano pozycje kart w rzędzie do `row-cards` w źródłowym CSS: karty są centrowane, a odstępy/optyczne nakładanie wynikają ze źródłowej szerokości kart i `resizeCardContainer(10, .075, .00325)`.
+- Po zmianie liczby kart pozycje i odstępy interpolują przez 250 ms krzywą CSS `ease` odpowiadającą przejściu marginesów w źródle. Lot karty i nakładki zdolności korzystają z nowych docelowych pozycji rzędów.
+- Test wejścia sprawdza pozycję dla 1/9 kart, zagęszczanie przy 10/20 oraz interpolację 250 ms; smoke renderuje 10 kart w połowie przejścia. Desktop build, CTest (2/2), `--input-test` i pełny smoke przeszły. Cross-build GCC 8.2 zweryfikował ELF32 ARM hard-float; ZIP OnionOS przeszedł `unzip -t`, SHA-256 `3dc8fc01a09a3c6d418f57fbac3862d595392ede2d57574040c15a2f6b646f44`; hash binarki w ZIP zgadza się z ARM buildem (`a0d2d056205cb0ba380365317f5400656797b347606c0254f2a7f7ca1196f8d3`). Nie wgrywano na SD.
+
+## Animacje z repozytorium źródłowego — 15.11.2026
+
+Przeniesiono do SDL wybrane istniejące animacje źródłowe: lot karty trwa 499 ms, oryginalne grafiki `anim_*.png` są używane dla efektów kart, a nakładka pogody pojawia się i znika w 500 ms. Szczegóły timingów i lista efektów nadal wymagających portu są w `docs/REFERENCE_ANIMATIONS.md`. To jest częściowy postęp, nie ukończony port animacji 1:1. Desktop build, CTest 2/2 i test wejścia SDL przeszły; ta zmiana nie była cross-buildowana dla Miyoo, kopiowana na kartę SD ani sprawdzana na konsoli.
+
+## Losowanie przeciwnika zgodne ze źródłem — 15.11.2026
+
+Źródłowy `DeckMaker.constructOpponentDeck()` wybiera losową talię z puli startowej, a potem losowego lidera należącego do frakcji tej talii. Port nie wybiera już deterministycznie „następnej” talii. Dodano `makeReferenceOpponentDeck(seed)` z lokalnym, odtwarzalnym PRNG oraz test 500 ziaren obejmujący wszystkie dziesięć talii, legalność liderów i poprawność składów. Build desktop i CTest 2/2 przeszły; kompilacja ARM i test Miyoo pozostają otwarte.
+
+## Automatyczne pasowanie zgodne ze źródłem — 15.11.2026
+
+Przeniesiono reguły `Player.canPlay()`, `Player.endTurn()` i `Game.startRound()`: gracz bez kart i dostępnej zdolności lidera pasuje po swojej akcji, a przed rozpoczęciem rundy automatycznie pasują strony, które nie mogą wykonać ruchu. Zdolność lidera użyta wcześniej w meczu nie odnawia się na początku kolejnej rundy. Dodano testy ostatniej karty i pustego rozpoczęcia; desktop build i CTest 2/2 przeszły.
+
+## Uzupełnienie celów animacji kart — 15.11.2026
+
+Porównanie z `abilities.js` i `Card.animate()` wykazało, że nakładki muszą pojawiać się na kartach dotkniętych zdolnością, a nie wyłącznie na karcie zagranej. Renderer obsługuje teraz nakładkę Więzi na wszystkie pasujące karty w rzędzie, Muster na każdej nowo przywołanej kopii, Medyka na wskrzeszonej jednostce oraz Pożogę równolegle na jednostkach usuwanych z planszy, zachowując ich pozycje sprzed zmiany stanu. Build, CTest (2/2) i `--input-test` przechodzą. To nadal częściowy port animacji; pełne przejścia, kolejność ruchu, karuzela, komunikaty i ekrany końca gry są otwarte. Nie robiono builda ARM ani zapisu na SD.
+
+## Lokalizacja katalogu kart PL/EN — 15.11.2026
+
+Generator katalogu kompiluje teraz osobne nazwy kart oraz tytuły/opisy zdolności po polsku i angielsku; UI wybiera tekst według ustawienia języka, a wybrane nazwy są nakładane nad oryginalną ilustracją w podglądzie i inspektorze. Dodano polskie glify bitmapowe i kontrolę, że każda nazwa katalogowa oraz każda zdolność źródłowa ma wpis PL. Test sprawdza Geralta w obu językach i obecność tłumaczeń dla wszystkich 258 instancji kart. Desktop build, CTest (2/2), `--input-test` oraz zrzut smoke 640×480 przeszły. Lokalizacja statycznych komunikatów UI nie jest jeszcze pełna, a tłumaczenia nazw wymagają weryfikacji względem oficjalnej polskiej wersji gry; parytet i build ARM pozostają otwarte.
+
+## Start z ekranem DeckMaker jak w źródle — 15.11.2026
+
+Pin `gwent.js` kończy inicjalizację przez `let dm = new DeckMaker()`, bez ekranu tytułowego. SDL uruchamia się teraz od razu w edytorze talii; usunięto nieźródłowy ekran tytułowy, a powrót z pomocniczego selektora talii prowadzi z powrotem do edytora. Test wejścia sprawdza domyślny ekran, a smoke przetestował render DeckMakera oraz powrót selektora. Build, CTest (2/2), `--input-test` i pełny smoke z sześcioma zrzutami zakończyły się poprawnie. Edytor nie odtwarza jeszcze całej geometrii i wszystkich operacji DeckMakera, dlatego pozycja parytetu pozostaje otwarta. Bez cross-builda i zapisu na SD.
+
+## Przepływ zdolności Eredina — 16.11.2026
+
+- Zgodnie z kodem źródłowym, Eredin odrzuca do dwóch kart z ręki (zależnie od liczby dostępnych), a następnie pokazuje wybór jednej karty z talii z możliwością pominięcia dobierania. Po rozpoczęciu zdolności anulowanie wyboru odrzucenia jest zablokowane, a anulowanie wyboru dobierania kończy zdolność bez pobrania karty.
+- Uzupełniono przypadki: ręka z jedną kartą, pusta ręka i wybór tylko dobierania, pusta talia i samo odrzucanie oraz całkowicie pusta ręka i talia. Dodano regresje silnika i testu wejścia SDL.
+- Desktop CTest (2/2), `--input-test` i zrzuty smoke 640×480 przechodzą. Fizyczne testy na Miyoo nadal są otwarte.
+
+## Animacja wskrzeszenia Medyka — 16.11.2026
+
+- Nakładka `anim_medic` pojawia się raz na wskrzeszanej karcie w cmentarzu; usunięto błędną drugą nakładkę z zagrywanej karty Medyka.
+- Lot cmentarz → rząd zaczyna się dokładnie po sekwencji `Card.animate()` trwającej 1650 ms. Test SDL sprawdza pozycję w cmentarzu, jeden efekt oraz granicę nakładka/lot.
+- CTest (2/2) i `--input-test` przechodzą. Inne animacje źródłowe i test sprzętowy pozostają otwarte.
+
+## Boardowe liczenie kart przez AI — 16.11.2026
+
+- `ControllerAI.getBoardData()` zlicza Szpiegów, Medyków i karty Pożogi ze wszystkich sześciu rzędów. Natywne AI uwzględniało tylko swoje rzędy, co zmieniało wagę Manekina, gdy na planszy przeciwnika leżał Szpieg, Medyk lub Pożoga.
+- Wagi obejmują teraz obie strony; wybór celu Manekina nadal wskazuje legalną kartę po stronie AI. Test 256 deterministycznych decyzji potwierdza wzrost prawdopodobieństwa zagrania Manekina przy wrogim Szpiegu.
+- CTest (2/2) przechodzi. Pełny rozkład wag i fizyczny test urządzenia pozostają otwarte.
+
+## Korekta: wagi Manekina AI — 16.11.2026
+
+- Ponowna kontrola przypiętego `gwent.js` wykazała, że `ControllerAI.getBoardData()` liczy zdolności z `board.row[0..2]`, czyli trzech rzędów kontrolowanych przez AI. Poprzednia notatka o wszystkich sześciu rzędach była niezgodna ze źródłem.
+- Waga Manekina używa własnych list AI Szpiegów, Medyków i Pożogi; przeciwnik nie zmienia tej wagi. Test 256 decyzji z tymi samymi ziarnami sprawdza równość wyników z i bez wrogiego Szpiega. Dodatkowo regresja weryfikuje wybór własnego Szpiega, kiedy po obu stronach leżą Szpiedzy.
+- Desktop CTest: 2/2 zaliczone; `--input-test` zaliczył sterowanie Miyoo, blokadę akcji, podgląd/lot kart, efekty zdolności, mulligan i Medyka; `--audio-test assets` zdekodował 35 efektów oraz oba utwory tła.
+- Zbudowano pakiet ARM hard-float dla Cortex-A7. ZIP przechodzi test CRC, zawiera 604 pliki razem ze skrótem OnionOS, a wszystkie 603 pliki gry na karcie SD odpowiadają paczce SHA-256. Miyoo Mini Plus nie uruchomiono fizycznie w tej walidacji.

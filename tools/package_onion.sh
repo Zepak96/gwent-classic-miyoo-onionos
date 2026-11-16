@@ -25,7 +25,7 @@ fi
 game_dir="$stage/Roms/PORTS/Games/GwentClassic"
 shortcut_dir="$stage/Roms/PORTS/Shortcuts/Cards"
 mkdir -p "$game_dir" "$shortcut_dir"
-mkdir -p "$game_dir/assets/gwent-classic"
+mkdir -p "$game_dir/assets/gwent-classic" "$game_dir/docs"
 install -m 755 "$build_dir/gwent" "$game_dir/gwent"
 install -m 755 "$(dirname "$0")/../packaging/onion/launch.sh" "$game_dir/launch.sh"
 install -m 755 "$(dirname "$0")/../packaging/onion/GwentClassic.notfound" "$shortcut_dir/GwentClassic.notfound"
@@ -61,6 +61,7 @@ install -m 644 "$(dirname "$0")/../patches/miyoo-sdl-keyhome.patch" "$game_dir/S
 install -m 644 "$sdl_source/sdl2/dependency/json-c-0.15.tar.gz" "$game_dir/json-c-0.15-source.tar.gz"
 copy_text packaging/onion/THIRD_PARTY.txt THIRD_PARTY.txt
 copy_text assets/gwent-classic/ASSET_ORIGIN.md assets/gwent-classic/ASSET_ORIGIN.md
+copy_text docs/ASSET_RIGHTS.md docs/ASSET_RIGHTS.md
 printf 'steward-fu/sdl2 commit %s\nMiyoo key mapping patch: SDL-MIYOO-KEYHOME.patch\n' "$actual_sdl_commit" > "$game_dir/BUILD-SDL.txt"
 {
   printf 'SDL2 source: steward-fu/sdl2 %s\n' "$actual_sdl_commit"

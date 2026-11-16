@@ -15,6 +15,8 @@ namespace {
 struct WeightedAction { AiAction action; double weight{0.0}; bool legal{false}; };
 struct BoardData {
   std::vector<const Card*> spies, medics, scorches;
+  std::vector<const Card*> ownSpies, ownMedics, ownScorches;
+  std::vector<const Card*> decoyFallbackOwnRowMaxima;
   std::array<std::vector<const Card*>,2> graveSpies, graveMedics, graveScorches;
   std::array<std::vector<const Card*>,3> strongestOwn, strongestEnemy;
   int ownMax{-1}, enemyMax{-1};
@@ -24,6 +26,9 @@ bool has(const Card& card,const std::string& ability) {
   return std::find(card.abilities.begin(),card.abilities.end(),ability)!=card.abilities.end();
 }
 bool isUnit(const Card& card) { return card.kind==Kind::Unit && !card.hero; }
+bool isCombatUnitForAI(const Card& card) {
+  return card.kind==Kind::Unit && !card.hero && (card.row!=Row::None || card.agile);
+}
 std::uint32_t roll(Game& game) {
   auto x=static_cast<std::uint32_t>(game.rngState?game.rngState:1);
   x^=x<<13; x^=x>>17; x^=x<<5; game.rngState=x; return x;
@@ -48,22 +53,46 @@ int currentRowScore(const Game& game,int owner,int row) {
   return scoreRow(game,owner,row,game.players[owner].board[row],
                   game.weather[row],game.horn[owner][row]);
 }
-void collectCards(const std::vector<Card>& cards,int owner,BoardData& data,bool grave=false) {
+int currentBoardCardPower(const Game& game,int owner,const Card* target) {
+  for(int row=0;row<3;++row)for(const auto& card:game.players[owner].board[row])
+    if(&card==target)return cardPower(game,owner,row,card,game.players[owner].board[row]);
+  return target?target->power:0;
+}
+void collectCards(const std::vector<Card>& cards,int owner,BoardData& data,bool grave=false,bool ownBoard=false) {
   for(const auto& card:cards) {
     if(!isUnit(card)) continue;
-    if(card.spy) { if(!grave)data.spies.push_back(&card); else data.graveSpies[owner].push_back(&card); }
-    if(card.medic) { if(!grave)data.medics.push_back(&card); else data.graveMedics[owner].push_back(&card); }
-    if(hasScorch(card)) { if(!grave)data.scorches.push_back(&card); else data.graveScorches[owner].push_back(&card); }
+    if(card.spy) {
+      if(grave)data.graveSpies[owner].push_back(&card);
+      else {data.spies.push_back(&card);if(ownBoard)data.ownSpies.push_back(&card);}
+    }
+    if(card.medic) {
+      if(grave)data.graveMedics[owner].push_back(&card);
+      else {data.medics.push_back(&card);if(ownBoard)data.ownMedics.push_back(&card);}
+    }
+    if(hasScorch(card)) {
+      if(grave)data.graveScorches[owner].push_back(&card);
+      else {data.scorches.push_back(&card);if(ownBoard)data.ownScorches.push_back(&card);}
+    }
   }
 }
 BoardData collectBoardData(const Game& game,int who) {
   BoardData data;
   for(int owner=0;owner<2;++owner) {
-    for(const auto& row:game.players[owner].board) collectCards(row,owner,data);
+    // Keep board-wide counts for helpers that inspect both sides; the source
+    // ControllerAI separately scans its own three rows for Decoy choices.
+    for(const auto& row:game.players[owner].board)collectCards(row,owner,data,false,owner==who);
     collectCards(game.players[owner].graveyard,owner,data,true);
     int best=-1;
-    for(int row=0;row<3;++row) for(const auto& card:game.players[owner].board[row])
-      if(isUnit(card)) best=std::max(best,cardPower(game,owner,row,card,game.players[owner].board[row]));
+    std::array<int,3> rowMaximum{{-1,-1,-1}};
+    for(int row=0;row<3;++row) {
+      for(const auto& card:game.players[owner].board[row])
+        if(isUnit(card))rowMaximum[row]=std::max(rowMaximum[row],cardPower(game,owner,row,card,game.players[owner].board[row]));
+      best=std::max(best,rowMaximum[row]);
+    }
+    if(owner==who)for(int row=0;row<3;++row)
+      if(rowMaximum[row]>=0)
+        for(const auto& card:game.players[owner].board[row])
+          if(isUnit(card)&&cardPower(game,owner,row,card,game.players[owner].board[row])==rowMaximum[row])data.decoyFallbackOwnRowMaxima.push_back(&card);
     for(int row=0;row<3;++row) for(const auto& card:game.players[owner].board[row])
       if(isUnit(card) && cardPower(game,owner,row,card,game.players[owner].board[row])==best)
         (owner==who?data.strongestOwn[row]:data.strongestEnemy[row]).push_back(&card);
@@ -78,12 +107,6 @@ int totalMaxPower(const BoardData& data,int ownerSide) {
   int count=0; for(const auto& row:rows)count+=static_cast<int>(row.size());
   return power*count;
 }
-std::vector<const Card*> allStrongest(const BoardData& data,int ownerSide) {
-  const auto& rows=ownerSide==0?data.strongestOwn:data.strongestEnemy;
-  std::vector<const Card*> result;
-  for(const auto& row:rows)result.insert(result.end(),row.begin(),row.end());
-  return result;
-}
 int weightRowChange(const Game& game,int who,int row,const Card& card) {
   auto cards=game.players[who].board[row];
   const int before=scoreRow(game,who,row,cards,game.weather[row],game.horn[who][row]);
@@ -95,7 +118,7 @@ int weightRowChange(const Game& game,int who,int row,const Card& card) {
   return std::max(0,change);
 }
 int weightHornRow(const Game& game,int who,int row) {
-  if(game.horn[who][row])return 0;
+  if(game.players[who].specialOccupied[row])return 0;
   return std::max(0,scoreRow(game,who,row,game.players[who].board[row],game.weather[row],true)-
                      currentRowScore(game,who,row));
 }
@@ -122,7 +145,10 @@ int weightWeather(const Game& game,int who,const Card& card) {
     const int enemyBefore=currentRowScore(game,1-who,row);
     const int ownAfter=scoreRow(game,who,row,game.players[who].board[row],next,game.horn[who][row]);
     const int enemyAfter=scoreRow(game,1-who,row,game.players[1-who].board[row],next,game.horn[1-who][row]);
-    value+=(enemyAfter-enemyBefore)-(ownAfter-ownBefore);
+    // ControllerAI.calcRowPower() measures before-minus-after, then returns
+    // opponentDiff-minus-ownDiff. That is the AI's own gain minus the
+    // opponent's gain; reversing it makes weather help the wrong side.
+    value+=(ownAfter-ownBefore)-(enemyAfter-enemyBefore);
   }
   return value;
 }
@@ -132,8 +158,8 @@ int weightScorchRow(const Game& game,int who,int row) {
   int strongest=-1,total=0;
   for(const auto& card:game.players[enemy].board[row]) if(isUnit(card))
     strongest=std::max(strongest,cardPower(game,enemy,row,card,game.players[enemy].board[row]));
-  for(const auto& card:game.players[enemy].board[row]) if(isUnit(card) && !card.hero &&
-       cardPower(game,enemy,row,card,game.players[enemy].board[row])==strongest)
+  // Source max.rmax uses current Row Card.power values, including row effects.
+  for(const auto& card:game.players[enemy].board[row]) if(isUnit(card)&&cardPower(game,enemy,row,card,game.players[enemy].board[row])==strongest)
     total+=cardPower(game,enemy,row,card,game.players[enemy].board[row]);
   return total;
 }
@@ -142,30 +168,41 @@ int weightGlobalScorch(const BoardData& data) {
   if(data.ownMax<data.enemyMax)return totalMaxPower(data,1);
   return std::max(0,totalMaxPower(data,1)-totalMaxPower(data,0));
 }
-int weightMardroemeRow(const Game& game,int who,int row) {
-  if(game.horn[who][row])return 0;
+int weightMardroemeRow(const Game& game,int who,const Card& card,int row) {
+  if(row!=0&&row!=1)return 0;
+  if(card.name=="Mardroeme"&&game.players[who].specialOccupied[row])return 0;
+  if(row==1&&card.name!="Ermion"&&std::any_of(game.players[who].hand.begin(),game.players[who].hand.end(),
+      [](const Card& item){return item.name=="Ermion";}))return 0;
   const std::string target=row==1?"Young Berserker":"Berserker";
   int count=0;
   for(const auto& card:game.players[who].board[row])if(card.name==target)++count;
-  return std::max(1,row==2?10*count:8*count*count-2*count);
+  // Source board indexes put close combat at 2 and ranged at 1; native Row
+  // uses melee at 0 and ranged at 1. Preserve the source's corresponding
+  // weights: close Berserkers use 10*n, ranged Young Berserkers use 8*n²-2*n.
+  return std::max(1,row==0?10*count:8*count*count-2*count);
 }
 bool hasInHand(const Player& player,const std::string& ability) {
   return std::any_of(player.hand.begin(),player.hand.end(),[&](const Card& c){return has(c,ability);});
 }
 int weightBerserker(const Game& game,int who,int row,const Card& card,int score) {
-  if(!hasInHand(game.players[who],"mardroeme"))return score;
+  if(!hasInHand(game.players[who],"mardroeme") && !game.players[who].mardroeme[row])return score;
   score-=card.power;
   if(row==0)return std::max(1,score+14);
   int count=0;
-  const std::string transformed=card.name=="Young Berserker"?"Transformed Young Vildkaarl":"Transformed Vildkaarl";
-  for(const auto& unit:game.players[who].board[row])if(unit.name==transformed)++count;
+  if(!game.players[who].mardroeme[row]) {
+    for(const auto& unit:game.players[who].board[row])if(unit.name=="Young Berserker")++count;
+  } else {
+    // Preserve ControllerAI.weightBerserker's source expression exactly:
+    // its predicate is a non-empty string literal, so every row card counts.
+    count=static_cast<int>(game.players[who].board[row].size());
+  }
   score=8*((count+1)*(count+1)-count*count)+count*score;
   return std::max(1,score);
 }
-int weightMedic(const Game& game,int who,const BoardData& data,int score,int graveOwner,bool includeHeroes=false) {
+int weightMedic(const Game& game,int who,const BoardData& data,int score,int graveOwner) {
   bool hasEligible=false;
   for(const auto& card:game.players[graveOwner].graveyard)
-    if(card.kind==Kind::Unit&&(includeHeroes||!card.hero)){hasEligible=true;break;}
+    if(isCombatUnitForAI(card)){hasEligible=true;break;}
   if(!hasEligible)return std::min(1,score);
   int bonus=0;
   const int ownerOpponent=1-graveOwner;
@@ -176,53 +213,67 @@ int weightMedic(const Game& game,int who,const BoardData& data,int score,int gra
   return score+bonus;
 }
 int weightDecoy(const BoardData& data) {
-  if(!data.spies.empty())return 50;
-  if(!data.medics.empty())return 15;
-  if(!data.scorches.empty())return 10;
+  // ControllerAI.getBoardData() scans board.row[0..2], the AI's three rows
+  // in the source layout. Opponent-side abilities must not affect this weight.
+  if(!data.ownSpies.empty())return 50;
+  if(!data.ownMedics.empty())return 15;
+  if(!data.ownScorches.empty())return 10;
   return data.ownMax>=0?1:0;
 }
-std::vector<Card> discardOrder(const Player& player) {
+std::vector<Card> discardOrder(Game& game,int who) {
+  const auto& player=game.players[who];
   std::vector<Card> cards;
-  std::map<std::string,std::vector<Card>> groups;
   std::vector<Card> musters;
-  const auto isMusterTargetInHand=[&](const Card& candidate) {
-    return std::any_of(player.hand.begin(),player.hand.end(),[&](const Card& card) {
-      if(!(card.muster||has(card,"muster"))||card.group.empty())return false;
-      return card.group==candidate.name || candidate.name.rfind(card.group+" - ",0)==0;
-    });
-  };
   for(const auto& card:player.hand)if(card.muster||has(card,"muster"))musters.push_back(card);
+  std::vector<std::vector<Card>> groups;
   while(!musters.empty()) {
     Card current=musters.back(); musters.pop_back();
     const auto dash=current.name.find('-');
     const std::string prefix=dash==std::string::npos?current.name:current.name.substr(0,dash);
-    auto& group=groups[prefix]; group.push_back(current);
-    for(int i=static_cast<int>(musters.size())-1;i>=0;--i) if(musters[i].name.rfind(prefix,0)==0) {
+    auto trim=[](std::string value){
+      const auto first=value.find_first_not_of(" \t\r\n");
+      const auto last=value.find_last_not_of(" \t\r\n");
+      return first==std::string::npos?std::string{}:value.substr(first,last-first+1);
+    };
+    const auto groupName=trim(prefix);
+    std::vector<Card> group{current};
+    for(int i=static_cast<int>(musters.size())-1;i>=0;--i) if(musters[static_cast<std::size_t>(i)].name.rfind(groupName,0)==0) {
       group.push_back(musters[static_cast<std::size_t>(i)]);
       musters.erase(musters.begin()+i);
     }
+    groups.push_back(std::move(group));
   }
-  for(auto& pair:groups) {
-    auto& group=pair.second;
-    std::sort(group.begin(),group.end(),[](const Card& a,const Card& b){return a.power<b.power;});
+  const auto compare=[](const Card& a,const Card& b){
+    const auto rank=[](const Card& card){return card.kind==Kind::Weather?-1:
+      card.kind==Kind::CommanderHorn||card.kind==Kind::Mardroeme||card.kind==Kind::Scorch||
+      card.kind==Kind::ClearWeather||card.kind==Kind::Decoy?-2:0;};
+    if(rank(a)!=rank(b))return rank(a)<rank(b);
+    if(a.power!=b.power)return a.power<b.power;
+    return a.name<b.name;
+  };
+  for(auto& group:groups) {
+    std::stable_sort(group.begin(),group.end(),compare);
     if(!group.empty())group.pop_back();
     cards.insert(cards.end(),group.begin(),group.end());
   }
   std::vector<Card> weather;
-  for(const auto& card:player.hand)if(card.kind==Kind::Weather)weather.push_back(card);
+  // Clear Weather also has source row "weather" and participates in the
+  // same multi-weather redraw selection pool.
+  for(const auto& card:player.hand)
+    if(card.kind==Kind::Weather||card.kind==Kind::ClearWeather)weather.push_back(card);
   if(weather.size()>1) {
-    weather.erase(weather.begin());
+    weather.erase(weather.begin()+static_cast<std::ptrdiff_t>(roll(game)%weather.size()));
     cards.insert(cards.end(),weather.begin(),weather.end());
   }
   std::vector<Card> normal;
-  for(const auto& card:player.hand)if(card.abilities.empty()&&!isMusterTargetInHand(card))normal.push_back(card);
-  std::sort(normal.begin(),normal.end(),[](const Card& a,const Card& b){return a.power<b.power;});
+  for(const auto& card:player.hand)if(card.abilities.empty())normal.push_back(card);
+  std::stable_sort(normal.begin(),normal.end(),compare);
   cards.insert(cards.end(),normal.begin(),normal.end());
   return cards;
 }
-const Card* chooseMedicTarget(const std::vector<Card>& grave,bool includeHeroes=false) {
+const Card* chooseMedicTarget(Game& game,const std::vector<Card>& grave) {
   std::vector<const Card*> units;
-  for(const auto& card:grave)if(card.kind==Kind::Unit&&(includeHeroes||!card.hero))units.push_back(&card);
+  for(const auto& card:grave)if(isCombatUnitForAI(card))units.push_back(&card);
   if(units.empty())return nullptr;
   auto minSpy=std::min_element(units.begin(),units.end(),[](const Card* a,const Card* b){
     const int ap=a->spy?a->power:std::numeric_limits<int>::max();
@@ -235,7 +286,7 @@ const Card* chooseMedicTarget(const std::vector<Card>& grave,bool includeHeroes=
   if((*maxMedic)->medic)return *maxMedic;
   std::vector<const Card*> scorches;
   for(const auto* card:units)if(hasScorch(*card))scorches.push_back(card);
-  if(!scorches.empty())return scorches.front();
+  if(!scorches.empty())return scorches[roll(game)%scorches.size()];
   return *std::max_element(units.begin(),units.end(),[](const Card* a,const Card* b){return a->power<b->power;});
 }
 int rowForTag(const std::string& tag) {
@@ -252,7 +303,7 @@ int weightCard(const Game& game,int who,const Card& card,const BoardData& data) 
     return best/2;
   }
   if(card.kind==Kind::Mardroeme || has(card,"mardroeme"))
-    return std::max(weightMardroemeRow(game,who,1),weightMardroemeRow(game,who,2));
+    return std::max(weightMardroemeRow(game,who,card,1),weightMardroemeRow(game,who,card,0));
   if(card.kind==Kind::Weather || card.kind==Kind::ClearWeather)return std::max(0,weightWeather(game,who,card));
 
   int row=card.agile?0:static_cast<int>(card.row);
@@ -281,7 +332,7 @@ int weightWeatherFromDeck(const Game& game,int who,const std::string& weatherTag
   Card virtualWeather;virtualWeather.kind=Kind::Weather;virtualWeather.name="Weather";virtualWeather.abilities={weatherTag};
   return weightCard(game,who,virtualWeather,collectBoardData(game,who));
 }
-int weightLeader(const Game& game,int who,const BoardData& data,const std::string& id) {
+int weightLeader(Game& game,int who,const BoardData& data,const std::string& id) {
   if(id=="foltest_king")return weightWeatherFromDeck(game,who,"fog");
   if(id=="foltest_lord") { Card clear;clear.kind=Kind::ClearWeather;clear.name="Clear Weather";return weightWeather(game,who,clear); }
   if(id=="foltest_siegemaster")return weightHornRow(game,who,2);
@@ -292,11 +343,11 @@ int weightLeader(const Game& game,int who,const BoardData& data,const std::strin
     const auto count=game.players[1-who].hand.size();
     return count==0?0:std::max(10,10*(8-static_cast<int>(count)));
   }
-  if(id=="emhyr_relentless")return weightMedic(game,who,data,0,1-who,true);
+  if(id=="emhyr_relentless")return weightMedic(game,who,data,0,1-who);
   if(id=="eredin_commander")return weightHornRow(game,who,0);
-  if(id=="eredin_bringer_of_death")return weightMedic(game,who,data,0,who,true);
+  if(id=="eredin_bringer_of_death")return weightMedic(game,who,data,0,who);
   if(id=="eredin_destroyer") {
-    auto discard=discardOrder(game.players[who]);
+    auto discard=discardOrder(game,who);
     if(discard.size()<2)return 0;
     discard.resize(2);
     discard.erase(std::remove_if(discard.begin(),discard.end(),[](const Card& c){return c.power>=7;}),discard.end());
@@ -313,36 +364,42 @@ int weightLeader(const Game& game,int who,const BoardData& data,const std::strin
   if(id=="francesca_beautiful")return weightHornRow(game,who,1);
   if(id=="francesca_pureblood")return weightWeatherFromDeck(game,who,"frost");
   if(id=="francesca_hope") {
+    const bool hasAgile=std::any_of(game.players[who].board[0].begin(),game.players[who].board[0].end(),
+                                    [](const Card& card){return card.agile;}) ||
+                        std::any_of(game.players[who].board[1].begin(),game.players[who].board[1].end(),
+                                    [](const Card& card){return card.agile;});
+    if(!hasAgile)return -1; // source helper returns score=-1 when there are no Agile units.
     Game after=game;
     if(!activateLeader(after,who))return 0;
     const int before=calculateScore(game.players[who],game.weather,game.horn[who]);
-    return std::max(0,after.players[who].score-before);
+    const int afterScore=calculateScore(after.players[who],after.weather,after.horn[who]);
+    return afterScore-before;
   }
   if(id=="crach_an_craite") {
     if(game.round<2)return 0;
     if(hasInHand(game.players[who],"medic")||hasInHand(game.players[who],"spy"))return 0;
     if(hasInHand(game.players[who],"decoy") &&
-       (!data.medics.empty() || (!data.spies.empty() &&
+       (!data.ownMedics.empty() || (!data.ownSpies.empty() &&
         std::any_of(game.players[who].deck.begin(),game.players[who].deck.end(),[](const Card& c){return c.medic;}))))return 0;
     return 15;
   }
   return 10+(game.round-1)*15;
 }
-std::vector<std::string> leaderSelection(const Game& game,int who,const std::string& id,const BoardData& data) {
+std::vector<std::string> leaderSelection(Game& game,int who,const std::string& id,const BoardData& data) {
   const auto& player=game.players[who];
   if(id=="emhyr_relentless") {
-    const auto* target=chooseMedicTarget(game.players[1-who].graveyard,true);
+    const auto* target=chooseMedicTarget(game,game.players[1-who].graveyard);
     return target?std::vector<std::string>{target->id}:std::vector<std::string>{};
   }
   if(id=="eredin_bringer_of_death") {
-    const auto* target=chooseMedicTarget(player.graveyard,true);
+    const auto* target=chooseMedicTarget(game,player.graveyard);
     return target?std::vector<std::string>{target->id}:std::vector<std::string>{};
   }
   if(id=="eredin_destroyer") {
-    auto discard=discardOrder(player);
+    auto discard=discardOrder(game,who);
     std::vector<std::string> chosen;
     for(const auto& card:discard)if(card.power<7 && chosen.size()<2)chosen.push_back(card.id);
-    if(chosen.size()==2&&!player.deck.empty())chosen.push_back(player.deck.back().id);
+    if(chosen.size()==2&&!player.deck.empty())chosen.push_back(player.deck.front().id);
     return chosen;
   }
   if(id=="eredin_king") {
@@ -360,38 +417,50 @@ AiAction cardAction(Game& game,int who,const Card& card,const BoardData& data) {
   AiAction action;action.cardId=card.id;
   if(card.kind==Kind::Decoy || has(card,"decoy")) {
     const Card* target=nullptr;
-    auto lowest=[](const std::vector<const Card*>& cards)->const Card* {
+    auto lowest=[&](const std::vector<const Card*>& cards)->const Card* {
       if(cards.empty())return nullptr;
-      return *std::min_element(cards.begin(),cards.end(),[](const Card* a,const Card* b){return a->power<b->power;});
+      return *std::min_element(cards.begin(),cards.end(),[&](const Card* a,const Card* b){
+        return currentBoardCardPower(game,who,a)<currentBoardCardPower(game,who,b);
+      });
     };
-    target=lowest(data.spies);
-    if(!target && !data.medics.empty())target=data.medics[roll(game)%data.medics.size()];
-    if(!target && !data.scorches.empty())target=data.scorches[roll(game)%data.scorches.size()];
-    if(!target) {
-      const auto own=allStrongest(data,0);
-      if(!own.empty())target=own[roll(game)%own.size()];
-    }
+    target=lowest(data.ownSpies);
+    if(!target && !data.ownMedics.empty())target=data.ownMedics[roll(game)%data.ownMedics.size()];
+    if(!target && !data.ownScorches.empty())target=data.ownScorches[roll(game)%data.ownScorches.size()];
+    if(!target&&!data.decoyFallbackOwnRowMaxima.empty())
+      target=data.decoyFallbackOwnRowMaxima[roll(game)%data.decoyFallbackOwnRowMaxima.size()];
     if(target)action.selectedCardId=target->id;
   } else if(card.kind==Kind::Unit && card.medic) {
-    const auto* target=chooseMedicTarget(game.players[who].graveyard);
-    if(target)action.selectedCardId=target->id;
+    const auto* target=chooseMedicTarget(game,game.players[who].graveyard);
+    if(target) {
+      action.selectedCardId=target->id;
+      if(target->agile) {
+        auto difference=[&](int row) {
+          auto cards=game.players[who].board[row];cards.push_back(*target);
+          return scoreRow(game,who,row,cards,game.weather[row],game.horn[who][row])-
+                 currentRowScore(game,who,row);
+        };
+        const int close=difference(0),ranged=difference(1);
+        action.target=close>ranged?Row::Melee:ranged>close?Row::Ranged:
+          (roll(game)%2?Row::Melee:Row::Ranged);
+      }
+    }
   } else if(card.kind==Kind::CommanderHorn) {
-    int best=-1,bestRow=0;
-    for(int row=0;row<3;++row) {
+    int best=0,bestRow=2;
+    for(const int row:{2,1,0}) {
       const int score=weightHornRow(game,who,row);
       if(score>best){best=score;bestRow=row;}
     }
     action.target=static_cast<Row>(bestRow);
   } else if(card.kind==Kind::Mardroeme || has(card,"mardroeme")) {
-    const int score1=weightMardroemeRow(game,who,1),score2=weightMardroemeRow(game,who,2);
-    action.target=static_cast<Row>(score2>score1?2:1);
+    const int ranged=weightMardroemeRow(game,who,card,1),close=weightMardroemeRow(game,who,card,0);
+    action.target=close>ranged?Row::Melee:Row::Ranged;
   } else if(card.agile) {
     const int close=weightRowChange(game,who,0,card),ranged=weightRowChange(game,who,1,card);
     action.target=static_cast<Row>(ranged>close?1:close>ranged?0:(roll(game)%2));
   }
   return action;
 }
-AiAction chooseLeaderAction(const Game& game,int who,const BoardData& data) {
+AiAction chooseLeaderAction(Game& game,int who,const BoardData& data) {
   AiAction action;action.activateLeader=true;
   if(!game.players[who].leader.abilities.empty())
     action.leaderSelection=leaderSelection(game,who,game.players[who].leader.abilities.front(),data);
@@ -399,7 +468,7 @@ AiAction chooseLeaderAction(const Game& game,int who,const BoardData& data) {
 }
 }
 
-AiAction chooseAiAction(Game& game,int who,AiDifficulty difficulty) {
+AiAction chooseAiAction(Game& game,int who) {
   if(who<0||who>1||who!=game.currentPlayer||
      (game.phase!=Phase::PlayerTurn&&game.phase!=Phase::OpponentTurn))return {true,{},{},{}};
   const auto& player=game.players[who];
@@ -420,7 +489,7 @@ AiAction chooseAiAction(Game& game,int who,AiDifficulty difficulty) {
   }
   if(player.leaderAbilityAvailable && !player.leader.abilities.empty()) {
     const auto choice=chooseLeaderAction(game,who,data);
-    int weight=std::max(0,weightLeader(game,who,data,player.leader.abilities.front()));
+    int weight=weightLeader(game,who,data,player.leader.abilities.front());
     Game preview=game;
     const bool legal=activateLeader(preview,who,choice.target,choice.leaderSelection);
     if(!legal)weight=0;
@@ -435,31 +504,14 @@ AiAction chooseAiAction(Game& game,int who,AiDifficulty difficulty) {
   }
   actions.push_back({AiAction{true,{},{},{}},passWeight,true});
 
-  if(difficulty==AiDifficulty::Easy) {
-    const bool alreadyAhead=player.score>opponent.score ||
-      (player.score==opponent.score && player.faction==Faction::Nilfgaard);
-    if(opponent.passed && alreadyAhead)return actions.back().action;
-    std::vector<const AiAction*> playable;
-    for(const auto& action:actions)if(action.legal&&!action.action.pass)playable.push_back(&action.action);
-    if(playable.empty())return actions.back().action;
-    // Easy makes occasional low-risk strategic mistakes but still submits
-    // only actions that the engine has verified as legal.
-    if(!opponent.passed && roll(game)%6==0)return actions.back().action;
-    return *playable[roll(game)%playable.size()];
-  }
-  if(difficulty==AiDifficulty::Hard) {
-    const WeightedAction* best=nullptr;
-    for(const auto& action:actions) {
-      if(!action.legal)continue;
-      if(!best || action.weight>best->weight)best=&action;
-    }
-    if(best && (best->weight>0 || best->action.pass))return best->action;
-  }
   double total=0;
   for(const auto& action:actions)total+=action.weight;
   if(total<=0) {
     for(const auto& card:player.hand)
-      if((card.kind==Kind::Weather && weightWeather(game,who,card)>-1) ||
+      // The source fallback checks card.row === "weather", which includes
+      // Clear Weather as well as the typed weather cards.
+      if(((card.kind==Kind::Weather || card.kind==Kind::ClearWeather) &&
+          weightWeather(game,who,card)>-1) ||
          has(card,"avenger") || has(card,"avenger_kambi"))
         return cardAction(game,who,card,data);
     return {true,{},{},{}};
@@ -473,23 +525,26 @@ AiAction chooseAiAction(Game& game,int who,AiDifficulty difficulty) {
   return actions.back().action;
 }
 
-std::vector<std::string> chooseAiMulligan(const Game& game,int who) {
-  if(who<0||who>1||game.phase!=Phase::Mulligan||game.players[who].mulliganDone)return {};
-  Player simulated=game.players[who];
-  std::vector<std::string> selected;
+bool performAiMulligan(Game& game,int who) {
+  if(who<0||who>1||game.phase!=Phase::Mulligan||game.scoiataelChoicePending||game.players[who].mulliganDone)
+    return false;
+  auto& player=game.players[who];
   for(int redraw=0;redraw<2;++redraw) {
-    const auto order=discardOrder(simulated);
-    const auto candidate=std::find_if(order.begin(),order.end(),[](const Card& card){return card.power<15;});
-    if(candidate==order.end())break;
-    const auto handCard=std::find_if(simulated.hand.begin(),simulated.hand.end(),[&](const Card& card){return card.id==candidate->id;});
-    if(handCard==simulated.hand.end()||simulated.deck.empty())break;
+    const auto order=discardOrder(game,who);
+    if(order.empty()||order.front().power>=15)break;
+    const auto handCard=std::find_if(player.hand.begin(),player.hand.end(),[&](const Card& card){return card.id==order.front().id;});
+    if(handCard==player.hand.end())break;
+    const auto handIndex=static_cast<std::size_t>(handCard-player.hand.begin());
     const Card discarded=*handCard;
-    selected.push_back(discarded.id);
-    simulated.hand.erase(handCard);
-    simulated.deck.insert(simulated.deck.begin(),discarded);
-    simulated.hand.push_back(simulated.deck.back());
-    simulated.deck.pop_back();
+    player.hand.erase(handCard);
+    // Deck.swap() uses Deck.addCardRandom(), then immediately draws index 0.
+    player.deck.push_back(discarded);
+    const auto randomIndex=static_cast<std::size_t>(roll(game))%player.deck.size();
+    std::swap(player.deck[randomIndex],player.deck.back());
+    Card drawn=std::move(player.deck.front());
+    player.deck.erase(player.deck.begin());
+    insertSourceHandCard(player,std::move(drawn),who,static_cast<int>(handIndex));
   }
-  return selected;
+  return replaceMulliganCards(game,who,{});
 }
 }

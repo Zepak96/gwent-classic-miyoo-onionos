@@ -20,6 +20,19 @@ Data raportu: 2026-11-15.
 
 ## Wynik
 
+### Uzupełnienie modelu Mardroeme i Medyka Agile — 15.11.2026
+
+- Zgodnie z `Row.updateState` w przypiętym `gwent.js`, Mardroeme jest trwałym
+  efektem rzędu w tej rundzie. Silnik rozróżnia ten efekt od zajętego slotu
+  specjalnego, co pozwala poprawnie odwzorować Mardroeme z Ermiona. Test sprawdza
+  transformację istniejącego i później zagranego Berserkera, Zbiórkę, ponowne
+  użycie slotu oraz zapis obu stanów.
+- Zapis stanu używa wersji 4; loader akceptuje formaty 2 i 3.
+- Desktop SDL2 build, CTest 2/2 i `--input-test` pod SDL dummy przechodzą.
+  Nie wykonano ARM cross-builda: Docker Desktop przerwał wcześniejszą próbę i
+  nie powstał z niej pakiet. Nie instalowano zmian na SD ani nie testowano ich
+  na fizycznym Miyoo.
+
 ### Najnowsza weryfikacja — 15.11.2026
 
 - Po ponownym audycie wizualnym podgląd zdolności w meczu zmieniono na czcionkę 2×, ograniczono do czterech wierszy, a dłuższy tekst otrzymuje widoczną wskazówkę `I - PELNY OPIS` / `I - FULL TEXT`. Pełny inspektor pokazuje cały opis Cirilli i cytat. Świeży render 640×480 obejrzano w natywnej skali; testy CTest 2/2 i dekodowanie 35 SFX przeszły. Długie opisy pozostają w inspektorze, a wizualna zgodność 1:1 i test na fizycznym Miyoo nadal są otwarte.
@@ -85,3 +98,110 @@ Następnie ustandaryzowano ścieżki źródeł kompilatora, końce linii notice 
 Po kolejnym commitcie workflow #43735744971 ponownie zbudował ARM i przesłał artefakt. Paczka z tego runu ma ten sam SHA-256 `b93ea51d4ff998919e014035cf21d4306d254740b532c84630c0e0272ed9db77`. Sprawdzono ZIP, skład wszystkich plików i licencje GCC. Po instalacji najnowszego artefaktu porównano SHA-256 każdego z 599 plików na karcie z wpisami w ZIP-ie: 0 brakujących, 0 różniących się i 0 dodatkowych. Ścieżka OnionOS `~Import ports.miyoocmd`, standalone launcher i wersja `v4.3.1-1` są obecne. Składnia `launch.sh` i `.notfound` jest poprawna. Gra nie została jeszcze uruchomiona; użytkownik przeprowadzi fizyczny test po zaimportowaniu skrótu.
 
 Po kolejnym zgłoszeniu problemu z czytelnością UI powiększono podgląd ilustracji kart na planszy oraz kartę w inspektorze; karta Cirilli zajmuje teraz niemal całą dostępną wysokość, dzięki czemu jej oryginalny cytat i nazwa są wyraźniejsze. Moc na zwykłych kartach jest rysowana standardowym, kontrastowym krojem i wycentrowana w medalionie; poprawiono też kontrast/nieprzezroczystość panelu opisu. Build SDL2 w Ubuntu 24.04 i czteroklatkowy smoke render zakończyły się poprawnie. Kadry meczu i inspektora ponownie obejrzano w 640×480. To desktopowy render, a nie weryfikacja na fizycznym Miyoo.
+## Audyt źródłowy i wybór rzędu Medyka Agile — 15.11.2026
+
+Na gałęzi `codex/full-source-parity` wykonano w kontenerze `gwent-miyoo-verify`:
+
+- konfigurację i kompilację CMake desktop SDL2 z `GWENT_BUILD_TESTS=ON`;
+- CTest: `engine_rules` i `card_catalog`, oba zaliczone (2/2);
+- test sterowania `SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy gwent --input-test`,
+  który przeszedł na mapowaniu wejścia Miyoo dla wymiany kart, potwierdzenia pass
+  oraz wyboru rzędu dla wskrzeszanej karty Agile.
+
+Nie wykonano w tej gałęzi cross-builda ARM, kontroli paczki OnionOS, odczytu SD
+ani testu na fizycznym Miyoo. Testy nie dowodzą jeszcze parytetu pełnego zestawu
+kart, liderów, interfejsu ani animacji. Lista elementów otwartych jest w
+`docs/SOURCE_PARITY.md`.
+
+## Source animation port — 15.11.2026
+
+- Added use of the upstream `anim_<ability>.png` overlays for source ability
+  visuals, using the reference 50/300/1000/300 ms sequence; Scorch uses its
+  reference 50/300/1300/300 ms sequence.
+- Native played-card movement now follows the source `translate()` duration
+  (499 ms). Weather row overlays now fade over 500 ms.
+- Desktop CMake build succeeded in `gwent-miyoo-verify`; CTest passed 2/2 and
+  `gwent --input-test` passed with dummy SDL video/audio.
+- This is a partial animation port. `docs/REFERENCE_ANIMATIONS.md` records the
+  remaining source behaviors; no ARM build, SD copy, or physical Miyoo check was
+  made for this change.
+
+## Random source opponent setup — 15.11.2026
+
+`DeckMaker.constructOpponentDeck()` in the pinned reference chooses a random premade deck and then a random legal leader from that deck's faction. Replaced the port's predictable "next recipe" opponent with that behavior. `makeReferenceOpponentDeck(seed)` uses a local deterministic PRNG so it can be tested and replayed; the SDL front end supplies a per-match seed. CTest verifies 500 seeds, all ten premade recipes, faction-legal leaders, valid card lists, and repeatability. Desktop build and CTest passed (2/2); ARM/device verification remains open.
+
+## Source automatic passing — 15.11.2026
+
+Ported the reference `Player.canPlay()`, `Player.endTurn()`, and `Game.startRound()` rule: a player with no cards and no available leader action passes automatically after their action; players unable to act are also passed as a round starts. Round start deliberately does not refresh a leader already used earlier in the match. Reworked engine fixtures to retain spare actions where a test needs to continue, and added explicit last-card and empty-opening cases. Desktop build and CTest passed (2/2).
+
+## Reference ability animation targets — 15.11.2026
+
+- Compared `abilities.js` and `Card.animate()` in pinned upstream commit `08592d847f2573440a34deb9f32bc855b2544cdd`.
+- Extended the original PNG/timing overlays to each matching Bond unit, newly summoned Muster unit, revived Medic target, and each Scorch target at its pre-action board location.
+- Desktop build succeeded; CTest passed 2/2; dummy SDL `--input-test` passed.
+- This remains partial animation parity. Cross-build, physical device, and SD copy were not performed. See `docs/REFERENCE_ANIMATIONS.md` for open animation behavior.
+
+## Polish and English catalog rendering — 15.11.2026
+
+- Updated CMake catalog generation to include `data/card-names-pl.json` and `data/ability-text-pl.json`.
+- Added locale-aware card names, ability titles and descriptions; the UI uses localized names in its detail/preview, deck and match labels and adds a localized name strip over enlarged source artwork. Added bitmap glyphs for Polish diacritics.
+- Catalog validation checks complete name-map and ability-map coverage; engine tests check Geralt's English/Polish name and translated ability description across the catalog.
+- Fresh desktop configure/build passed; CTest passed 2/2; SDL `--input-test` passed; 640×480 Polish detail/deck smoke frames were generated and visually inspected.
+- This does not complete UI localization: several static prompts and labels remain English, official Polish text still requires a source-by-source review, and no ARM/SD/device validation was performed.
+
+## Start on the source DeckMaker screen — 15.11.2026
+
+- Removed the invented title screen and made the deck editor the app's initial screen, matching the source's immediate `new DeckMaker()` initialization.
+- The auxiliary deck selector's Escape path returns to the deck editor. Startup-screen checks run in `--input-test` and `--smoke-test`.
+- Desktop build, CTest 2/2, `--input-test`, and a six-frame SDL dummy smoke run passed; the initial DeckMaker frame is saved at `artifacts/qa/deckmaker-start.png`.
+- Only the initial-screen flow is aligned here; DeckMaker geometry and interaction parity remain open. No ARM, SD, or physical-device validation was done.
+
+## Timed source notifications — 15.11.2026
+
+- Ported the reference notification lifecycle to the SDL frontend: source notification PNGs, a center-screen banner, a queued event sequence, and 150 ms fade-in + 900 ms hold + 150 ms fade-out (1200 ms total).
+- Wired initial coin result, round start, turn handoff, pass, and round result events; added PL/EN labels and a persisted notification toggle. Existing settings remain readable.
+- Extended `--input-test` with notification alpha boundaries, queue ordering, disabled behavior, and gameplay transition cases. Desktop build and CTest (2/2), `--input-test`, and the SDL dummy smoke run passed; the notification screenshot was generated and visually inspected.
+- This is one slice of the animation port, not full animation parity. Carousel/preview/end-screen fades, source-exact sequencing and physical Miyoo behavior remain open. No ARM build or SD write was made in this slice.
+
+## Source result-screen fade — 15.11.2026
+
+- Implemented the reference `showEndScreen()` 300 ms fade for the board shade, result art and labels, starting when the game enters a round or match result. A loaded result save starts its fade on load.
+- Added timing-boundary checks at 0/150/300/600 ms and a half-fade SDL smoke frame. Desktop build, CTest (2/2), `--input-test` and the full SDL dummy smoke run passed; the 640×480 half-fade frame was visually inspected. Result-screen source composition and physical Miyoo behavior remain unverified.
+
+## Ability overlay scale easing — 15.11.2026
+
+- Compared `Card.animate()` and the source CSS background-size transition. Replaced instantaneous overlay size jumps with the source 250 ms CSS `ease` curve across the 40→100%, 100→80% and 80→40% stages.
+- Added boundary checks to `--input-test` and an SDL smoke frame with the Morale overlay midway through its first scale transition. Desktop build, CTest (2/2), `--input-test`, and full SDL dummy smoke passed. ARM GCC 8.2 build produced a 32-bit ARM hard-float ELF; the OnionOS ZIP passed `unzip -t`, SHA-256 `e9b8fbebbc730a58fa94e87e41caebdb6bc7bdedb235db9af6d9dfd78cca1046`. No SD copy or physical Miyoo test was performed.
+
+## Source row centering and spacing transition — 15.11.2026
+
+- Ported `Row.resize()` card spacing and `.card`'s 250 ms margin transition, including centered rows and source overlap for larger unit counts. Card flight/effect target coordinates now use that row layout.
+- Added test coverage for row geometry at 1/9/10/20 cards and mid-transition interpolation; added a 10-card half-transition SDL smoke frame. Desktop build, CTest 2/2, `--input-test`, and full SDL smoke passed; the 640×480 frame was visually inspected. ARM GCC 8.2 produced a 32-bit ARM hard-float ELF, and the OnionOS ZIP passed `unzip -t` with SHA-256 `3dc8fc01a09a3c6d418f57fbac3862d595392ede2d57574040c15a2f6b646f44`; packaged binary hash matches ARM build `a0d2d056205cb0ba380365317f5400656797b347606c0254f2a7f7ca1196f8d3`. No SD install or physical Miyoo test was performed.
+
+## Card caption legibility and Release test configuration — 16.11.2026
+
+- Cropped the large source-card artwork at its printed gold divider and render
+  localized card names, power/row labels and ability text as SDL text. Applied
+  to the inspector, hand preview, card carousel and deck collection so the
+  original miniature English flavor text no longer competes with readable UI.
+- Visually inspected the 640×480 inspector, collection and target-carousel
+  frames at `artifacts/qa/card-details-polish.png`,
+  `artifacts/qa/deck-builder-card-preview.png` and
+  `artifacts/qa/target-carousel.png`.
+- Fixed the Release test configuration: `NDEBUG` had removed state-changing
+  expressions embedded in `assert`, causing a false Release-only crash. The
+  engine test target now keeps assertions enabled.
+- SDL2 Release build succeeded; CTest passed 2/2; `--input-test` passed for
+  Miyoo controls, mulligan, guarded pass and Agile Medic row choice; `--audio-test`
+  decoded all 35 SFX and both music tracks and exercised music switch/mute.
+  These dummy-device checks do not verify actual speaker output or gameplay on
+  physical Miyoo hardware. ARM/package/SD/device checks remain open.
+
+## Exact card-catalog comparison — 16.11.2026
+
+- `tests/validate_catalog.py` now parses the card JSON embedded in the pinned
+  upstream `cards.js` and compares all fields and record order to `data/cards.json`.
+- The current data matches all 216 upstream records exactly, including the
+  upstream Witcher 3 DLC/next-gen additions. Release CTest passed 2/2 after the
+  check was added. This verifies catalog data only; it does not prove that every
+  card ability or interaction is fully implemented in the engine.

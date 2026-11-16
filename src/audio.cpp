@@ -146,7 +146,7 @@ void AudioSystem::play(const std::string& key) {
 }
 
 void AudioSystem::playMusic(const std::string& key) {
-  if(!device_||key==musicKey_)return;
+  if(!device_||!musicEnabled_||key==musicKey_)return;
   const auto* sample=loadMusic(key);
   if(!sample||sample->pcm.empty())return;
   SDL_LockAudioDevice(device_);
@@ -159,6 +159,15 @@ void AudioSystem::setEnabled(bool enabled) {
   SDL_LockAudioDevice(device_);
   enabled_=enabled;
   if(!enabled_)for(auto& voice:voices_)voice={};
+  SDL_UnlockAudioDevice(device_);
+}
+
+void AudioSystem::setMusicEnabled(bool enabled) {
+  if(!device_) { musicEnabled_=enabled;return; }
+  SDL_LockAudioDevice(device_);
+  musicEnabled_=enabled;
+  if(!musicEnabled_)musicVoice_={};
+  musicKey_.clear();
   SDL_UnlockAudioDevice(device_);
 }
 
@@ -182,7 +191,7 @@ void AudioSystem::callback(void* userdata,Uint8* stream,int length) {
       voice.offset+=bytes;written+=bytes;
     }
   };
-  mixVoice(self.musicVoice_,SDL_MIX_MAXVOLUME/6);
+  if(self.musicEnabled_)mixVoice(self.musicVoice_,SDL_MIX_MAXVOLUME/2);
   if(self.enabled_)for(auto& voice:self.voices_)mixVoice(voice,SDL_MIX_MAXVOLUME/3);
 }
 

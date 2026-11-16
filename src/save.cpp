@@ -15,7 +15,7 @@
 namespace gwent {
 namespace {
 constexpr std::array<std::uint8_t,8> kMagic{{'G','W','N','T','M','Y','S','V'}};
-constexpr std::uint32_t kVersion=2;
+constexpr std::uint32_t kVersion=4;
 constexpr std::size_t kMaxSaveBytes=4*1024*1024;
 constexpr std::uint32_t kMaxItems=4096;
 constexpr std::uint32_t kMaxString=8192;
@@ -72,15 +72,17 @@ void writeCards(Writer& w,const std::vector<Card>& cards){w.u32(static_cast<std:
 bool readCards(Reader& r,std::vector<Card>& cards){const auto n=r.u32();if(n>kMaxItems){r.good=false;return false;}cards.clear();cards.reserve(n);for(std::uint32_t i=0;i<n;++i){Card c;if(!readCard(r,c))return false;cards.push_back(std::move(c));}return r.good;}
 void writePlayer(Writer& w,const Player& p){
   writeCards(w,p.deck);writeCards(w,p.hand);writeCards(w,p.graveyard);for(const auto& row:p.board)writeCards(w,row);writeCard(w,p.leader);
-  const bool values[]={p.passed,p.mulliganDone,p.leaderAbilityAvailable,p.leaderAbilityCancelled,p.leaderPassivesApplied,p.halfWeather,p.doubleSpyPower};
-  std::uint16_t flags=0;for(unsigned i=0;i<7;++i)if(values[i])flags|=static_cast<std::uint16_t>(1u<<i);w.u32(flags);
+  const bool values[]={p.passed,p.mulliganDone,p.leaderAbilityAvailable,p.leaderAbilityCancelled,p.leaderPassivesApplied,p.halfWeather,p.doubleSpyPower,p.mardroeme[0],p.mardroeme[1],p.mardroeme[2],p.specialOccupied[0],p.specialOccupied[1],p.specialOccupied[2]};
+  std::uint16_t flags=0;for(unsigned i=0;i<13;++i)if(values[i])flags|=static_cast<std::uint16_t>(1u<<i);w.u32(flags);
   w.i32(p.score);w.i32(p.roundWins);w.i32(p.roundLosses);enumWrite(w,p.faction);
 }
-bool readPlayer(Reader& r,Player& p){
+bool readPlayer(Reader& r,Player& p,std::uint32_t version){
   if(!readCards(r,p.deck)||!readCards(r,p.hand)||!readCards(r,p.graveyard))return false;for(auto& row:p.board)if(!readCards(r,row))return false;
-  if(!readCard(r,p.leader))return false;const auto flags=r.u32();if(flags&~0x7fu)r.good=false;
+  if(!readCard(r,p.leader))return false;const auto flags=r.u32();if(flags&~(version>=4?0x1fffu:version>=3?0x3ffu:0x7fu))r.good=false;
   p.passed=(flags&1)!=0;p.mulliganDone=(flags&2)!=0;p.leaderAbilityAvailable=(flags&4)!=0;p.leaderAbilityCancelled=(flags&8)!=0;
   p.leaderPassivesApplied=(flags&16)!=0;p.halfWeather=(flags&32)!=0;p.doubleSpyPower=(flags&64)!=0;
+  if(version>=3)for(unsigned row=0;row<3;++row)p.mardroeme[row]=(flags&(1u<<(7+row)))!=0;
+  if(version>=4)for(unsigned row=0;row<3;++row)p.specialOccupied[row]=(flags&(1u<<(10+row)))!=0;
   p.score=r.i32();p.roundWins=r.i32();p.roundLosses=r.i32();enumRead(r,p.faction,static_cast<std::uint8_t>(Faction::Neutral));
   return r.good&&p.roundWins>=0&&p.roundLosses>=0&&p.roundWins<=2&&p.roundLosses<=2;
 }
@@ -91,8 +93,8 @@ void encodeGame(Writer& w,const Game& g){
   w.boolean(g.randomRespawn);w.boolean(g.scoiataelChoicePending);w.i32(g.skelligeRevivesRemaining);w.i32(g.skelligeRevivePlayer);w.u32(static_cast<std::uint32_t>(g.skelligeAgileReviveIds.size()));for(const auto& id:g.skelligeAgileReviveIds)w.string(id);w.boolean(g.factionAbilitiesInitialized);
   for(const auto& cards:g.revealedCards)writeCards(w,cards);w.u64(g.rngState);w.string(g.lastError);
 }
-bool decodeGame(Reader& r,Game& g){
-  for(auto& p:g.players)if(!readPlayer(r,p))return false;
+bool decodeGame(Reader& r,Game& g,std::uint32_t version){
+  for(auto& p:g.players)if(!readPlayer(r,p,version))return false;
   enumRead(r,g.phase,static_cast<std::uint8_t>(Phase::MatchResult));g.currentPlayer=r.i32();g.firstPlayer=r.i32();g.matchWinner=r.i32();g.round=r.i32();
   for(auto& x:g.weather)x=r.boolean();for(auto& side:g.horn)for(auto& x:side)x=r.boolean();
   const auto n=r.u32();if(n>128){r.good=false;return false;}g.weatherCards.clear();g.weatherCards.reserve(n);
@@ -138,11 +140,11 @@ bool loadGame(const std::string& path,Game& game,std::string* error){
   if(!std::equal(kMagic.begin(),kMagic.end(),bytes.begin())){setError(error,"save file signature is invalid");return false;}
   std::vector<std::uint8_t> header(bytes.begin()+8,bytes.begin()+headerSize);Reader hr(header);
   const auto version=hr.u32(),length=hr.u32(),checksum=hr.u32();
-  if(version!=kVersion){setError(error,"save version is not supported");return false;}
+  if(version<2||version>kVersion){setError(error,"save version is not supported");return false;}
   if(length!=bytes.size()-headerSize){setError(error,"save file length is invalid");return false;}
   std::vector<std::uint8_t> payload(bytes.begin()+headerSize,bytes.end());if(crc32(payload)!=checksum){setError(error,"save checksum does not match");return false;}
   Reader reader(payload);Game decoded;
-  if(!decodeGame(reader,decoded)||!reader.done()){setError(error,"save data is invalid or incomplete");return false;}
+  if(!decodeGame(reader,decoded,version)||!reader.done()){setError(error,"save data is invalid or incomplete");return false;}
   game=std::move(decoded);setError(error,{});return true;
 }
 }

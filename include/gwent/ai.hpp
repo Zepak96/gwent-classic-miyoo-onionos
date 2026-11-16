@@ -4,7 +4,6 @@
 #include <vector>
 
 namespace gwent {
-enum class AiDifficulty : std::uint8_t { Easy, Normal, Hard };
 struct AiAction {
   bool pass{false};
   std::string cardId;
@@ -14,6 +13,6 @@ struct AiAction {
   std::vector<std::string> leaderSelection;
 };
 // Weighted, seeded ControllerAI ported from the pinned Gwent Classic reference.
-AiAction chooseAiAction(Game& game, int playerIndex, AiDifficulty difficulty = AiDifficulty::Normal);
-std::vector<std::string> chooseAiMulligan(const Game& game, int playerIndex);
+AiAction chooseAiAction(Game& game, int playerIndex);
+bool performAiMulligan(Game& game, int playerIndex);
 }
