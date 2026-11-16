@@ -1027,6 +1027,24 @@ static void sourceAiPassDecisions() {
   assert(!lastGemAction.pass&&lastGemAction.cardId=="last-gem-action");
 }
 
+static void sourceAiHeroMoraleWeight() {
+  std::uint64_t seed=0;
+  for(std::uint64_t candidate=1;candidate<1000;++candidate) {
+    auto state=candidate;
+    const double ticket=static_cast<double>(expectedRandom(state))/4294967296.0;
+    // The source weights Isengrim as 10 strength plus one gained point (11),
+    // ahead of a five-point unit. The old native weight was only one.
+    if(ticket>1.0/6.0&&ticket<11.0/16.0) { seed=candidate;break; }
+  }
+  assert(seed!=0);
+  Game game;game.phase=Phase::OpponentTurn;game.currentPlayer=1;game.rngState=seed;
+  game.players[1].hand={referenceCard("Isengrim Faoiltiarna"),unit("ordinary-five",5)};
+  game.players[1].board[0]={unit("ally-five",5)};
+  game.players[0].board[0]={unit("opponent-five",5)};
+  const auto action=chooseAiAction(game,1);
+  assert(!action.pass&&action.cardId==game.players[1].hand.front().id);
+}
+
 static void sourceMatchInitializationOrder() {
   std::vector<Card> playerDeck,opponentDeck;
   for(int i=0;i<12;++i) {
@@ -1414,4 +1432,4 @@ static void leaderAbilities() {
   for(int owner=0;owner<2;++owner)
     for(std::size_t i=0;i<untouchedDecks[owner].size();++i)assert(emptyCrach.players[owner].deck[i].id==untouchedDecks[owner][i]);
 }
-int main() { scoreRules(); duplicateWeatherIsDiscarded(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
+int main() { scoreRules(); duplicateWeatherIsDiscarded(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiHeroMoraleWeight(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }

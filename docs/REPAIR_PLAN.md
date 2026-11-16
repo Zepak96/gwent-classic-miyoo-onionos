@@ -321,3 +321,8 @@ rodzajami kart; pełny test na urządzeniu opisany wersją binarium i wynikiem.
   `ControllerAI.startTurn()`. Testy blokują szybkie spasowanie po przewadze,
   remis Nilfgaardu, remis innej frakcji oraz zakaz wydawania ostatniego życia
   na pas; wymuszony pas nie zużywa RNG.
+- [x] Waga AI dla Bohatera z Morale/Więzi zachowuje wynik źródłowego
+  `weightRowChangeTrue()`: helper pomija Bohaterów w `calcRowPower()`, ale
+  nadal odejmuje ich siłę z `row.calcCardScore()`. Port zaniżał przez to wagę
+  Isengrimowi i Kayranowi; regresja z Isengrimem sprawdza przedział losowania,
+  w którym zgodny helper wybiera właśnie tę kartę.

@@ -115,6 +115,11 @@ int weightRowChange(const Game& game,int who,int row,const Card& card) {
   int change=after-before;
   if(card.kind==Kind::Unit)
     change-=cardPower(game,who,row,card,cards);
+  // The source AI's calcRowPower() excludes Heroes, but weightRowChangeTrue()
+  // still subtracts row.calcCardScore(card) for every non-special card. For a
+  // Hero with Morale/Bond this leaves its printed strength in the source
+  // weight as well as the gain to other units. Preserve that source behavior.
+  if(card.kind==Kind::Unit&&card.hero)change+=cardPower(game,who,row,card,cards);
   return std::max(0,change);
 }
 int weightHornRow(const Game& game,int who,int row) {

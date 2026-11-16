@@ -52,6 +52,9 @@ source behavior. A build or screenshot alone does not count as parity.
   faction's tie, and does not spend its final gem on an AI pass. Deterministic
   engine regressions cover all four decisions and verify forced passes do not
   consume RNG.
+- [x] Hero Morale/Bond weighting preserves the pinned AI helper's treatment of
+  Hero power. A seeded Isengrim-vs-five-point choice regression distinguishes
+  the source weight from the previously reduced native weight.
 - [x] Source AI redraw and discard ordering, including two sequential
   `ControllerAI.redraw()` calls that each recalculate discard order after
   drawing the replacement. Clear Weather joins typed weather cards in the
