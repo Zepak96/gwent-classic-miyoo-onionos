@@ -2681,6 +2681,24 @@ int main(int argc,char** argv) {
     okay=okay&&resultSide(resultProbe)==ResultSide::Draw;
     resultProbe.matchWinner=1;okay=okay&&resultSide(resultProbe)==ResultSide::Defeat;
     resultProbe.matchWinner=0;okay=okay&&resultSide(resultProbe)==ResultSide::Victory;
+    {
+      App chainProbe;chainProbe.screen=Screen::Match;chainProbe.miyooControls=true;
+      auto first=gwent::Card{};first.id="input-chain-first";first.kind=gwent::Kind::Unit;
+      first.row=gwent::Row::Melee;first.power=5;first.medic=true;first.abilities={"medic"};
+      auto second=first;second.id="input-chain-second";
+      auto revived=gwent::Card{};revived.id="input-chain-agile";revived.kind=gwent::Kind::Unit;
+      revived.row=gwent::Row::Melee;revived.power=6;revived.agile=true;
+      chainProbe.game.players[0].hand={first};
+      chainProbe.game.players[0].graveyard={second,revived};
+      okay=okay&&gwent::playCard(chainProbe.game,0,first.id,gwent::Row::None,second.id);
+      okay=okay&&chainProbe.game.pendingMedicPlayer==0&&chainProbe.game.players[0].hand.empty();
+      handleMatchKey(chainProbe,SDLK_DOWN);
+      okay=okay&&chainProbe.rowIndex==1;
+      handleMatchKey(chainProbe,normalizeMiyooKey(chainProbe,SDLK_LALT));
+      okay=okay&&chainProbe.game.pendingMedicPlayer==-1&&
+        chainProbe.game.players[0].board[1].size()==1&&
+        chainProbe.game.players[0].board[1][0].id==revived.id;
+    }
     const bool startsInDeckMaker=app.screen==Screen::DeckBuilder;
     app.miyooControls=true;
     app.screen=Screen::Match;
