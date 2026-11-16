@@ -1732,7 +1732,7 @@ void drawMainMenu(SDL_Renderer* r,const App& a) {
   centeredTextInBox(r,30,16,W-60,24,"GWENT CLASSIC",gold,2);
   centeredTextInBox(r,30,45,W-60,16,"MIYOO MINI PLUS",paper,1);
   const bool pl=a.language==Language::Polish;
-  const char* names[]={"Geralt of Rivia","Cirilla Fiona Elen Riannon","Yennefer of Vengerberg"};
+  const char* names[]={"Geralt of Rivia","Cirilla Fiona Elen Riannon","Triss Merigold"};
   const char* labelsPL[]={"GRA KLASYCZNA","MOJE TALIE","WZNOW PARTIE"};
   const char* labelsEN[]={"CLASSIC MATCH","MY DECKS","RESUME MATCH"};
   for(int i=0;i<3;++i) {
@@ -1744,7 +1744,7 @@ void drawMainMenu(SDL_Renderer* r,const App& a) {
     if(card!=catalog.end())drawCardPortrait(r,a,"img/lg/"+gwent::referenceCardImage(card->referenceIndex),x,y,w,h-44);
     box(r,x,y+h-44,w,44,Color{13,10,8,245});
     frame(r,x,y,w,h,selected?Color{107,243,244,255}:gold);
-    centeredTextInBox(r,x+4,y+h-38,w-8,31,pl?labelsPL[i]:labelsEN[i],paper,1);
+    centeredTextInBox(r,x+4,y+h-38,w-8,31,pl?labelsPL[i]:labelsEN[i],paper,2);
   }
   box(r,22,402,W-44,57,Color{0,0,0,180});
   centeredTextInBox(r,28,412,W-56,18,pl?"LEWO/PRAWO: WYBOR   B: POTWIERDZ":"LEFT/RIGHT: SELECT   B: CONFIRM",paper,1);
@@ -3275,6 +3275,23 @@ int main(int argc,char** argv) {
     app.userDeckSelected=false;
   }
   app.audio.play("menu_opening");
+  if(argc>2&&std::string(argv[1])=="--menu-smoke-test") {
+    app.screen=Screen::MainMenu;app.mainMenuEnabled=true;app.status.clear();
+    SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);
+    drawMainMenu(renderer,app);presentFrame();
+    auto* surface=SDL_CreateRGBSurfaceWithFormat(0,W,H,32,SDL_PIXELFORMAT_ARGB8888);
+    const bool saved=surface&&SDL_RenderReadPixels(renderer,nullptr,SDL_PIXELFORMAT_ARGB8888,surface->pixels,surface->pitch)==0&&SDL_SaveBMP(surface,argv[2])==0;
+    if(surface)SDL_FreeSurface(surface);
+    bool testRunning=true;
+    handleKey(app,SDLK_RIGHT,testRunning);
+    const bool moved=app.menuIndex==1;
+    handleKey(app,SDLK_AC_BACK,testRunning);
+    const bool opened=app.screen==Screen::DeckBuilder;
+    handleKey(app,SDLK_ESCAPE,testRunning);
+    const bool returned=app.screen==Screen::MainMenu&&testRunning;
+    app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();
+    return saved&&moved&&opened&&returned?0:13;
+  }
   if(argc>1 && std::string(argv[1])=="--smoke-test") {
     if(app.screen!=Screen::DeckBuilder) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 11; }
     const auto clearFrame=[&](){SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);};
