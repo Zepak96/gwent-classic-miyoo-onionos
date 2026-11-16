@@ -1187,11 +1187,34 @@ static void scorchSourceTargets() {
   Game row;
   auto rowScorch=unit("source-row-scorch",4);rowScorch.abilities={"scorch_c"};
   row.players[0].hand.push_back(rowScorch);
+  row.players[0].board[0].push_back(unit("row-scorch-own-unit",16));
   auto highHero=unit("row-scorch-hero",15);highHero.hero=true;
   row.players[1].board[0]={highHero,unit("row-scorch-target",1)};
   assert(playCard(row,0,rowScorch.id));
+  assert(std::any_of(row.players[0].board[0].begin(),row.players[0].board[0].end(),
+                     [](const Card& card){return card.id=="row-scorch-own-unit";}));
   assert(row.players[1].board[0].size()==1&&row.players[1].board[0][0].hero);
   assert(row.players[1].graveyard.size()==1&&row.players[1].graveyard[0].id=="row-scorch-target");
+
+  const std::array<const char*,3> rowScorchAbilities={"scorch_c","scorch_r","scorch_s"};
+  for(int targetRow=1;targetRow<3;++targetRow) {
+    Game rangedOrSiege;
+    auto source=unit("scorch-source-"+std::to_string(targetRow),4);
+    source.abilities={rowScorchAbilities[static_cast<std::size_t>(targetRow)]};
+    rangedOrSiege.players[0].hand.push_back(source);
+    rangedOrSiege.players[1].board[targetRow]={unit("high-"+std::to_string(targetRow),6),
+                                                unit("low-"+std::to_string(targetRow),4)};
+    assert(playCard(rangedOrSiege,0,source.id));
+    assert(rangedOrSiege.players[1].board[targetRow].size()==1&&
+           rangedOrSiege.players[1].board[targetRow][0].id=="low-"+std::to_string(targetRow));
+  }
+
+  Game belowThreshold;
+  auto under=unit("under-threshold-scorch",4);under.abilities={"scorch_c"};
+  belowThreshold.players[0].hand.push_back(under);
+  belowThreshold.players[1].board[0]={unit("row-five",5),unit("row-four",4)};
+  assert(playCard(belowThreshold,0,under.id));
+  assert(belowThreshold.players[1].board[0].size()==2&&belowThreshold.players[1].graveyard.empty());
 }
 static void leaderAbilities() {
   std::vector<Card> deck;

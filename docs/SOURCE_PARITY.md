@@ -48,7 +48,11 @@ source behavior. A build or screenshot alone does not count as parity.
   source's one-shot Vildkaarl marker is also removed after transformation, so a
   later Medic revival receives ordinary placement audio instead of suppressing
   it as a fresh transformation.
-- [ ] Global Scorch and each row Scorch threshold/targets.
+- [x] Global Scorch chooses the strongest non-Hero units on both sides and
+  removes ties; row Scorch uses the selected enemy row, includes Hero power in
+  the 10-point threshold but cannot destroy Heroes. Regression cases cover all
+  three rows, exactly 10 versus 9 total strength, preserving own units, and
+  global ties/Hero immunity.
 - [ ] Clear Weather, each individual weather type, Skellige Storm, duplicate
   weather behavior and weather-card ownership/discard.
 - [ ] Bovine Defense Force and Kambi/Hemdall Avenger triggers.
