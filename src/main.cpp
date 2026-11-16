@@ -1141,8 +1141,16 @@ void performAi(App& a) {
   const auto action=gwent::chooseAiAction(a.game,1);
   bool success=false;
   if(action.resolveMedic) {
+    const auto before=a.game;
+    const auto found=std::find_if(before.players[1].graveyard.begin(),before.players[1].graveyard.end(),
+      [&](const auto& c){return c.id==action.selectedCardId;});
     success=gwent::chooseMedicRevive(a.game,1,action.selectedCardId,action.target);
-    if(success)a.audio.play("medic");
+    if(success&&found!=before.players[1].graveyard.end()) {
+      auto visual=*found;visual.medic=true;
+      queueTriggeredEffects(a,before,visual,1);
+      playCardSound(a,*found,before,1,action.target);
+      lockCardActionUntilAnimationsFinish(a,visual,before,1,action.target);
+    }
   }
   else if(action.pass) { success=gwent::pass(a.game,1);a.audio.play("pass");a.status=tr(a,"ai_pass"); }
   else if(action.activateLeader) {
@@ -2121,7 +2129,10 @@ void drawMatchOnScreen(SDL_Renderer* r,const App& a) {
   drawMatch(r,a);
   drawNotification(r,a);
   SDL_RenderSetViewport(r,nullptr);
-  if(a.cardDetailsOpen) {
+  if(a.game.pendingMedicPlayer==0) {
+    const auto choices=pendingMedicChoices(a);
+    if(!choices.empty())drawCardRulesPanel(r,a,*choices[static_cast<std::size_t>(std::clamp(a.targetIndex,0,static_cast<int>(choices.size())-1))],6,MATCH_RULES_PANEL_Y,W-12,MATCH_RULES_PANEL_H);
+  } else if(a.cardDetailsOpen) {
     const auto& hand=a.game.players[0].hand;
     if(!hand.empty())drawCardDetails(r,a,hand[static_cast<std::size_t>(std::clamp(a.handIndex,0,static_cast<int>(hand.size())-1))]);
   } else if(!a.game.players[0].hand.empty()&&
@@ -2257,8 +2268,14 @@ void handleMatchKey(App& a,SDL_Keycode key) {
     else if(key==SDLK_AC_BACK||key==SDLK_RETURN||key==SDLK_KP_ENTER) {
       const auto id=choices[a.targetIndex]->id;
       const auto row=choices[a.targetIndex]->agile?static_cast<gwent::Row>(a.rowIndex):gwent::Row::None;
+      const auto revived=*choices[a.targetIndex];
+      const auto before=a.game;
       if(gwent::chooseMedicRevive(a.game,0,id,row)) {
-        a.targetIndex=0;a.audio.play("medic");
+        auto visual=revived;visual.medic=true;
+        queueTriggeredEffects(a,before,visual,0);
+        playCardSound(a,revived,before,0,row);
+        lockCardActionUntilAnimationsFinish(a,visual,before,0,row);
+        a.targetIndex=0;
         if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+450;
       }
     }
