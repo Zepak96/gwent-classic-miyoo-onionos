@@ -89,11 +89,28 @@ zmieniania legalnej talii. Nowa kolejność musi ponownie przejść pomiar.
 
 Boss Północy uzyskał zbyt niski wynik względem pozostałych frakcji. Heurystyka
 preferowała wysoką drukowaną siłę kosztem słabszych szpiegów i pełnych grup
-Więzi. Nowy draft wymusza szpiegów, medyków i komplety Więzi o sile co najmniej
-4, a pozostałe miejsca uzupełnia najlepiej ocenionymi jednostkami.
-Skuteczność tego wariantu nie jest jeszcze zmierzona.
+Więzi. Reguła jawnie zachowuje szpiegów, medyków i komplety Więzi o sile co najmniej
+4, a pozostałe miejsca uzupełnia najlepiej ocenionymi jednostkami. Porównanie
+list kart wykazało jednak, że ta reguła daje identyczny skład jak wcześniejszy
+boss: nie stanowi faktycznego wzmocnienia i nie zmieniła wyniku 0,271.
+Nie należy opisywać samego dodania reguły jako poprawy skuteczności.
 
 Benchmark przyjmuje argumenty seedStart i seedCount; po dostrojeniu należy
 użyć niezależnego zakresu, np. 101 48. Zmiany silnika medyków/Skellige wymagają
 powtórzenia obu zestawów i zapisania rewizji, zamiast porównywania wyników z
 różnych wersji mechaniki jak jednego eksperymentu.
+
+
+## Powtórny trening — engine job w CI 43909090788
+
+Po przestawieniu Skellige wszystkie cztery drabinki mają rosnące oszacowania
+punktowe na tym samym zbiorze treningowym. Nowe wyniki Skellige:
+0,179 / 0,221 / 0,258 / 0,342 / 0,410. Pozostałe wyniki są identyczne z
+pierwszym raportem; skład bossa Północy pozostał niezmieniony. Sam frontend
+tego uruchomienia zgłosił oddzielny błąd input-test, dlatego nie jest to dowód
+pełnego przejścia CI portu. Raport kampanii powstał w zielonym jobie engine.
+
+Wyniki są historyczne: późniejsza naprawa replay wskrzeszeń Skellige i medyków
+zmienia rozgrywkę. Kolejność wymaga ponownej oceny na tej rewizji oraz na
+niezależnym zakresie ziaren. Małe odstępy (np. Potwory 1→2) nie dają podstawy
+do twierdzenia, że każdy kolejny przeciwnik będzie zawsze zauważalnie trudniejszy.
