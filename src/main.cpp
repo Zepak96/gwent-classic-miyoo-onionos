@@ -156,8 +156,9 @@ void powerBadgeNumber(SDL_Renderer* r,int x,int y,int width,int height,const std
   // two-digit value still fits the 24px medallion without changing font size
   // when a unit gains or loses strength.
   constexpr int scale=2;
-  const int advance=static_cast<int>(value.size())>1?5*scale:6*scale;
-  const int glyphWidth=value.empty()?0:(static_cast<int>(value.size())-1)*advance+5*scale;
+  const int digitWidth=value.size()>2?std::max(5,(width-4)/static_cast<int>(value.size())):5*scale;
+  const int advance=value.size()>1?digitWidth:6*scale;
+  const int glyphWidth=value.empty()?0:(static_cast<int>(value.size())-1)*advance+digitWidth;
   const int glyphHeight=7*scale;
   const int x0=x+std::max(0,(width-glyphWidth)/2);
   const int y0=y+std::max(0,(height-glyphHeight)/2);
@@ -168,8 +169,9 @@ void powerBadgeNumber(SDL_Renderer* r,int x,int y,int width,int height,const std
       const Glyph glyph=found==font().end()?font().at('?'):found->second;
       for(int row=0;row<7;++row)for(int column=0;column<5;++column)
         if(glyph[static_cast<std::size_t>(row)]&(1u<<(4-column))) {
-          SDL_Rect pixel{x0+static_cast<int>(index)*advance+column*scale+offsetX,
-                         y0+row*scale+offsetY,scale,scale};
+          SDL_Rect pixel{x0+static_cast<int>(index)*advance+(column*digitWidth)/5+offsetX,
+                         y0+row*scale+offsetY,
+                         std::max(1,((column+1)*digitWidth)/5-(column*digitWidth)/5),scale};
           SDL_RenderFillRect(r,&pixel);
         }
     }
