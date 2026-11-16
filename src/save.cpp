@@ -108,6 +108,10 @@ bool decodeGame(Reader& r,Game& g,std::uint32_t version){
   if(version>=9&&!readCards(r,g.skelligeAiReviveQueue))return false;
   if(g.skelligeRoundOwner< -1||g.skelligeRoundOwner>1||g.skelligeRoundRemaining<0||g.skelligeRoundRemaining>2||g.skelligeAiReviveQueue.size()>2)return false;
   if(g.skelligeRoundOwner>=0&&(g.phase!=Phase::RoundSetup||g.round!=3))return false;
+  if(g.skelligeRoundOwner<0&&(g.skelligeRoundRemaining!=0||!g.skelligeAiReviveQueue.empty()))return false;
+  if(g.skelligeRoundOwner==0&&!g.skelligeAiReviveQueue.empty())return false;
+  if(g.skelligeAiReviveQueue.size()>static_cast<std::size_t>(g.skelligeRoundRemaining))return false;
+  if(g.skelligeRoundOwner>=0&&g.pendingMedicPlayer<0&&g.skelligeRevivesRemaining==0)return false;
   if(g.pendingMedicDuringRoundSetup&&(g.pendingMedicPlayer<0||g.phase!=Phase::RoundSetup))return false;
   if(g.pendingMedicPlayer>=0&&g.pendingMedicPlayer<2) {
     if(g.players[g.pendingMedicPlayer].passed)return false;

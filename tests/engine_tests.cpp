@@ -1211,6 +1211,9 @@ static void skelligeRoundSetupReplaysSpyAndMedic() {
   Game saved;std::string error;
   assert(saveGame(path,medic,&error)&&loadGame(path,saved,&error));std::filesystem::remove(path);
   assert(saved.skelligeRoundOwner==0&&saved.skelligeRoundRemaining==1&&saved.pendingMedicDuringRoundSetup);
+  auto invalid=saved;invalid.skelligeAiReviveQueue={unit("invalid-human-ai-queue",2)};
+  assert(saveGame(path,invalid,&error)&&!loadGame(path,saved,&error));std::filesystem::remove(path);
+  assert(saved.skelligeAiReviveQueue.empty()&&saved.pendingMedicPlayer==0);
   assert(chooseMedicRevive(saved,0,target.id));
   assert(saved.players[0].board[0].size()==2&&saved.players[0].graveyard.empty());
   assert(saved.pendingMedicPlayer==-1&&!saved.pendingMedicDuringRoundSetup);
