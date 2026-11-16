@@ -149,6 +149,18 @@ void tallTextInBox(SDL_Renderer* r,int x,int y,int width,int height,const std::s
 void rowScoreText(SDL_Renderer* r,int x,int y,const std::string& value) {
   tallTextInBox(r,x,y,17,44,value,ink,true);
 }
+void powerBadgeNumber(SDL_Renderer* r,int x,int y,int width,int height,const std::string& value) {
+  // Keep every value at the same bitmap-font scale. Enlarging one-digit values
+  // made a card's badge visibly change typography when its strength crossed
+  // from one digit to two (for example after an effect).
+  constexpr int scale=1;
+  const int glyphWidth=std::max(0,(static_cast<int>(value.size())*6-1)*scale);
+  const int glyphHeight=7*scale;
+  const int x0=x+std::max(0,(width-glyphWidth)/2);
+  const int y0=y+std::max(0,(height-glyphHeight)/2);
+  text(r,x0+1,y0+1,value,Color{15,14,12,230},scale);
+  text(r,x0,y0,value,Color{246,237,215,255},scale);
+}
 
 enum class Screen { DeckBuilder, Match };
 enum class Language { Polish, English };
@@ -187,6 +199,7 @@ struct App {
   int deckSlot{1};
   bool userDeckSelected{false};
   bool editingLeader{false};
+  int leaderSelectionOriginalReference{-1};
   bool cardDetailsOpen{false};
   bool miyooControls{false};
   bool leaderSelectionMode{false};
@@ -215,6 +228,8 @@ struct App {
   bool weatherInitialized{false};
   Uint32 selectDownAt{0};
   bool selectLongPressed{false};
+  Uint32 xDownAt{0};
+  bool xLongPressed{false};
   int editorPane{0};
   int editorCardIndex{0};
   gwent::UserDeck editDeck;
@@ -343,7 +358,7 @@ bool actionAnimationLocked(const App& app,Uint32 now) {
 void extendAnimationDeadline(Uint32& deadline,Uint32 candidate) {
   if(static_cast<Sint32>(candidate-deadline)>0)deadline=candidate;
 }
-void lockInputUntilQueuedAnimationsFinish(App& app,Uint32 minimumUntil) {
+void lockInputUntilQueuedAnimationsFinish(App& app,Uint32 minimumUntil,bool includeScheduledAudio=true) {
   Uint32 deadline=minimumUntil;
   const auto includeFlight=[&](const App::CardFlight& flight) {
     if(!flight.active)return;
@@ -359,7 +374,7 @@ void lockInputUntilQueuedAnimationsFinish(App& app,Uint32 minimumUntil) {
   for(const auto& flight:app.triggeredCardFlights)includeFlight(flight);
   for(const auto& effect:app.cardEffects)if(effect.active)
     extendAnimationDeadline(deadline,effect.startedAt+effect.duration+600);
-  for(const auto& sound:app.scheduledSounds)
+  if(includeScheduledAudio)for(const auto& sound:app.scheduledSounds)
     extendAnimationDeadline(deadline,sound.startedAt+SOURCE_ROW_PLACEMENT_AUDIO_WAIT_MS);
   app.actionAnimationLockUntil=deadline;
   app.actionAnimationLockActive=true;
@@ -373,9 +388,10 @@ void lockCardActionUntilAnimationsFinish(App& app,const gwent::Card& played,cons
     if(app.cardFlight.destination==App::CardZone::Board&&
        sourceWaitsForRowPlacementAudio(played,before,player,targetRow))
       minimumUntil+=SOURCE_ROW_PLACEMENT_AUDIO_WAIT_MS;
-    minimumUntil+=600;
+    if(app.cardFlight.destination==App::CardZone::Board)minimumUntil+=600;
   }
-  lockInputUntilQueuedAnimationsFinish(app,minimumUntil);
+  const bool waitForRowAudio=played.kind!=gwent::Kind::Weather&&played.kind!=gwent::Kind::ClearWeather;
+  lockInputUntilQueuedAnimationsFinish(app,minimumUntil,waitForRowAudio);
 }
 void queueCardTransitionFlights(App& app,const gwent::Game& before,const gwent::Card& played,int player) {
   const auto oldLocations=cardLocations(before),newLocations=cardLocations(app.game);
@@ -982,6 +998,7 @@ const gwent::Card* findTargetCard(const gwent::Game& game,const std::string& id)
   }
   return nullptr;
 }
+bool cardHasRowChoice(const gwent::Card& card);
 void doHumanPlay(App& a) {
   auto& hand=a.game.players[0].hand;
   if(a.handIndex<0 || a.handIndex>=static_cast<int>(hand.size())) { a.status=tr(a,"no_card_selected"); return; }
@@ -993,13 +1010,23 @@ void doHumanPlay(App& a) {
   }
   const int handSizeBefore=static_cast<int>(hand.size());
   const auto before=a.game;
-  if(gwent::playCard(a.game,0,card.id,static_cast<gwent::Row>(a.rowIndex))) {
+  const auto targetRow=cardHasRowChoice(card)?
+    static_cast<gwent::Row>(a.rowIndex):gwent::Row::None;
+  if(gwent::playCard(a.game,0,card.id,targetRow)) {
     animatePlayedCard(a,card,0,a.handIndex,handSizeBefore);
     queueTriggeredEffects(a,before,card,0);
-    playCardSound(a,card,before,0,static_cast<gwent::Row>(a.rowIndex));
-    lockCardActionUntilAnimationsFinish(a,card,before,0,static_cast<gwent::Row>(a.rowIndex));
+    playCardSound(a,card,before,0,targetRow);
+    lockCardActionUntilAnimationsFinish(a,card,before,0,targetRow);
     a.status=displayCardName(a,card)+(a.language==Language::Polish?" - ZAGRANO":" - PLAYED"); a.handIndex=std::min(a.handIndex,static_cast<int>(a.game.players[0].hand.size())-1);
   } else a.status=tr(a,"illegal_play");
+}
+bool cardHasRowChoice(const gwent::Card& card) {
+  if(card.agile||card.kind==gwent::Kind::CommanderHorn||card.kind==gwent::Kind::Mardroeme)return true;
+  if(card.kind==gwent::Kind::Weather)
+    return std::none_of(card.abilities.begin(),card.abilities.end(),[](const std::string& ability) {
+      return ability=="frost"||ability=="fog"||ability=="rain"||ability=="storm";
+    });
+  return false;
 }
 void performAi(App& a) {
   if(a.game.phase!=gwent::Phase::OpponentTurn) return;
@@ -1066,17 +1093,7 @@ void drawSourceCard(SDL_Renderer* r,const App& a,int x,int y,const gwent::Card& 
   drawImage(r,a,"img/icons/power_"+powerIcon+".png",x-1,y-2,24,25);
   if(card.kind==gwent::Kind::Unit||card.kind==gwent::Kind::Leader) {
     const std::string power=std::to_string(card.power);
-    if(card.hero) {
-      const int scale=power.size()>1?1:2;
-      centeredTextInBox(r,x-1,y-2,24,25,power,paper,scale);
-    } else {
-      // The badge's inner disc is 12x12 px at the 640x480 render size.
-      // Use the regular bitmap glyphs so two-digit strengths remain legible.
-      const int numberWidth=static_cast<int>(power.size())*6-1;
-      const int numberX=x+6-numberWidth/2;
-      text(r,numberX+1,y+4,power,Color{190,145,70,255},1);
-      text(r,numberX,y+3,power,ink,1);
-    }
+    powerBadgeNumber(r,x-1,y-2,24,25,power);
   }
   if(card.row!=gwent::Row::None) {
     const char* rowIcon=card.agile?"agile":card.row==gwent::Row::Ranged?"ranged":card.row==gwent::Row::Siege?"siege":"close";
@@ -1209,8 +1226,7 @@ void queueTriggeredEffects(App& a,const gwent::Game& before,const gwent::Card& p
       if(target.id==played.id&&owner==player) {
         if(played.bond&&bondCount>1)queueTargetEffect(a,"bond",x,y,placedEffectsStart-now);
         const auto isMusterGroup=[&](const gwent::Card& item) {
-          return !played.group.empty()&&(item.group==played.group||item.name==played.group||
-                 item.name.rfind(played.group+" - ",0)==0);
+          return !played.group.empty()&&item.name.rfind(played.group,0)==0;
         };
         const bool mustered=played.muster&&std::any_of(current.begin(),current.end(),[&](const gwent::Card& item) {
           if(item.id==played.id||!isMusterGroup(item))return false;
@@ -1460,7 +1476,10 @@ void noteCarouselMove(App& a,int direction) {
 void drawRow(SDL_Renderer* r,const App& a,int owner,int row,int y) {
   constexpr int left=170,width=336,rowHeight=44;
   const bool player=owner==0;
-  const bool chosen=player&&a.game.phase==gwent::Phase::PlayerTurn&&a.rowIndex==row;
+  const auto& hand=a.game.players[0].hand;
+  const bool hasSelected=player&&a.game.phase==gwent::Phase::PlayerTurn&&!hand.empty()&&
+    a.handIndex>=0&&a.handIndex<static_cast<int>(hand.size())&&cardHasRowChoice(hand[static_cast<std::size_t>(a.handIndex)]);
+  const bool chosen=hasSelected&&a.rowIndex==row;
   if(chosen)box(r,left,y,width,rowHeight,Color{255,255,0,20});
   const int total=rowScore(a.game,owner,row);
   // The source row score occupies a centered 5.1% column; high-score laurels
@@ -1543,7 +1562,11 @@ void drawDeckBuilder(SDL_Renderer* r,const App& a) {
   }
   const auto& shownCards=a.editorPane==0?bankCards:deckCards;
   const int cursor=shownCards.empty()?0:std::clamp(a.editorCardIndex,0,static_cast<int>(shownCards.size())-1);
-  const int first=std::clamp(cursor-5,0,std::max(0,static_cast<int>(shownCards.size())-6));
+  const int visibleColumns=a.editorPane==1?2:3;
+  const int visibleRows=a.editorPane==1?3:2;
+  const int lastRowStart=shownCards.empty()?0:((static_cast<int>(shownCards.size())-1)/visibleColumns)*visibleColumns;
+  const int maxFirst=std::max(0,lastRowStart-(visibleRows-1)*visibleColumns);
+  const int first=shownCards.empty()?0:std::clamp((cursor/visibleColumns-(visibleRows-1))*visibleColumns,0,maxFirst);
   const auto drawArray=[&](const std::vector<const gwent::Card*>& source,int x,int pane) {
     const int start=(pane==a.editorPane)?first:0;
     for(int i=start;i<std::min(static_cast<int>(source.size()),start+6);++i) {
@@ -1577,13 +1600,15 @@ void drawDeckBuilder(SDL_Renderer* r,const App& a) {
     box(r,trackX+2,thumbY+2,3,thumbHeight-4,Color{85,85,85,170});
   };
   drawArray(bankCards,53,0);drawArray(deckCards,374,1);
+  narrowText(r,54,340,pl?"D-PAD: KARTY  KRAWEDZ: TALIA  A: DODAJ  L: LIDER":"D-PAD: CARDS  EDGE: DECK  A: ADD  L: LEADER",Color{195,172,129},3);
+  narrowText(r,374,340,pl?"D-PAD: KARTY  B: KOLEKCJA  A: USUN":"D-PAD: CARDS  B: COLLECTION  A: REMOVE",Color{195,172,129},3);
 
   auto leaders=editorLeaders(a);
   int leaderIndex=0;
   if(!leaders.empty()) {
     const auto selected=std::find_if(leaders.begin(),leaders.end(),[&](const auto* card){return card->referenceIndex==a.editDeck.leaderReferenceIndex;});
     if(selected!=leaders.end())leaderIndex=static_cast<int>(selected-leaders.begin());
-    narrowText(r,291,76,pl?"LIDER":"LEADER",Color{143,108,54});
+    narrowText(r,291,76,pl?"L - ZMIEN LIDERA":"L - CHANGE LEADER",Color{143,108,54});
     drawImage(r,a,"img/lg/"+gwent::referenceCardImage(leaders[static_cast<std::size_t>(leaderIndex)]->referenceIndex),298,89,44,82);
   }
 
@@ -1616,11 +1641,8 @@ void drawDeckBuilder(SDL_Renderer* r,const App& a) {
   if(!a.status.empty())narrowText(r,370,306,shortName(a.status,32),gold);
   box(r,298,310,43,11,Color{20,20,20});frame(r,298,310,43,11,Color{55,55,55});
   narrowText(r,301,312,pl?"GRAJ":"START GAME",paper);
-  const auto opponent=recipes().empty()?gwent::ReferenceDeck{}:recipes()[(a.deckIndex+1)%recipes().size()];
-  const auto opponentLeader=recipeLeader((a.deckIndex+1)%recipes().size());
   narrowText(r,271,330,pl?"TALIA PRZECIWNIKA":"OPPONENT'S DECK",Color{130,115,95});
-  narrowText(r,300,343,factionName(opponent.faction,pl),paper);
-  drawImage(r,a,"img/icons/deck_back_"+std::string(opponent.faction==gwent::Faction::Monsters?"monsters":opponent.faction==gwent::Faction::Nilfgaard?"nilfgaard":opponent.faction==gwent::Faction::Scoiatael?"scoiatael":opponent.faction==gwent::Faction::Skellige?"skellige":"realms")+".jpg",354,330,23,28);
+  narrowText(r,300,343,pl?"FRAKCJA LOSOWA":"RANDOM FACTION",paper);
   const int toggleY=290;
   drawImage(r,a,"img/icons/ui_music.png",299,toggleY,16,16);drawImage(r,a,"img/icons/ui_sfx.png",321,toggleY,16,16);
   drawImage(r,a,"img/icons/ui_notification.png",343,toggleY,16,16);
@@ -1632,6 +1654,20 @@ void drawDeckBuilder(SDL_Renderer* r,const App& a) {
     drawCardPreview(r,a,selected);
     if(a.cardDetailsOpen)drawCardDetails(r,a,selected);
     else drawCardRulesPanel(r,a,selected,8,DECK_RULES_PANEL_Y,W-16,DECK_RULES_PANEL_H);
+  }
+  if(a.editingLeader) {
+    auto leaders=editorLeaders(a);
+    if(!leaders.empty()) {
+      box(r,0,0,W,H,Color{0,0,0,232});
+      frame(r,14,12,W-28,H-24,gold);
+      std::vector<const gwent::Card*> choices(leaders.begin(),leaders.end());
+      const auto current=std::find_if(choices.begin(),choices.end(),[&](const gwent::Card* card) {
+        return card->referenceIndex==a.editDeck.leaderReferenceIndex;
+      });
+      const int selected=current==choices.end()?0:static_cast<int>(current-choices.begin());
+      drawChoiceCarousel(r,a,choices,selected,pl?"WYBIERZ LIDERA":"CHOOSE LEADER",
+        pl?"LEWO/PRAWO: LIDER   A: ZATWIERDZ   B: ANULUJ":"LEFT/RIGHT: LEADER   A: CONFIRM   B: CANCEL");
+    }
   }
 }
 void drawMatch(SDL_Renderer* r,const App& a) {
@@ -1687,8 +1723,20 @@ void drawMatch(SDL_Renderer* r,const App& a) {
   };
   drawPile(1,true,23);drawPile(1,false,23);drawPile(0,true,275);drawPile(0,false,275);
   box(r,107,295,34,15,Color{20,20,20,230});frame(r,107,295,34,15,Color{143,108,54});text(r,112,299,tr(a,"pass_button"),paper,1);
+  if(a.game.phase==gwent::Phase::PlayerTurn) {
+    const bool rowChoice=!me.hand.empty()&&a.handIndex>=0&&a.handIndex<static_cast<int>(me.hand.size())&&
+      cardHasRowChoice(me.hand[static_cast<std::size_t>(a.handIndex)]);
+    const std::string controls=a.language==Language::Polish?
+      (rowChoice?"LEWO/PRAWO KARTA  L/R RZAD  A ZAGRAJ  X PRZYTRZYMAJ PASUJ":
+                 "LEWO/PRAWO KARTA  A ZAGRAJ  X PRZYTRZYMAJ PASUJ"):
+      (rowChoice?"LEFT/RIGHT CARD  L/R ROW  A PLAY  HOLD X PASS":
+                 "LEFT/RIGHT CARD  A PLAY  HOLD X PASS");
+    narrowText(r,184,337,controls,paper,3);
+  }
   if(me.passed)text(r,110,282,tr(a,"passed"),paper,1);
   if(op.passed)text(r,110,80,tr(a,"passed"),paper,1);
+  if(actionAnimationLocked(a,SDL_GetTicks()))
+    narrowText(r,194,325,a.language==Language::Polish?"TRWA ANIMACJA - CHWILECZKE":"ANIMATION - PLEASE WAIT",gold,3);
   drawImage(r,a,"img/icons/ui_music.png",90,313,16,16);drawImage(r,a,"img/icons/ui_sfx.png",110,313,16,16);drawImage(r,a,"img/icons/ui_notification.png",128,313,16,16);
   if(!a.musicEnabled) { color(r,gold);SDL_RenderDrawLine(r,90,313,106,329); }
   if(!a.audio.enabled()) { color(r,gold);SDL_RenderDrawLine(r,110,313,126,329); }
@@ -1858,7 +1906,7 @@ void drawMatchOnScreen(SDL_Renderer* r,const App& a) {
 void handleMatchKey(App& a,SDL_Keycode key) {
   if(a.pauseOpen) {
     constexpr int optionCount=8;
-    if(key==SDLK_ESCAPE||key==SDLK_z||key==SDLK_BACKSPACE) { a.pauseOpen=false;return; }
+    if(key==SDLK_ESCAPE||key==SDLK_AC_BACK||key==SDLK_z||key==SDLK_BACKSPACE) { a.pauseOpen=false;return; }
     if(key==SDLK_UP||key==SDLK_LEFT) { a.pauseIndex=(a.pauseIndex+optionCount-1)%optionCount;return; }
     if(key==SDLK_DOWN||key==SDLK_RIGHT) { a.pauseIndex=(a.pauseIndex+1)%optionCount;return; }
     if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x||key==SDLK_SPACE) {
@@ -1876,7 +1924,7 @@ void handleMatchKey(App& a,SDL_Keycode key) {
     return;
   }
   if(a.passConfirmationOpen) {
-    if(key==SDLK_ESCAPE||key==SDLK_z||key==SDLK_BACKSPACE) { a.passConfirmationOpen=false;return; }
+    if(key==SDLK_ESCAPE||key==SDLK_AC_BACK||key==SDLK_z||key==SDLK_BACKSPACE) { a.passConfirmationOpen=false;return; }
     if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x||key==SDLK_SPACE) {
       a.passConfirmationOpen=false;
       if(gwent::pass(a.game,0)) { a.audio.play("pass");a.status=tr(a,"you_passed");if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+400; }
@@ -1897,7 +1945,7 @@ void handleMatchKey(App& a,SDL_Keycode key) {
     return;
   }
   if(a.leaderRevealOpen) {
-    if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x||key==SDLK_SPACE||key==SDLK_ESCAPE||key==SDLK_z||key==SDLK_BACKSPACE) {
+    if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x||key==SDLK_SPACE||key==SDLK_ESCAPE||key==SDLK_AC_BACK||key==SDLK_z||key==SDLK_BACKSPACE) {
       a.leaderRevealOpen=false;
       if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+350;
     }
@@ -1906,7 +1954,7 @@ void handleMatchKey(App& a,SDL_Keycode key) {
   if(a.leaderSelectionMode) {
     const auto cards=leaderChoiceCards(a);
     if(cards.empty()) { a.leaderSelectionMode=false;a.leaderSelections.clear();a.status=tr(a,"leader_no_target");return; }
-    if(key==SDLK_ESCAPE||key==SDLK_z||key==SDLK_BACKSPACE) {
+    if(key==SDLK_ESCAPE||key==SDLK_AC_BACK||key==SDLK_z||key==SDLK_BACKSPACE) {
       if(activeLeaderAbility(a.game.players[0].leader)=="eredin_destroyer") {
         if(a.leaderSelections.size()<leaderDiscardQuota(a))return;
         finishLeaderChoice(a);return;
@@ -1924,6 +1972,10 @@ void handleMatchKey(App& a,SDL_Keycode key) {
         } else finishLeaderChoice(a);
       } else finishLeaderChoice(a);
     }
+    return;
+  }
+  if(key==SDLK_AC_BACK) {
+    if(a.targetMode) { a.targetMode=false;a.selectedTargets.clear();a.status=tr(a,"your_turn"); }
     return;
   }
   if(key==SDLK_ESCAPE) {
@@ -2020,12 +2072,33 @@ void handleMatchKey(App& a,SDL_Keycode key) {
     }
     return;
   }
-  if(key==SDLK_LEFT||key==SDLK_a) { if(!hand.empty())a.handIndex=(a.handIndex+static_cast<int>(hand.size())-1)%static_cast<int>(hand.size());a.audio.play("ui_card"); }
-  else if(key==SDLK_RIGHT||key==SDLK_d) { if(!hand.empty())a.handIndex=(a.handIndex+1)%static_cast<int>(hand.size());a.audio.play("ui_card"); }
+  if(key==SDLK_LEFT||key==SDLK_a) {
+    if(!hand.empty()) {
+      a.handIndex=(a.handIndex+static_cast<int>(hand.size())-1)%static_cast<int>(hand.size());
+      const auto& selected=hand[static_cast<std::size_t>(a.handIndex)];
+      if(selected.agile)a.rowIndex=selected.row==gwent::Row::Ranged?1:0;
+    }
+    a.audio.play("ui_card");
+  }
+  else if(key==SDLK_RIGHT||key==SDLK_d) {
+    if(!hand.empty()) {
+      a.handIndex=(a.handIndex+1)%static_cast<int>(hand.size());
+      const auto& selected=hand[static_cast<std::size_t>(a.handIndex)];
+      if(selected.agile)a.rowIndex=selected.row==gwent::Row::Ranged?1:0;
+    }
+    a.audio.play("ui_card");
+  }
   else if(key==SDLK_PAGEUP) { if(!hand.empty())a.handIndex=(a.handIndex+static_cast<int>(hand.size())-(5%static_cast<int>(hand.size())))%static_cast<int>(hand.size()); }
   else if(key==SDLK_PAGEDOWN) { if(!hand.empty())a.handIndex=(a.handIndex+5)%static_cast<int>(hand.size()); }
-  else if(key==SDLK_UP) a.rowIndex=(a.rowIndex+2)%3;
-  else if(key==SDLK_DOWN) a.rowIndex=(a.rowIndex+1)%3;
+  else if(key==SDLK_UP||key==SDLK_DOWN) {
+    if(!hand.empty()&&a.handIndex>=0&&a.handIndex<static_cast<int>(hand.size())&&
+       cardHasRowChoice(hand[static_cast<std::size_t>(a.handIndex)])) {
+      const int old=a.rowIndex;
+      const int rowCount=hand[static_cast<std::size_t>(a.handIndex)].agile?2:3;
+      a.rowIndex=(a.rowIndex+(key==SDLK_UP?rowCount-1:1))%rowCount;
+      if(old!=a.rowIndex)a.audio.play("ui_card");
+    }
+  }
   else if(key==SDLK_l) {
     beginLeaderChoice(a);
   }
@@ -2043,7 +2116,7 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
   if(a.screen==Screen::Match&&!a.activeNotification.empty())return;
   if(a.screen==Screen::Match&&(a.leaderSelectionMode||a.leaderRevealOpen||a.passConfirmationOpen||a.pauseOpen)) { handleMatchKey(a,key);return; }
   if(a.cardDetailsOpen) {
-    if(key==SDLK_i||key==SDLK_ESCAPE||key==SDLK_BACKSPACE||key==SDLK_z)a.cardDetailsOpen=false;
+    if(key==SDLK_i||key==SDLK_ESCAPE||key==SDLK_AC_BACK||key==SDLK_BACKSPACE||key==SDLK_z)a.cardDetailsOpen=false;
     return;
   }
   if(key==SDLK_i&&(a.screen==Screen::DeckBuilder||a.screen==Screen::Match)) { a.cardDetailsOpen=true;a.audio.play("open");return; }
@@ -2052,6 +2125,13 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
   if(key==SDLK_n) { a.notificationsEnabled=!a.notificationsEnabled;saveSettings(a);return; }
   if(a.screen==Screen::DeckBuilder) {
     if(key==SDLK_ESCAPE) { running=false;return; }
+    if(key==SDLK_AC_BACK) {
+      if(a.editingLeader) {
+        a.editDeck.leaderReferenceIndex=a.leaderSelectionOriginalReference;
+        a.editingLeader=false;
+      } else if(a.editorPane==1) { a.editorPane=0;a.editorCardIndex=0; }
+      return;
+    }
     if(key==SDLK_z) { a.language=a.language==Language::Polish?Language::English:Language::Polish;saveSettings(a);return; }
     if(key==SDLK_r) { loadSavedMatch(a);return; }
     if(key==SDLK_p&&!recipes().empty()) {
@@ -2063,7 +2143,12 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
     if(key==SDLK_PAGEUP||key==SDLK_LEFTBRACKET) { a.deckSlot=a.deckSlot<=1?3:a.deckSlot-1;openDeckEditor(a);return; }
     if(key==SDLK_PAGEDOWN||key==SDLK_RIGHTBRACKET) { a.deckSlot=a.deckSlot>=3?1:a.deckSlot+1;openDeckEditor(a);return; }
     if(key==SDLK_f) { changeDeckFaction(a);return; }
-    if(key==SDLK_l||key==SDLK_TAB) { a.editingLeader=!a.editingLeader;return; }
+    if(key==SDLK_l||key==SDLK_TAB) {
+      if(a.editingLeader)a.userDeckSelected=true;
+      else a.leaderSelectionOriginalReference=a.editDeck.leaderReferenceIndex;
+      a.editingLeader=!a.editingLeader;
+      return;
+    }
     if(key==SDLK_s||key==SDLK_F5) {
       std::string error;
       if(gwent::saveUserDeck(userDeckPath(a,a.deckSlot),a.editDeck,&error)) { a.userDeckSelected=true;a.status=tr(a,"deck_saved"); }
@@ -2076,13 +2161,48 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
       int index=found==leaders.end()?0:static_cast<int>(found-leaders.begin());
       if(key==SDLK_LEFT||key==SDLK_a)index=(index+static_cast<int>(leaders.size())-1)%static_cast<int>(leaders.size());
       else if(key==SDLK_RIGHT||key==SDLK_d||key==SDLK_x)index=(index+1)%static_cast<int>(leaders.size());
-      else if(key==SDLK_RETURN||key==SDLK_KP_ENTER) { a.editingLeader=false;return; }
-      a.editDeck.leaderReferenceIndex=leaders[static_cast<std::size_t>(index)]->referenceIndex;a.userDeckSelected=true;return;
+      else if(key==SDLK_x||key==SDLK_RETURN||key==SDLK_KP_ENTER) { a.editingLeader=false;a.userDeckSelected=true;return; }
+      else if(key==SDLK_ESCAPE||key==SDLK_BACKSPACE||key==SDLK_AC_BACK) {
+        a.editDeck.leaderReferenceIndex=a.leaderSelectionOriginalReference;
+        a.editingLeader=false;return;
+      } else return;
+      a.editDeck.leaderReferenceIndex=leaders[static_cast<std::size_t>(index)]->referenceIndex;return;
     }
     if(key==SDLK_RETURN||key==SDLK_KP_ENTER) { startMatch(a);return; }
-    if(key==SDLK_LEFT||key==SDLK_RIGHT) { a.editorPane=1-a.editorPane;a.editorCardIndex=0;return; }
-    if(key==SDLK_UP||key==SDLK_w)a.editorCardIndex=std::max(0,a.editorCardIndex-(a.editorPane==1?2:3));
-    else if(key==SDLK_DOWN||key==SDLK_j)++a.editorCardIndex;
+    const auto paneCards=[&](int pane) {
+      std::vector<const gwent::Card*> visible;
+      for(const auto* card:editorCards(a)) {
+        const int count=deckCopies(a.editDeck,card->referenceIndex);
+        if((pane==0&&count<card->deckCopies)||(pane==1&&count>0))visible.push_back(card);
+      }
+      return visible;
+    };
+    if(key==SDLK_LEFT||key==SDLK_RIGHT||key==SDLK_UP||key==SDLK_DOWN||key==SDLK_w||key==SDLK_j) {
+      auto visible=paneCards(a.editorPane);
+      if(visible.empty())return;
+      a.editorCardIndex=std::clamp(a.editorCardIndex,0,static_cast<int>(visible.size())-1);
+      const int columns=a.editorPane==0?3:2;
+      const int row=a.editorCardIndex/columns,col=a.editorCardIndex%columns;
+      if(key==SDLK_UP||key==SDLK_w) {
+        if(a.editorCardIndex>=columns)a.editorCardIndex-=columns;
+      } else if(key==SDLK_DOWN||key==SDLK_j) {
+        a.editorCardIndex=std::min(static_cast<int>(visible.size())-1,a.editorCardIndex+columns);
+      } else if(key==SDLK_RIGHT) {
+        if(col+1<columns&&a.editorCardIndex+1<static_cast<int>(visible.size()))++a.editorCardIndex;
+        else if(a.editorPane==0) {
+          const auto deckVisible=paneCards(1);
+          if(!deckVisible.empty()) { a.editorPane=1;a.editorCardIndex=std::min(row*2,static_cast<int>(deckVisible.size())-1); }
+        }
+      } else if(key==SDLK_LEFT) {
+        if(col>0)--a.editorCardIndex;
+        else if(a.editorPane==1) {
+          const auto bankVisible=paneCards(0);
+          if(!bankVisible.empty()) { a.editorPane=0;a.editorCardIndex=std::min(row*3+2,static_cast<int>(bankVisible.size())-1); }
+        }
+      }
+      a.audio.play("ui_card");return;
+    }
+    if(key==SDLK_TAB) { a.editorPane=1-a.editorPane;a.editorCardIndex=0;return; }
     const auto allCards=editorCards(a);
     std::vector<const gwent::Card*> cards;
     for(const auto* card:allCards) {
@@ -2108,6 +2228,23 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
     }
   } else handleMatchKey(a,key);
 }
+SDL_Keycode normalizeMiyooKey(const App& app,SDL_Keycode key);
+bool beginMiyooXHold(App& app,Uint32 now) {
+  if(!app.miyooControls||app.screen!=Screen::Match||app.game.phase!=gwent::Phase::PlayerTurn)return false;
+  app.xDownAt=now;app.xLongPressed=false;return true;
+}
+void updateMiyooXHold(App& app,Uint32 now) {
+  if(app.xDownAt&&!app.xLongPressed&&app.activeNotification.empty()&&
+     app.screen==Screen::Match&&app.game.phase==gwent::Phase::PlayerTurn&&
+     !actionAnimationLocked(app,now)&&SDL_TICKS_PASSED(now,app.xDownAt+600)) {
+    app.passConfirmationOpen=true;app.xLongPressed=true;app.audio.play("open");
+  }
+}
+void releaseMiyooXHold(App& app,bool& running) {
+  if(!app.xDownAt)return;
+  if(!app.xLongPressed)handleKey(app,normalizeMiyooKey(app,SDLK_LSHIFT),running);
+  app.xDownAt=0;app.xLongPressed=false;
+}
 SDL_Keycode controllerKey(const SDL_ControllerButtonEvent& button,const App& app) {
   switch(button.button) {
     case SDL_CONTROLLER_BUTTON_DPAD_UP:return SDLK_UP;
@@ -2115,10 +2252,7 @@ SDL_Keycode controllerKey(const SDL_ControllerButtonEvent& button,const App& app
     case SDL_CONTROLLER_BUTTON_DPAD_LEFT:return SDLK_LEFT;
     case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:return SDLK_RIGHT;
     case SDL_CONTROLLER_BUTTON_A:return SDLK_x;
-    case SDL_CONTROLLER_BUTTON_B:
-      if(app.screen==Screen::DeckBuilder&&!app.cardDetailsOpen)
-        return app.editorPane==1?SDLK_BACKSPACE:SDLK_RIGHT;
-      return SDLK_ESCAPE;
+    case SDL_CONTROLLER_BUTTON_B:return SDLK_AC_BACK;
     case SDL_CONTROLLER_BUTTON_X:return SDLK_i;
     case SDL_CONTROLLER_BUTTON_Y:return app.screen==Screen::Match?SDLK_l:SDLK_f;
     case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:return app.screen==Screen::Match?SDLK_UP:SDLK_TAB;
@@ -2131,10 +2265,7 @@ SDL_Keycode normalizeMiyooKey(const App& app,SDL_Keycode key) {
   if(!app.miyooControls)return key;
   switch(key) {
     case SDLK_LCTRL:return SDLK_x;       // A
-    case SDLK_LALT: // B
-      if(app.screen==Screen::DeckBuilder&&!app.cardDetailsOpen)
-        return app.editorPane==1?SDLK_BACKSPACE:SDLK_RIGHT;
-      return SDLK_ESCAPE;
+    case SDLK_LALT:return SDLK_AC_BACK; // B always goes back/cancels; it never plays or removes a card.
     case SDLK_LSHIFT:return SDLK_i; // X
     case SDLK_SPACE:
       if(app.screen==Screen::Match)return SDLK_l; // Y = leader
@@ -2259,7 +2390,7 @@ int main(int argc,char** argv) {
     app.screen=Screen::Match;
     bool okay=startsInDeckMaker&&
               normalizeMiyooKey(app,SDLK_LCTRL)==SDLK_x&&
-              normalizeMiyooKey(app,SDLK_LALT)==SDLK_ESCAPE&&
+              normalizeMiyooKey(app,SDLK_LALT)==SDLK_AC_BACK&&
               normalizeMiyooKey(app,SDLK_LSHIFT)==SDLK_i&&
               normalizeMiyooKey(app,SDLK_SPACE)==SDLK_l&&
               normalizeMiyooKey(app,SDLK_TAB)==SDLK_UP&&
@@ -2270,7 +2401,7 @@ int main(int argc,char** argv) {
               sourceEase(0.0)<0.001&&sourceEase(0.5)>0.75&&sourceEase(0.5)<0.85&&sourceEase(1.0)>0.999;
     App deckKeyProbe;deckKeyProbe.miyooControls=true;deckKeyProbe.screen=Screen::DeckBuilder;
     okay=okay&&normalizeMiyooKey(deckKeyProbe,SDLK_LCTRL)==SDLK_x&&
-         normalizeMiyooKey(deckKeyProbe,SDLK_LALT)==SDLK_RIGHT&&
+         normalizeMiyooKey(deckKeyProbe,SDLK_LALT)==SDLK_AC_BACK&&
          normalizeMiyooKey(deckKeyProbe,SDLK_LSHIFT)==SDLK_i&&
          normalizeMiyooKey(deckKeyProbe,SDLK_SPACE)==SDLK_f&&
          normalizeMiyooKey(deckKeyProbe,SDLK_TAB)==SDLK_TAB&&
@@ -2280,9 +2411,9 @@ int main(int argc,char** argv) {
          normalizeMiyooKey(deckKeyProbe,SDLK_RETURN)==SDLK_RETURN&&
          normalizeMiyooKey(deckKeyProbe,SDLK_ESCAPE)==SDLK_s;
     deckKeyProbe.editorPane=1;
-    okay=okay&&normalizeMiyooKey(deckKeyProbe,SDLK_LALT)==SDLK_BACKSPACE;
+    okay=okay&&normalizeMiyooKey(deckKeyProbe,SDLK_LALT)==SDLK_AC_BACK;
     deckKeyProbe.cardDetailsOpen=true;
-    okay=okay&&normalizeMiyooKey(deckKeyProbe,SDLK_LALT)==SDLK_ESCAPE&&
+    okay=okay&&normalizeMiyooKey(deckKeyProbe,SDLK_LALT)==SDLK_AC_BACK&&
          normalizeMiyooKey(deckKeyProbe,SDLK_ESCAPE)==SDLK_ESCAPE;
     App scoiataelProbe;scoiataelProbe.miyooControls=true;
     scoiataelProbe.game.phase=gwent::Phase::Mulligan;
@@ -2304,11 +2435,11 @@ int main(int argc,char** argv) {
     controllerButton.button=SDL_CONTROLLER_BUTTON_A;
     okay=okay&&controllerKey(controllerButton,deckKeyProbe)==SDLK_x;
     controllerButton.button=SDL_CONTROLLER_BUTTON_B;
-    okay=okay&&controllerKey(controllerButton,deckKeyProbe)==SDLK_ESCAPE;
+    okay=okay&&controllerKey(controllerButton,deckKeyProbe)==SDLK_AC_BACK;
     deckKeyProbe.cardDetailsOpen=false;deckKeyProbe.editorPane=0;
-    okay=okay&&controllerKey(controllerButton,deckKeyProbe)==SDLK_RIGHT;
+    okay=okay&&controllerKey(controllerButton,deckKeyProbe)==SDLK_AC_BACK;
     deckKeyProbe.editorPane=1;
-    okay=okay&&controllerKey(controllerButton,deckKeyProbe)==SDLK_BACKSPACE;
+    okay=okay&&controllerKey(controllerButton,deckKeyProbe)==SDLK_AC_BACK;
     controllerButton.button=SDL_CONTROLLER_BUTTON_X;
     okay=okay&&controllerKey(controllerButton,deckKeyProbe)==SDLK_i;
     controllerButton.button=SDL_CONTROLLER_BUTTON_Y;
@@ -2319,7 +2450,66 @@ int main(int argc,char** argv) {
     okay=okay&&controllerKey(controllerButton,deckKeyProbe)==SDLK_TAB;
     controllerButton.button=SDL_CONTROLLER_BUTTON_RIGHTSHOULDER;
     okay=okay&&controllerKey(controllerButton,deckKeyProbe)==SDLK_DOWN;
+    App buttonBProbe;buttonBProbe.miyooControls=true;buttonBProbe.screen=Screen::Match;
+    buttonBProbe.game.phase=gwent::Phase::PlayerTurn;gwent::Card bTestCard;
+    bTestCard.id="button-b-must-not-play";bTestCard.kind=gwent::Kind::Unit;bTestCard.row=gwent::Row::Melee;
+    buttonBProbe.game.players[0].hand.push_back(bTestCard);
+    handleMatchKey(buttonBProbe,normalizeMiyooKey(buttonBProbe,SDLK_LALT));
+    okay=okay&&buttonBProbe.game.players[0].hand.size()==1&&!buttonBProbe.game.players[0].passed;
+    App xHoldProbe;xHoldProbe.miyooControls=true;xHoldProbe.screen=Screen::Match;
+    xHoldProbe.game.phase=gwent::Phase::PlayerTurn;bool xProbeRunning=true;
+    const Uint32 xStart=SDL_GetTicks()+1;
+    okay=okay&&beginMiyooXHold(xHoldProbe,xStart);
+    updateMiyooXHold(xHoldProbe,xStart+601);
+    okay=okay&&xHoldProbe.passConfirmationOpen&&!xHoldProbe.game.players[0].passed;
+    releaseMiyooXHold(xHoldProbe,xProbeRunning);
+    handleMatchKey(xHoldProbe,normalizeMiyooKey(xHoldProbe,SDLK_LCTRL));
+    okay=okay&&xHoldProbe.game.players[0].passed;
+    App xTapProbe;xTapProbe.miyooControls=true;xTapProbe.screen=Screen::Match;
+    xTapProbe.game.phase=gwent::Phase::PlayerTurn;bool xTapRunning=true;
+    okay=okay&&beginMiyooXHold(xTapProbe,SDL_GetTicks()+1);
+    releaseMiyooXHold(xTapProbe,xTapRunning);
+    okay=okay&&xTapProbe.cardDetailsOpen&&!xTapProbe.passConfirmationOpen;
     deckKeyProbe.cardDetailsOpen=false;deckKeyProbe.editorPane=0;deckKeyProbe.language=Language::Polish;
+    if(!recipes().empty()) {
+      const auto& recipe=recipes().front();
+      deckKeyProbe.editDeck={"input-grid-test",recipe.faction,recipe.leaderReferenceIndex,recipe.cardCounts};
+      deckKeyProbe.userDeckSelected=false;deckKeyProbe.editorCardIndex=0;deckKeyProbe.editorPane=0;
+      bool navRunning=true;
+      const auto bankBefore=editorCards(deckKeyProbe);
+      std::vector<const gwent::Card*> bankAvailable;
+      for(const auto* card:bankBefore)if(deckCopies(deckKeyProbe.editDeck,card->referenceIndex)<card->deckCopies)bankAvailable.push_back(card);
+      if(bankAvailable.size()>5) {
+        handleKey(deckKeyProbe,SDLK_RIGHT,navRunning);
+        okay=okay&&deckKeyProbe.editorPane==0&&deckKeyProbe.editorCardIndex==1;
+        handleKey(deckKeyProbe,SDLK_DOWN,navRunning);
+        okay=okay&&deckKeyProbe.editorCardIndex==4;
+        const auto* selected=bankAvailable[4];
+        const int copiesBefore=deckCopies(deckKeyProbe.editDeck,selected->referenceIndex);
+        handleKey(deckKeyProbe,normalizeMiyooKey(deckKeyProbe,SDLK_LCTRL),navRunning);
+        okay=okay&&deckCopies(deckKeyProbe.editDeck,selected->referenceIndex)==copiesBefore+1;
+        deckKeyProbe.editorCardIndex=2;
+        handleKey(deckKeyProbe,SDLK_RIGHT,navRunning);
+        okay=okay&&deckKeyProbe.editorPane==1&&deckKeyProbe.editorCardIndex==0;
+        handleKey(deckKeyProbe,normalizeMiyooKey(deckKeyProbe,SDLK_LALT),navRunning);
+        okay=okay&&deckKeyProbe.editorPane==0;
+      } else okay=false;
+      const auto leadersForInput=editorLeaders(deckKeyProbe);
+      if(leadersForInput.size()>1) {
+        const int original=deckKeyProbe.editDeck.leaderReferenceIndex;
+        handleKey(deckKeyProbe,SDLK_TAB,navRunning);
+        handleKey(deckKeyProbe,SDLK_RIGHT,navRunning);
+        okay=okay&&deckKeyProbe.editingLeader&&deckKeyProbe.editDeck.leaderReferenceIndex!=original;
+        handleKey(deckKeyProbe,normalizeMiyooKey(deckKeyProbe,SDLK_LALT),navRunning);
+        okay=okay&&!deckKeyProbe.editingLeader&&deckKeyProbe.editDeck.leaderReferenceIndex==original;
+        handleKey(deckKeyProbe,SDLK_TAB,navRunning);
+        handleKey(deckKeyProbe,SDLK_RIGHT,navRunning);
+        handleKey(deckKeyProbe,normalizeMiyooKey(deckKeyProbe,SDLK_LCTRL),navRunning);
+        okay=okay&&!deckKeyProbe.editingLeader&&deckKeyProbe.userDeckSelected&&
+             deckKeyProbe.editDeck.leaderReferenceIndex!=original;
+      } else okay=false;
+    } else okay=false;
+    deckKeyProbe.editingLeader=false;deckKeyProbe.userDeckSelected=false;deckKeyProbe.editDeck={};
     bool deckMenuRunning=true;
     handleKey(deckKeyProbe,SDLK_z,deckMenuRunning);
     okay=okay&&deckKeyProbe.screen==Screen::DeckBuilder&&deckKeyProbe.language==Language::English&&deckMenuRunning;
@@ -2418,6 +2608,13 @@ int main(int argc,char** argv) {
          !actionAnimationLocked(timingProbe,lockUntil)&&timingProbe.handIndex==0&&
          static_cast<Sint32>(lockUntil-(timingProbe.cardEffects.front().startedAt+
            timingProbe.cardEffects.front().duration+600))>=0;
+    App weatherLockProbe;gwent::Card frostTiming;frostTiming.id="source-timing-frost";
+    frostTiming.kind=gwent::Kind::Weather;frostTiming.abilities={"frost"};
+    weatherLockProbe.cardFlight.active=true;weatherLockProbe.cardFlight.destination=App::CardZone::Weather;
+    weatherLockProbe.cardFlight.card=frostTiming;weatherLockProbe.cardFlight.startedAt=SDL_GetTicks()+SOURCE_CARD_PREVIEW_MS;
+    weatherLockProbe.scheduledSounds.push_back({"frost",SDL_GetTicks()+SOURCE_CARD_PREVIEW_MS});
+    lockCardActionUntilAnimationsFinish(weatherLockProbe,frostTiming,gwent::Game{},0,gwent::Row::None);
+    okay=okay&&weatherLockProbe.actionAnimationLockUntil==weatherLockProbe.cardFlight.startedAt+SOURCE_CARD_FLIGHT_MS;
     okay=okay&&std::string(sourceWeatherOverlayForRow(0))=="frost"&&
          std::string(sourceWeatherOverlayForRow(1))=="fog"&&
          std::string(sourceWeatherOverlayForRow(2))=="rain";
@@ -2781,9 +2978,17 @@ int main(int argc,char** argv) {
     while(SDL_PollEvent(&event)) {
       if(event.type==SDL_QUIT)running=false;
       else if(event.type==SDL_KEYDOWN&&!event.key.repeat) {
-        if(app.miyooControls&&event.key.keysym.sym==SDLK_ESCAPE) {
+        if(app.miyooControls)
+          std::cerr<<"Input SDL_KEYDOWN raw="<<SDL_GetKeyName(event.key.keysym.sym)
+                   <<" code="<<event.key.keysym.sym<<" normalized="
+                   <<SDL_GetKeyName(normalizeMiyooKey(app,event.key.keysym.sym))<<"\n";
+        if(app.miyooControls&&event.key.keysym.sym==SDLK_LSHIFT&&beginMiyooXHold(app,SDL_GetTicks())) {
+          // Short X opens the card inspector; a hold requests a pass.
+        } else if(app.miyooControls&&event.key.keysym.sym==SDLK_ESCAPE) {
           app.selectDownAt=SDL_GetTicks();app.selectLongPressed=false;
         } else handleKey(app,normalizeMiyooKey(app,event.key.keysym.sym),running);
+      } else if(event.type==SDL_KEYUP&&app.miyooControls&&event.key.keysym.sym==SDLK_LSHIFT&&app.xDownAt) {
+        releaseMiyooXHold(app,running);
       } else if(event.type==SDL_KEYUP&&app.miyooControls&&event.key.keysym.sym==SDLK_ESCAPE) {
         if(app.selectDownAt&&!app.selectLongPressed)handleKey(app,normalizeMiyooKey(app,event.key.keysym.sym),running);
         app.selectDownAt=0;app.selectLongPressed=false;
@@ -2812,6 +3017,7 @@ int main(int argc,char** argv) {
        SDL_TICKS_PASSED(SDL_GetTicks(),app.selectDownAt+500)) {
       app.cardDetailsOpen=true;app.selectLongPressed=true;app.audio.play("open");
     }
+    updateMiyooXHold(app,SDL_GetTicks());
     if(app.cardFlight.active&&SDL_TICKS_PASSED(SDL_GetTicks(),app.cardFlight.startedAt+499))app.cardFlight.active=false;
     const Uint32 now=SDL_GetTicks();
     app.triggeredCardFlights.erase(std::remove_if(app.triggeredCardFlights.begin(),app.triggeredCardFlights.end(),[&](const App::CardFlight& flight) {

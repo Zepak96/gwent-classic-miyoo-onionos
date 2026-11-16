@@ -19,13 +19,13 @@ nie zastępuje odczytu `event0` na konkretnej wersji firmware.
 
 | Miyoo | Zdarzenie SDL Mini | Akcja w grze |
 |---|---|---|
-| D-pad | strzałki | W edytorze góra/dół wybiera kartę, lewo/prawo przełącza bank i talię; w meczu wybiera kartę/rząd |
+| D-pad | strzałki | W edytorze porusza się po siatce kart; przejście przez krawędź łączy kolekcję z talią. W meczu wybiera kartę; rząd zmienia się tylko dla kart, które pozwalają go wybrać |
 | A | Left Ctrl | Zatwierdź / zagraj; podczas mulliganu zaznacza kartę |
-| B | Left Alt | W edytorze: przejście z banku do talii albo usunięcie kopii w panelu talii; zamyka podgląd karty. W meczu anuluje bieżący wybór lub zapisuje mecz i wraca do edytora |
-| X | Left Shift | Otwiera/zamyka czytelny podgląd karty |
+| B | Left Alt | Cofnij/anuluj; w edytorze wraca z talii do kolekcji; nigdy nie zagrywa ani nie usuwa karty |
+| X | Left Shift | Krótkie naciśnięcie otwiera podgląd karty; przytrzymanie podczas swojej tury otwiera potwierdzenie spasowania |
 | Y | Space | Zmienia frakcję w edytorze; używa zdolności lidera w meczu; zatwierdza/pomija wymianę w mulliganie |
-| L | Tab | Poprzedni rząd w meczu; wybór lidera w edytorze |
-| R | Backspace | Następny rząd w meczu; nawigacja w edytorze |
+| L | Tab | W meczu zmienia wybrany rząd tylko dla karty z wyborem rzędu; w edytorze otwiera wybór lidera |
+| R | Backspace | W meczu zmienia wybrany rząd tylko dla karty z wyborem rzędu; w edytorze przesuwa kursor w dół |
 | L2 / R2 | PageDown / PageUp | L2: następny, R2: poprzedni slot talii; w meczu L2 przewija rękę o pięć kart naprzód, R2 wstecz |
 | Start | Enter | Rozpoczyna mecz z edytora; otwiera pauzę w meczu; zatwierdza/pomija mulligan |
 | Select | Escape | Zapis talii w edytorze; zamyka podgląd, jeśli jest otwarty. W meczu otwiera potwierdzenie pasowania lub zatwierdza wybór fazy |
@@ -37,12 +37,14 @@ zapisany mecz, `Z` zmienia język, a `F` zmienia frakcję. Te klawisze są dost�
 na klawiaturze; fizyczne Y zmienia frakcję, a język jest domyślnie polski.
 
 Klawisz Select nie pasuje automatycznie: najpierw otwiera pytanie, A zatwierdza,
-a B anuluje. Na ekranie mulliganu lewo/prawo wybiera kartę, A ją zaznacza, a
-Start, Y lub Select zatwierdza wybór albo pomija wymianę, gdy nic nie
-zaznaczono. X otwiera tekstowy inspektor karty. Wbudowany smoke `--input-test`
+a B anuluje. Przytrzymanie X również otwiera potwierdzenie spasowania. Na ekranie
+mulliganu lewo/prawo wybiera kartę, A ją zaznacza, a Start, Y lub Select
+zatwierdza wybór albo pomija wymianę, gdy nic nie zaznaczono. Krótkie naciśnięcie
+X otwiera tekstowy inspektor karty. Wbudowany smoke `--input-test`
 sprawdza mapowanie klawiszy Mini SDL i alternatywnych zdarzeń gamepada dla obu
 ekranów, zachowanie B zależnie od panelu, pauzę, bezpieczne potwierdzanie
-pasowania oraz ochronę wyboru celu.
+pasowania oraz ochronę wyboru celu. Test sprawdza założone kody SDL, nie odczyt
+fizycznych przycisków konkretnej konsoli; wymaga to osobnego testu na Miyoo.
 
 ## Status weryfikacji
 

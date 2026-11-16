@@ -386,21 +386,26 @@ static void abilitiesAndValidation() {
   medicNonCombat.players[0].graveyard.push_back(excluded);
   assert(!playCard(medicNonCombat,0,"medic-noncombat",Row::None,excluded.id));
 
-  Game muster; auto leader=unit("muster1",4); leader.muster=true; leader.group="crone";
-  auto copy=unit("muster2",4,Row::Ranged); copy.muster=true; copy.group="crone";
+  Game muster; auto leader=unit("muster1",4); leader.name="Crone - Brewess";leader.muster=true;leader.group="Crone";
+  auto copy=unit("muster2",4,Row::Ranged);copy.name="Crone - Whispess";copy.muster=true;copy.group="Crone";
   muster.players[0].hand.push_back(leader); muster.players[0].deck.push_back(copy);
   assert(playCard(muster,0,"muster1"));
   assert(muster.players[0].deck.empty() && muster.players[0].board[0].size()==1 && muster.players[0].board[1].size()==1);
 
   Game roachMuster;
   Card geralt = referenceCard("Geralt of Rivia");
+  Card ciri = referenceCard("Cirilla Fiona Elen Riannon");
   Card roach = referenceCard("Roach");
   roachMuster.players[0].hand.push_back(geralt);
+  roachMuster.players[0].hand.push_back(ciri);
   roachMuster.players[0].deck.push_back(roach);
   assert(playCard(roachMuster,0,geralt.id));
-  assert(roachMuster.players[0].deck.empty());
+  assert(roachMuster.players[0].deck.empty() && roachMuster.players[0].hand.size()==1 &&
+         roachMuster.players[0].hand.front().name=="Cirilla Fiona Elen Riannon");
   assert(std::any_of(roachMuster.players[0].board[0].begin(),roachMuster.players[0].board[0].end(),
                      [](const Card& card){return card.name=="Roach";}));
+  assert(std::none_of(roachMuster.players[0].board[0].begin(),roachMuster.players[0].board[0].end(),
+                      [](const Card& card){return card.name=="Cirilla Fiona Elen Riannon";}));
 
   Game weather; Card frost; frost.id="frost"; frost.kind=Kind::Weather; frost.abilities={"frost"};
   weather.players[0].hand.push_back(frost); weather.players[0].board[0].push_back(unit("cold",8));

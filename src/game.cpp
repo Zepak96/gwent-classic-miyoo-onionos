@@ -192,9 +192,11 @@ void finishActionTurn(Game& g) {
 void applyMuster(Player& player, const Card& played) {
   if ((!played.muster && !hasAbility(played, "muster")) || played.group.empty()) return;
   const auto matchesMusterGroup = [&](const Card& candidate) {
-    if (candidate.group == played.group) return true;
-    if (candidate.name == played.group) return true;
-    return candidate.name.rfind(played.group + " - ", 0) == 0;
+    // Match the source abilities.js predicate exactly: card names must start
+    // with the Muster key. The catalog's `group` field also stores the key on
+    // every member, including Geralt and Ciri (both group="Roach"), so using
+    // candidate.group here incorrectly summons one hero when the other plays.
+    return candidate.name.rfind(played.group, 0) == 0;
   };
   auto deploy = [&](std::vector<Card>& source) {
     for (auto it = source.begin(); it != source.end();) {
