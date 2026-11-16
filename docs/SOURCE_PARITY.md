@@ -148,6 +148,10 @@ items above:
 - Targeted plays now use the same input/action lock as ordinary plays and AI
   actions, through the end of queued card/effect animations. SDL input
   regression verifies the Medic target-confirm path activates the lock.
+- Match initialization namespaces runtime card IDs by player and deck instance.
+  The same neutral catalog card may be present in both decks, while the
+  renderer tracks card flights and effects by ID. A regression verifies that
+  identical catalog copies on opposite sides receive distinct runtime IDs.
 - Mardroeme's persistent row effect, its distinction from special-slot
   occupancy, Ermion activation, Berserker transformation on later plays and
   Muster summons, round reset, and save/load state.

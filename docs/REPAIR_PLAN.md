@@ -133,6 +133,14 @@ objawy, dopóki nie da się ich odtworzyć w kodzie lub logu.
     Zwykłe zagranie i ruch AI blokowały wejście do zakończenia sekwencji lotu,
     ale ścieżka zatwierdzenia celu Medyka tego nie robiła. Dodano tę samą
     blokadę po zagrywce i regresję wejścia SDL; fizyczny test pozostaje otwarty.
+21. **Kopie tych samych neutralnych kart miały kolidujące identyfikatory między
+    taliami — naprawione w kodzie.** Identyfikator generowany z katalogu
+    wskazywał definicję/kopię karty, więc ta sama karta obecna w obu taliach
+    miała ten sam ID. Interfejs dopasowuje loty i efekty kart po ID; kolizja
+    mogła przypisać ruch do kopii drugiego gracza. Przy inicjalizacji meczu
+    każda karta dostaje teraz ID z prefiksem właściciela i indeksem instancji.
+    Test używa tej samej neutralnej karty po obu stronach i wymaga różnych ID.
+    Stare zapisy z aktywnym meczem wymagają osobnego sprawdzenia migracji.
 
 ## Kolejność naprawy i kryteria odbioru
 

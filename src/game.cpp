@@ -291,6 +291,13 @@ void beginMatchImpl(Game& g,std::vector<Card> playerDeck,Faction playerFaction,
   for (int i = 0; i < 2; ++i) {
     auto& p = g.players[i];
     p.deck = i == 0 ? std::move(playerDeck) : std::move(opponentDeck);
+    // Catalog IDs identify a card definition/copy slot, so both decks can
+    // contain the same ID (most often for neutral cards). The native UI and
+    // target APIs track physical cards by ID; namespace each match instance
+    // before shuffling/dealing to keep card flights and selections attached
+    // to the correct copy across both sides.
+    for(std::size_t index=0;index<p.deck.size();++index)
+      p.deck[index].id="p"+std::to_string(i)+":"+std::to_string(index)+":"+p.deck[index].id;
     p.faction = i == 0 ? playerFaction : opponentFaction;
     if(i==0&&playerLeader)p.leader=*playerLeader;
     if(i==1&&opponentLeader)p.leader=*opponentLeader;

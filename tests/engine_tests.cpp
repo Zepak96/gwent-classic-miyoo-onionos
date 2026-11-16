@@ -957,10 +957,16 @@ static void sourceMatchInitializationOrder() {
   playerDeck[0]=referenceCard("Decoy");playerDeck[0].id="initial-player-decoy-a";
   playerDeck[1]=referenceCard("Decoy");playerDeck[1].id="initial-player-decoy-b";
   playerDeck[2]=referenceCard("Biting Frost");playerDeck[2].id="initial-player-weather";
+  auto expectedPlayerDeck=playerDeck,expectedOpponentDeck=opponentDeck;
+  const auto namespaceInstances=[](std::vector<Card>& cards,int owner) {
+    for(std::size_t i=0;i<cards.size();++i)
+      cards[i].id="p"+std::to_string(owner)+":"+std::to_string(i)+":"+cards[i].id;
+  };
+  namespaceInstances(expectedPlayerDeck,0);namespaceInstances(expectedOpponentDeck,1);
   constexpr std::uint64_t seed=0x5a17c3;
   std::uint64_t expectedRng=seed;
-  auto expectedPlayer=expectedSourceDeckInitialization(playerDeck,expectedRng);
-  auto expectedOpponent=expectedSourceDeckInitialization(opponentDeck,expectedRng);
+  auto expectedPlayer=expectedSourceDeckInitialization(expectedPlayerDeck,expectedRng);
+  auto expectedOpponent=expectedSourceDeckInitialization(expectedOpponentDeck,expectedRng);
 
   Game daisy;
   beginMatchWithLeaders(daisy,playerDeck,leader("francesca_daisy"),opponentDeck,
@@ -978,8 +984,8 @@ static void sourceMatchInitializationOrder() {
   assert(daisy.rngState==expectedRng); // a forced starter skips the coin toss
 
   expectedRng=seed;
-  expectedPlayer=expectedSourceDeckInitialization(playerDeck,expectedRng);
-  expectedOpponent=expectedSourceDeckInitialization(opponentDeck,expectedRng);
+  expectedPlayer=expectedSourceDeckInitialization(expectedPlayerDeck,expectedRng);
+  expectedOpponent=expectedSourceDeckInitialization(expectedOpponentDeck,expectedRng);
   const int expectedStarter=static_cast<int>(expectedRandom(expectedRng)%2);
   Game coin;
   beginMatch(coin,playerDeck,Faction::NorthernRealms,opponentDeck,Faction::Monsters,seed);
@@ -990,6 +996,15 @@ static void sourceMatchInitializationOrder() {
     assert(coin.players[0].hand[i].id==expectedHumanHand[i].id);
     assert(coin.players[1].hand[i].id==expectedOpponent[9-i].id);
   }
+}
+static void matchCardInstancesHaveUniqueIds() {
+  const auto sharedNeutral=referenceCard("Cirilla Fiona Elen Riannon");
+  Game game;
+  beginMatch(game,{sharedNeutral},Faction::NorthernRealms,{sharedNeutral},Faction::Monsters,0x1234,0);
+  assert(game.players[0].hand.size()==1&&game.players[1].hand.size()==1);
+  assert(game.players[0].hand[0].id!=game.players[1].hand[0].id);
+  assert(game.players[0].hand[0].id.rfind("p0:0:",0)==0);
+  assert(game.players[1].hand[0].id.rfind("p1:0:",0)==0);
 }
 static void avengerCards() {
   Game decoy;
@@ -1295,4 +1310,4 @@ static void leaderAbilities() {
   for(int owner=0;owner<2;++owner)
     for(std::size_t i=0;i<untouchedDecks[owner].size();++i)assert(emptyCrach.players[owner].deck[i].id==untouchedDecks[owner][i]);
 }
-int main() { scoreRules(); duplicateWeatherIsDiscarded(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceMatchInitializationOrder(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
+int main() { scoreRules(); duplicateWeatherIsDiscarded(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
