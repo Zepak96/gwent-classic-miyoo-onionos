@@ -333,3 +333,10 @@ rodzajami kart; pełny test na urządzeniu opisany wersją binarium i wynikiem.
   pierwszym myślniku, jak źródłowe `abilities.js`. Poprzedni separator `" - "`
   pomijał „Arachas- Behemoth”; regresja potwierdza przywołanie Arachas z ręki
   i talii.
+- [x] Commit `450237d` sortuje rząd po przemianie Berserkera przez Mardroeme,
+  zgodnie ze źródłowym `removeCard()` + `addCard()`. Nowy przypadek regresyjny
+  przechodzi w CTest; CI desktopowe i build ARMHF również przeszły. Pakiet
+  `GwentClassic-OnionOS.zip` (`84f4b9eddfe31abee808df93401b7386fd0cbe53e40d8167df3ce149f6525137`)
+  wgrano na SD i zweryfikowano SHA-256 wszystkich 603 plików. Zachowano kopię
+  `GwentClassic.previous-450237d`. Fizyczny test partii z przemianą pozostaje
+  otwarty.

@@ -342,3 +342,15 @@ Arachas- Behemoth's default Muster prefix now follows the source
 The prior catalog generator split only on `" - "`, so it failed to summon
 Arachas copies from hand/deck. An engine regression verifies all three copies
 move and both source zones empty.
+
+## Berserker transformation row order — 16.11.2026
+
+The pinned `abilities.js` removes each Berserker and adds its Vildkaarl
+replacement through `Row.addCard()`, which sorts by printed power and name.
+The native engine previously replaced the struct in place. It now resorts the
+row after transformation, preserving the runtime card ID for UI selection. The
+engine regression confirms the 14-strength Vildkaarl moves after a 9-strength
+unit. CTest passed 2/2, desktop CI passed for commit `450237d`, and the ARMHF
+OnionOS package was installed and SHA-256 verified on SD (603 files). The SD
+backup is `GwentClassic.previous-450237d`. Physical match behavior and the
+remaining Vildkaarl callback/audio lifecycle still require audit.
