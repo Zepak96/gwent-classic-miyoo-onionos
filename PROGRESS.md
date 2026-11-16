@@ -44,6 +44,10 @@ końcowym wydaniem.
 - Przemienione karty Vildkaarl z tagiem `vildkarrl` odtwarzają teraz źródłowy
   efekt dźwiękowy Mardroeme zamiast standardowego dźwięku rzędu. Desktop build,
   CTest 2/2, test sterowania i dekodowanie wszystkich 37 plików audio przechodzą.
+- Rozszerzono testy zdolności liderów z repo referencyjnego o oczyszczenie
+  pogody, Torrential Rain, ranged/melee Scorch, Biting Frost, Ranged Horn,
+  Hope of the Aen Seidhe i Invader of the North. Pełne pokrycie wszystkich
+  zdolności i wyborów lidera pozostaje otwarte.
 
 - Naprawiono mapowanie własnych maksimów w wyborze celu AI dla Manekina:
   wariant źródłowy losuje spośród maksimum każdego własnego rzędu, nie tylko

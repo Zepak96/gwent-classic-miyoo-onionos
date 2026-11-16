@@ -660,6 +660,20 @@ static void leaderAbilities() {
   assert(activateLeader(exactWeather,0));
   assert(exactWeather.weather[1] && !exactWeather.weather[2] && exactWeather.weatherCards[0].card.name=="Impenetrable Fog");
 
+  Game emhyrRain;
+  emhyrRain.players[0].leader=leader("emhyr_imperial");emhyrRain.players[0].leaderAbilityAvailable=true;
+  emhyrRain.players[0].deck={referenceCard("Torrential Rain")};
+  assert(activateLeader(emhyrRain,0));
+  assert(emhyrRain.weather[2]&&emhyrRain.players[0].deck.empty()&&emhyrRain.weatherCards[0].card.name=="Torrential Rain");
+
+  Game clearWeather;
+  clearWeather.players[0].leader=leader("foltest_lord");clearWeather.players[0].leaderAbilityAvailable=true;
+  clearWeather.weather.fill(true);
+  clearWeather.weatherCards.push_back({referenceCard("Biting Frost"),1});
+  assert(activateLeader(clearWeather,0));
+  assert(std::none_of(clearWeather.weather.begin(),clearWeather.weather.end(),[](bool active){return active;}));
+  assert(clearWeather.players[1].graveyard.back().name=="Biting Frost");
+
   Game horn;
   horn.players[0].leader=leader("foltest_siegemaster"); horn.players[0].leaderAbilityAvailable=true;
   horn.players[0].board[2].push_back(unit("siege",5));
@@ -671,6 +685,24 @@ static void leaderAbilities() {
   rowScorch.players[1].board[2]={unit("siege-6",6,Row::Siege),unit("siege-4",4,Row::Siege)};
   assert(activateLeader(rowScorch,0));
   assert(rowScorch.players[1].board[2].size()==1 && rowScorch.players[1].graveyard.size()==1);
+
+  Game rangedScorch;
+  rangedScorch.players[0].leader=leader("foltest_son");rangedScorch.players[0].leaderAbilityAvailable=true;
+  rangedScorch.players[1].board[1]={unit("ranged-6",6,Row::Ranged),unit("ranged-4",4,Row::Ranged)};
+  assert(activateLeader(rangedScorch,0));
+  assert(rangedScorch.players[1].board[1].size()==1&&rangedScorch.players[1].graveyard.size()==1);
+
+  Game meleeScorch;
+  meleeScorch.players[0].leader=leader("francesca_queen");meleeScorch.players[0].leaderAbilityAvailable=true;
+  meleeScorch.players[1].board[0]={unit("melee-6",6,Row::Melee),unit("melee-4",4,Row::Melee)};
+  assert(activateLeader(meleeScorch,0));
+  assert(meleeScorch.players[1].board[0].size()==1&&meleeScorch.players[1].graveyard.size()==1);
+
+  Game rangedHorn;
+  rangedHorn.players[0].leader=leader("francesca_beautiful");rangedHorn.players[0].leaderAbilityAvailable=true;
+  rangedHorn.players[0].board[1].push_back(unit("ranged-horn",5,Row::Ranged));
+  assert(activateLeader(rangedHorn,0));
+  assert(rangedHorn.players[0].score==10&&rangedHorn.players[0].specialOccupied[1]);
 
   Game draw;
   draw.players[0].leader=leader("emhyr_relentless"); draw.players[0].leaderAbilityAvailable=true;
@@ -721,6 +753,23 @@ static void leaderAbilities() {
   assert(kingWeather.players[0].deck.size()==2 && kingWeather.weatherCards.empty());
   assert(activateLeader(kingWeather,0,Row::None,{kingWeather.players[0].deck[1].id}));
   assert(kingWeather.weather[2] && kingWeather.weatherCards.size()==1 && kingWeather.weatherCards[0].card.name=="Torrential Rain");
+
+  Game francescaWeather;
+  francescaWeather.players[0].leader=leader("francesca_pureblood");francescaWeather.players[0].leaderAbilityAvailable=true;
+  francescaWeather.players[0].deck={referenceCard("Biting Frost")};
+  assert(activateLeader(francescaWeather,0));
+  assert(francescaWeather.weather[0]&&francescaWeather.weatherCards[0].card.name=="Biting Frost");
+
+  Game francescaHope;
+  francescaHope.players[0].leader=leader("francesca_hope");francescaHope.players[0].leaderAbilityAvailable=true;
+  auto agile=unit("weather-agile",5,Row::Melee);agile.agile=true;
+  francescaHope.players[0].board[0].push_back(agile);francescaHope.weather[0]=true;
+  assert(activateLeader(francescaHope,0));
+  assert(francescaHope.players[0].board[0].empty()&&francescaHope.players[0].board[1].size()==1&&francescaHope.players[0].score==5);
+
+  Game randomRespawn;
+  beginMatchWithLeaders(randomRespawn,deck,leader("emhyr_invader"),deck,leader("foltest_lord"),0x9812,0);
+  assert(randomRespawn.randomRespawn);
 
   Game crach;
   crach.players[0].leader=leader("crach_an_craite"); crach.players[0].leaderAbilityAvailable=true;

@@ -99,6 +99,10 @@ items above:
 - Transformed Vildkaarl cards tagged `vildkarrl` now play the source Mardroeme
   sound and suppress the ordinary row-placement sound, matching the placed
   audio handler in `abilities.js`.
+- Targeted source-rule regressions now cover Foltest Lord/Son, Emhyr Imperial/
+  Invader, and Francesca Queen/Beautiful/Pureblood/Hope in addition to the
+  previously covered leaders. This does not yet cover every leader's effects
+  and selection flows.
 - Opponent setup now chooses a random source premade recipe and a random leader
   of that recipe's faction; a deterministic 500-seed regression covers legal
   leaders/decks, repeatability, and reachability of all ten premade recipes.
