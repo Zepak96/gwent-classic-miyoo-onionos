@@ -64,6 +64,7 @@ struct Game {
   std::array<std::array<bool, 3>, 2> horn{{{false, false, false}, {false, false, false}}};
   std::vector<ActiveWeather> weatherCards;
   bool randomRespawn{false};
+  int pendingMedicPlayer{-1};
   bool scoiataelChoicePending{false};
   int skelligeRevivesRemaining{0};
   int skelligeRevivePlayer{-1};
@@ -80,6 +81,7 @@ int calculateCardPower(const Card&, const std::vector<Card>& row, bool weather, 
                        bool halfWeather = false, bool doubleSpyPower = false);
 bool playCard(Game&, int playerIndex, const std::string& cardId, Row target = Row::None,
               const std::string& selectedCardId = {});
+bool chooseMedicRevive(Game&, int playerIndex, const std::string& cardId, Row target = Row::None);
 // Preview the random unit a Medic will revive without advancing match RNG.
 std::string previewRandomMedicTargetId(const Game&, int playerIndex);
 void beginMatch(Game&, std::vector<Card> playerDeck, Faction playerFaction,

@@ -451,10 +451,28 @@ void replayRevivedUnit(Game& g,int who,const Card& revived,int reviveRow) {
           if(hasAbility(revived,"scorch_s"))scorchEnemyRow(g,who,2);
           if(hasAbility(revived,"mardroeme"))p.mardroeme[reviveRow]=true;
           for(int row=0;row<3;++row)if(p.mardroeme[row])transformBerserkers(p,row);
-        
+  if(revived.medic&&std::any_of(p.graveyard.begin(),p.graveyard.end(),isCombatUnit))
+    g.pendingMedicPlayer=who;
+}
+
+bool chooseMedicRevive(Game& g,int who,const std::string& id,Row target) {
+  if(who<0||who>1||g.pendingMedicPlayer!=who||g.currentPlayer!=who)return false;
+  auto& grave=g.players[who].graveyard;
+  std::string selected=id;
+  if(g.randomRespawn)selected=previewRandomMedicTargetId(g,who);
+  const auto found=findCard(grave,selected);
+  if(found==grave.end()||!isCombatUnit(*found))return false;
+  const int row=found->agile?rowIndex(target):rowIndex(found->row);
+  if(row<0||row>=3||(found->agile&&target==Row::Siege))return false;
+  if(g.randomRespawn)nextRandom(g);
+  const Card revived=*found;grave.erase(found);g.pendingMedicPlayer=-1;
+  replayRevivedUnit(g,who,revived,row);
+  if(g.pendingMedicPlayer<0)finishActionTurn(g);else recompute(g);
+  return true;
 }
 
 bool playCard(Game& g, int who, const std::string& id, Row target, const std::string& selectedId) {
+  if(g.pendingMedicPlayer>=0)return false;
   if (who < 0 || who > 1 || who != g.currentPlayer || g.players[who].passed ||
       (g.phase != Phase::PlayerTurn && g.phase != Phase::OpponentTurn)) return false;
   auto& p = g.players[who];
@@ -573,7 +591,7 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
       p.hand.push_back(c);
       return false;
   }
-  finishActionTurn(g);
+  if(g.pendingMedicPlayer<0)finishActionTurn(g);else recompute(g);
   return true;
 }
 
@@ -587,6 +605,7 @@ std::string previewRandomMedicTargetId(const Game& g,int who) {
 }
 
 bool pass(Game& g, int who) {
+  if(g.pendingMedicPlayer>=0)return false;
   if (who < 0 || who > 1 || who != g.currentPlayer ||
       (g.phase != Phase::PlayerTurn && g.phase != Phase::OpponentTurn) || g.players[who].passed) return false;
   g.players[who].passed = true;
@@ -595,6 +614,7 @@ bool pass(Game& g, int who) {
 }
 
 bool activateLeader(Game& g, int who, Row target, const std::vector<std::string>& selectedIds) {
+  if(g.pendingMedicPlayer>=0)return false;
   if (who<0 || who>1 || who!=g.currentPlayer || g.players[who].passed ||
       (g.phase!=Phase::PlayerTurn && g.phase!=Phase::OpponentTurn)) return false;
   auto& player=g.players[who];
