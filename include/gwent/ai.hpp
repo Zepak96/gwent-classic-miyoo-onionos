@@ -11,6 +11,7 @@ struct AiAction {
   std::string selectedCardId;
   bool activateLeader{false};
   std::vector<std::string> leaderSelection;
+  bool resolveMedic{false};
 };
 // Weighted, seeded ControllerAI ported from the pinned Gwent Classic reference.
 AiAction chooseAiAction(Game& game, int playerIndex);

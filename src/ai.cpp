@@ -490,6 +490,27 @@ AiAction chooseAiAction(Game& game,int who) {
   if(who<0||who>1||who!=game.currentPlayer||
      (game.phase!=Phase::PlayerTurn&&game.phase!=Phase::OpponentTurn))return {true,{},{},{}};
   const auto& player=game.players[who];
+  if(game.pendingMedicPlayer==who) {
+    const Card* target=nullptr;
+    if(game.randomRespawn) {
+      const auto id=previewRandomMedicTargetId(game,who);
+      const auto found=std::find_if(player.graveyard.begin(),player.graveyard.end(),[&](const Card& c){return c.id==id;});
+      if(found!=player.graveyard.end())target=&*found;
+    } else target=chooseMedicTarget(game,player.graveyard);
+    AiAction action;action.resolveMedic=true;
+    if(target) {
+      action.selectedCardId=target->id;
+      if(target->agile) {
+        auto gain=[&](int row) {
+          auto cards=player.board[row];cards.push_back(*target);
+          return scoreRow(game,who,row,cards,game.weather[row],game.horn[who][row])-currentRowScore(game,who,row);
+        };
+        const int close=gain(0),ranged=gain(1);
+        action.target=close>ranged?Row::Melee:ranged>close?Row::Ranged:(roll(game)%2?Row::Melee:Row::Ranged);
+      }
+    }
+    return action;
+  }
   const auto& opponent=game.players[1-who];
   if(opponent.passed && (player.score>opponent.score ||
        (player.faction==Faction::Nilfgaard && player.score==opponent.score)))return {true,{},{},{}};

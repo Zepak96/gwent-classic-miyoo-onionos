@@ -991,7 +991,7 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
       if(game.phase==Phase::RoundResult) { assert(startNextRound(game)); continue; }
       const int actor=game.currentPlayer;
       const auto action=chooseAiAction(game,actor);
-      const bool ok=action.pass ? pass(game,actor) : action.activateLeader ? activateLeader(game,actor,action.target,action.leaderSelection) :
+      const bool ok=action.resolveMedic ? chooseMedicRevive(game,actor,action.selectedCardId,action.target) : action.pass ? pass(game,actor) : action.activateLeader ? activateLeader(game,actor,action.target,action.leaderSelection) :
         playCard(game,actor,action.cardId,action.target,action.selectedCardId);
       assert(ok); ++actions;
     }
@@ -1056,7 +1056,7 @@ static void aiUsesNoHiddenCardsAndCompletesMatches() {
       }
       const int actor=simulation.currentPlayer;
       const auto action=chooseAiAction(simulation,actor);
-      const bool legal=action.pass?pass(simulation,actor):action.activateLeader?
+      const bool legal=action.resolveMedic?chooseMedicRevive(simulation,actor,action.selectedCardId,action.target):action.pass?pass(simulation,actor):action.activateLeader?
         activateLeader(simulation,actor,action.target,action.leaderSelection):
         playCard(simulation,actor,action.cardId,action.target,action.selectedCardId);
       if(!legal) {

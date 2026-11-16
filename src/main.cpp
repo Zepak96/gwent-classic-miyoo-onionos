@@ -1132,7 +1132,11 @@ void performAi(App& a) {
   if(a.game.phase!=gwent::Phase::OpponentTurn) return;
   const auto action=gwent::chooseAiAction(a.game,1);
   bool success=false;
-  if(action.pass) { success=gwent::pass(a.game,1);a.audio.play("pass");a.status=tr(a,"ai_pass"); }
+  if(action.resolveMedic) {
+    success=gwent::chooseMedicRevive(a.game,1,action.selectedCardId,action.target);
+    if(success)a.audio.play("medic");
+  }
+  else if(action.pass) { success=gwent::pass(a.game,1);a.audio.play("pass");a.status=tr(a,"ai_pass"); }
   else if(action.activateLeader) {
     const auto before=a.game;
     const auto ability=activeLeaderAbility(a.game.players[1].leader);
