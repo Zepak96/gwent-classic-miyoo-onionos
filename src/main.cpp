@@ -706,22 +706,43 @@ void loadSettings(App& a) {
   a.notificationsEnabled=notifications!=0;
   a.musicEnabled=music!=0;
 }
-void playCardSound(App& a,const gwent::Card& card) {
-  if(std::find(card.abilities.begin(),card.abilities.end(),"vildkarrl")!=card.abilities.end()) {
-    // The source's Vildkaarl placed handler plays Mardroeme and suppresses
-    // the normal row-placement sound for transformed Vildkaarl cards.
-    a.audio.play("mardroeme");
+void playCardSound(App& a,const gwent::Card& card,const gwent::Game& before,int player,gwent::Row targetRow) {
+  const auto hasAbility=[&](const char* key) {
+    return std::find(card.abilities.begin(),card.abilities.end(),key)!=card.abilities.end();
+  };
+  // Source Weather.addCard() plays Card.audio (the final ability tag) for
+  // weather cards, while ordinary unit cards use Row.playPlacementAudio().
+  if(card.kind==gwent::Kind::Weather||card.kind==gwent::Kind::ClearWeather) {
+    if(!card.abilities.empty())a.audio.play(card.abilities.back());
     return;
   }
-  std::string key;
-  if(!card.abilities.empty()) {
-    key=card.abilities.back();
-    if(key=="cerys")key="muster";
-    if(key.rfind("scorch_",0)==0)key="scorch";
+
+  const int row=static_cast<int>(targetRow);
+  const bool rowHasMardroeme=row>=0&&row<3&&before.players[player].mardroeme[static_cast<std::size_t>(row)];
+  const int transformedCount=row>=0&&row<3?static_cast<int>(std::count_if(
+    before.players[player].board[static_cast<std::size_t>(row)].begin(),
+    before.players[player].board[static_cast<std::size_t>(row)].end(),
+    [](const gwent::Card& unit){return unit.berserker||std::find(unit.abilities.begin(),unit.abilities.end(),"berserker")!=unit.abilities.end();})):0;
+  const bool berserker=card.berserker||hasAbility("berserker");
+  if(card.kind==gwent::Kind::Mardroeme) {
+    // Mardroeme occupies the row's special slot and has no placement sound;
+    // each transformed Vildkaarl plays the Mardroeme SFX in its source handler.
+    for(int i=0;i<transformedCount;++i)a.audio.play("mardroeme");
+    return;
   }
-  if(key.empty()||!std::filesystem::exists(std::filesystem::path(a.assetDirectory)/"sfx"/(key+".mp3")))
-    key=card.row==gwent::Row::Ranged?"common_ranged":card.row==gwent::Row::Siege?"common_siege":"common_close";
-  a.audio.play(key);
+  if(card.kind==gwent::Kind::Decoy) { a.audio.play("decoy");return; }
+  if(card.kind==gwent::Kind::Scorch||card.kind==gwent::Kind::CommanderHorn) return;
+  if(card.spy||hasAbility("spy")||hasAbility("vildkarrl")||(berserker&&rowHasMardroeme)) {
+    if(berserker&&rowHasMardroeme)a.audio.play("mardroeme");
+    return;
+  }
+  const char* placement=card.hero?"hero":targetRow==gwent::Row::Ranged?"common_ranged":
+    targetRow==gwent::Row::Siege?"common_siege":"common_close";
+  a.audio.play(placement);
+
+  // A unit card carrying Mardroeme (Ermion) still gets its ordinary row
+  // placement sound; its placed callback then transforms existing Berserkers.
+  if(hasAbility("mardroeme"))for(int i=0;i<transformedCount;++i)a.audio.play("mardroeme");
 }
 std::vector<const gwent::Card*> editorCards(const App& a) {
   std::vector<const gwent::Card*> cards;std::vector<int> seen;
@@ -915,7 +936,7 @@ void doHumanPlay(App& a) {
   if(gwent::playCard(a.game,0,card.id,static_cast<gwent::Row>(a.rowIndex))) {
     animatePlayedCard(a,card,0,a.handIndex,handSizeBefore);
     queueTriggeredEffects(a,before,card,0);
-    playCardSound(a,card);
+    playCardSound(a,card,before,0,static_cast<gwent::Row>(a.rowIndex));
     a.status=displayCardName(a,card)+(a.language==Language::Polish?" - ZAGRANO":" - PLAYED"); a.handIndex=std::min(a.handIndex,static_cast<int>(a.game.players[0].hand.size())-1);
   } else a.status=tr(a,"illegal_play");
 }
@@ -938,7 +959,7 @@ void performAi(App& a) {
     const auto card=it==aiHand.end()?gwent::Card{}:*it;
     const auto before=a.game;
     success=gwent::playCard(a.game,1,action.cardId,action.target,action.selectedCardId);
-    if(success) { animatePlayedCard(a,card,1,cardIndex,handSizeBefore);queueTriggeredEffects(a,before,card,1);playCardSound(a,card); }
+    if(success) { animatePlayedCard(a,card,1,cardIndex,handSizeBefore);queueTriggeredEffects(a,before,card,1);playCardSound(a,card,before,1,action.target); }
     a.status=(a.language==Language::Polish?"RYWAL ZAGRYWA ":"OPPONENT PLAYED ")+displayCardName(a,card);
   }
   if(!success) {
@@ -1040,16 +1061,18 @@ void animatePlayedCard(App& a,const gwent::Card& card,int player,int handIndex,i
     // Source Card.animate() attaches the matching anim_<ability> artwork to
     // the card: 50 ms setup, 300 ms fade in, 1000 ms hold, 300 ms fade out.
     // Scorch has its own 50 + 1300 + 300 ms sequence and cover sizing.
-    std::string effect;
-    for(const auto* ability:{"horn","spy","muster","morale","bond","cerys"}) {
-      if(std::find(card.abilities.begin(),card.abilities.end(),ability)!=card.abilities.end()) { effect=ability;break; }
-    }
-    if(effect=="cerys")effect="muster";
-    if(effect.empty()&&card.kind==gwent::Kind::CommanderHorn)effect="horn";
-    if(effect.empty()&&card.spy)effect="spy";
-    if(!effect.empty()) {
+    std::vector<std::string> effects;
+    for(const auto* ability:{"horn","spy","morale"})
+      if(std::find(card.abilities.begin(),card.abilities.end(),ability)!=card.abilities.end())
+        effects.emplace_back(ability);
+    if(card.kind==gwent::Kind::CommanderHorn&&std::find(effects.begin(),effects.end(),"horn")==effects.end())effects.emplace_back("horn");
+    if(card.spy&&std::find(effects.begin(),effects.end(),"spy")==effects.end())effects.emplace_back("spy");
+    Uint32 effectStart=SDL_GetTicks()+499;
+    for(const auto& effect:effects) {
       App::CardEffect visual;visual.active=true;visual.icon=effect;visual.x=flight.toX;visual.y=flight.toY;
-      visual.startedAt=SDL_GetTicks()+499;visual.duration=1650;a.cardEffects.push_back(std::move(visual));
+      visual.startedAt=effectStart;visual.duration=1650;a.cardEffects.push_back(std::move(visual));
+      a.scheduledSounds.push_back({effect,effectStart});
+      effectStart+=1650;
     }
   }
 }
@@ -1061,15 +1084,6 @@ void queueTargetEffect(App& a,const std::string& icon,int x,int y,Uint32 delay=0
 }
 void queueTriggeredEffects(App& a,const gwent::Game& before,const gwent::Card& played,int player) {
   queueCardTransitionFlights(a,before,played,player);
-  if(played.kind==gwent::Kind::Scorch) {
-    const auto& hand=before.players[player].hand;
-    const auto it=std::find_if(hand.begin(),hand.end(),[&](const gwent::Card& item){return item.id==played.id;});
-    if(it!=hand.end()) {
-      const int index=static_cast<int>(it-hand.begin());
-      const int first=std::clamp(index-5,0,std::max(0,static_cast<int>(hand.size())-11));
-      queueTargetEffect(a,"scorch",194+(index-first)*29,277);
-    }
-  }
   const bool scorchAction=played.kind==gwent::Kind::Scorch||
     std::find(played.abilities.begin(),played.abilities.end(),"scorch_c")!=played.abilities.end()||
     std::find(played.abilities.begin(),played.abilities.end(),"scorch_r")!=played.abilities.end()||
@@ -1091,8 +1105,9 @@ void queueTriggeredEffects(App& a,const gwent::Game& before,const gwent::Card& p
         const auto& target=oldRow[index];
         if(containsId(a.game.players[owner].graveyard,target.id)) {
           const auto [x,y]=boardPosition(owner,row,index,oldRow.size());
-          const Uint32 effectDelay=played.kind==gwent::Kind::Scorch?2149:0;
-          queueTargetEffect(a,"scorch",x,y,effectDelay);
+          // Source Scorch animates the affected unit cards directly; the
+          // Scorch special itself has no Card.animate() call.
+          queueTargetEffect(a,"scorch",x,y);
         }
       }
     }
@@ -1109,6 +1124,26 @@ void queueTriggeredEffects(App& a,const gwent::Game& before,const gwent::Card& p
         queueTargetEffect(a,"medic",x,y,499);
       if(played.bond&&owner==player&&containsId(current,played.id)&&target.id!=played.id&&bondCount>1&&target.name==played.name)
         queueTargetEffect(a,"bond",x,y,499);
+      if(target.id==played.id&&owner==player) {
+        if(played.bond&&bondCount>1)queueTargetEffect(a,"bond",x,y,499);
+        const bool revived=played.medic&&std::any_of(current.begin(),current.end(),[&](const gwent::Card& item) {
+          return !std::any_of(before.players[0].board.begin(),before.players[0].board.end(),[&](const auto& oldRow){return containsId(oldRow,item.id);})&&
+                 !std::any_of(before.players[1].board.begin(),before.players[1].board.end(),[&](const auto& oldRow){return containsId(oldRow,item.id);})&&
+                 containsId(before.players[player].graveyard,item.id);
+        });
+        if(revived)queueTargetEffect(a,"medic",x,y,499);
+        const auto isMusterGroup=[&](const gwent::Card& item) {
+          return !played.group.empty()&&(item.group==played.group||item.name==played.group||
+                 item.name.rfind(played.group+" - ",0)==0);
+        };
+        const bool mustered=played.muster&&std::any_of(current.begin(),current.end(),[&](const gwent::Card& item) {
+          if(item.id==played.id||!isMusterGroup(item))return false;
+          const bool previouslyOnBoard=std::any_of(before.players[0].board.begin(),before.players[0].board.end(),[&](const auto& oldRow){return containsId(oldRow,item.id);})||
+                                       std::any_of(before.players[1].board.begin(),before.players[1].board.end(),[&](const auto& oldRow){return containsId(oldRow,item.id);});
+          return !previouslyOnBoard;
+        });
+        if(mustered)queueTargetEffect(a,"muster",x,y,499);
+      }
     }
   }
 }
@@ -1139,7 +1174,7 @@ void queueLeaderTransitionVisuals(App& a,const gwent::Game& before,const std::st
   }
   for(const auto& active:a.game.weatherCards) {
     const bool existed=std::any_of(before.weatherCards.begin(),before.weatherCards.end(),[&](const gwent::ActiveWeather& old){return old.card.id==active.card.id;});
-    if(!existed)playCardSound(a,active.card);
+    if(!existed)playCardSound(a,active.card,before,active.owner,gwent::Row::None);
   }
   if(ability=="crach_an_craite")a.audio.play("redraw");
   else if(ability=="eredin_destroyer") { a.audio.play("discard");a.audio.play("discard");a.audio.play("draw"); }
@@ -1892,7 +1927,7 @@ void handleMatchKey(App& a,SDL_Keycode key) {
         if(gwent::playCard(a.game,0,card.id,playRow,selectedId)) {
           animatePlayedCard(a,card,0,a.handIndex,handSizeBefore);
           queueTriggeredEffects(a,before,card,0);
-          playCardSound(a,card);
+          playCardSound(a,card,before,0,playRow);
           a.status=displayCardName(a,card)+(a.language==Language::Polish?" - ZAGRANO":" - PLAYED"); a.handIndex=std::min(a.handIndex,static_cast<int>(a.game.players[0].hand.size())-1);
         } else a.status=tr(a,"illegal_target");
       }

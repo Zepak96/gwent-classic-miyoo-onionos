@@ -99,6 +99,13 @@ items above:
 - Transformed Vildkaarl cards tagged `vildkarrl` now play the source Mardroeme
   sound and suppress the ordinary row-placement sound, matching the placed
   audio handler in `abilities.js`.
+- Card audio dispatch now follows the reference event split: unit placement
+  selects `hero` or the row's `common_*` cue, spies and Berserkers under active
+  Mardroeme suppress that cue, Decoy uses its own cue, and weather uses the
+  card's source audio tag. `Card.animate()` cues are scheduled separately from
+  placement; Mardroeme transformations and triggered Medic/Bond/Muster effects
+  receive their own animation cues. Desktop build and CTest pass, but physical
+  Miyoo speaker playback and timing still need device verification.
 - Targeted source-rule regressions now cover Foltest Lord/Son, Emhyr Imperial/
   Invader, and Francesca Queen/Beautiful/Pureblood/Hope in addition to the
   previously covered leaders. This does not yet cover every leader's effects

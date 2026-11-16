@@ -45,6 +45,12 @@ końcowym wydaniem.
 - Przemienione karty Vildkaarl z tagiem `vildkarrl` odtwarzają teraz źródłowy
   efekt dźwiękowy Mardroeme zamiast standardowego dźwięku rzędu. Desktop build,
   CTest 2/2, test sterowania i dekodowanie wszystkich 37 plików audio przechodzą.
+- Rozdzielono dźwięki zagrania i zdolności zgodnie z `Row.playPlacementAudio()`,
+  `Weather.addCard()` oraz `Card.animate()` w źródle. Port stosuje dźwięki
+  `hero`/`common_*`, wyjątki dla szpiegów, Decoya i Berserkera pod Mardroeme,
+  tagi dźwięków pogody oraz osobne zaplanowane SFX animacji Horn/Spy/Morale,
+  transformacji Mardroeme i wyzwolonych efektów Medic/Bond/Muster. Build i CTest
+  przechodzą; fizyczny odsłuch i synchronizacja na Miyoo nadal niezweryfikowane.
 - Rozszerzono testy zdolności liderów z repo referencyjnego o oczyszczenie
   pogody, Torrential Rain, ranged/melee Scorch, Biting Frost, Ranged Horn,
   Hope of the Aen Seidhe i Invader of the North. Pełne pokrycie wszystkich
