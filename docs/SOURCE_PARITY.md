@@ -495,3 +495,17 @@ running; SD remains on bc33dcc until a new ARM package is validated.
 ARM workflow 43881332283 now builds c2d06b8, which includes the 68a7a67
 engine correction. Desktop frontend checks for 68a7a67 are still running.
 No newer SD installation is claimed by this entry.
+
+## Confirmed Agile target scoring gap
+
+Source ControllerAI.determineAgileRow compares full virtual row-score gains,
+including the placed card's own weather-adjusted power. Native cardAction for
+ordinary Agile cards currently compares weightRowChange, which subtracts the
+placed card's power. For a plain Agile unit, both gains therefore become zero
+even when Frost makes melee weaker than ranged. Medic-revived Agile already
+uses full score deltas. Ordinary Agile selection must use the same full delta
+comparison and retain random choice only on a genuine tie. This discrepancy
+is not fixed by fractional-ticket commit 68a7a67.
+
+Desktop workflow 43881175307 passed in full for 68a7a67. ARM workflow
+43881332283 remains in progress; SD is still bc33dcc.
