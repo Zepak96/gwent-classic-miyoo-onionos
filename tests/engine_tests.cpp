@@ -1169,6 +1169,24 @@ static void rejectedRandomMedicPreservesRng() {
   assert(game.rngState!=state&&game.players[0].board[1].size()==1);
 }
 
+static void skelligeAgileCancellationKeepsCardInGrave() {
+  Game game;game.phase=Phase::RoundResult;game.round=2;game.firstPlayer=0;
+  game.players[0].faction=Faction::Skellige;game.players[0].hand={unit("cancel-setup-spare",1)};
+  auto first=unit("cancel-setup-agile-a",6,Row::None);first.agile=true;
+  auto second=unit("cancel-setup-agile-b",7,Row::None);second.agile=true;
+  game.players[0].graveyard={first,second};
+  assert(startNextRound(game));
+  assert(game.skelligeAgileReviveIds.size()==1&&game.skelligeRoundRemaining==1);
+  const auto cancelled=game.skelligeAgileReviveIds.front();
+  assert(cancelSkelligeRevive(game,0,cancelled));
+  assert(game.players[0].graveyard.size()==2&&game.players[0].board[0].empty());
+  assert(game.skelligeAgileReviveIds.size()==1&&game.skelligeRoundRemaining==0);
+  const auto next=game.skelligeAgileReviveIds.front();
+  assert(chooseSkelligeRevive(game,0,next,Row::Ranged));
+  assert(game.players[0].graveyard.size()==1&&game.players[0].board[1].size()==1);
+  assert(game.phase==Phase::PlayerTurn&&game.currentPlayer==0);
+}
+
 static void skelligeRoundSetupReplaysSpyAndMedic() {
   Game spy;spy.phase=Phase::RoundResult;spy.round=2;spy.firstPlayer=0;
   spy.players[0].faction=Faction::Skellige;
@@ -1854,4 +1872,4 @@ static void leaderAbilities() {
   for(int owner=0;owner<2;++owner)
     for(std::size_t i=0;i<untouchedDecks[owner].size();++i)assert(emptyCrach.players[owner].deck[i].id==untouchedDecks[owner][i]);
 }
-int main() { scoreRules(); duplicateWeatherIsDiscarded(); allSourceWeatherTypesAndOwnership(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiFractionalHornTickets(); sourceAiAgileWeatherRows(); graveLeadersReturnWithoutPlaying(); skelligeChoiceAcceptsGraveyardIdReference(); rejectedRandomMedicPreservesRng(); skelligeRoundSetupReplaysSpyAndMedic(); firstMedicCommitsBeforeChoiceAndAgileCancel(); randomNestedMedicKeepsTarget(); nestedMedicWaitsForChoice(); medicReplaysSpyPlacement(); medicReplaysMusterAndScorch(); sourceAiDefersRandomActionTargets(); sourceAiHeroMoraleWeight(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
+int main() { scoreRules(); duplicateWeatherIsDiscarded(); allSourceWeatherTypesAndOwnership(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiFractionalHornTickets(); sourceAiAgileWeatherRows(); graveLeadersReturnWithoutPlaying(); skelligeChoiceAcceptsGraveyardIdReference(); rejectedRandomMedicPreservesRng(); skelligeAgileCancellationKeepsCardInGrave(); skelligeRoundSetupReplaysSpyAndMedic(); firstMedicCommitsBeforeChoiceAndAgileCancel(); randomNestedMedicKeepsTarget(); nestedMedicWaitsForChoice(); medicReplaysSpyPlacement(); medicReplaysMusterAndScorch(); sourceAiDefersRandomActionTargets(); sourceAiHeroMoraleWeight(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }

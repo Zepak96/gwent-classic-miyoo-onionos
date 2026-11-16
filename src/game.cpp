@@ -932,6 +932,18 @@ bool chooseSkelligeRevive(Game& g,int who,const std::string& cardId,Row target) 
   return true;
 }
 
+bool cancelSkelligeRevive(Game& g,int who,const std::string& cardId) {
+  if(g.phase!=Phase::RoundSetup||g.pendingMedicPlayer>=0||who<0||who>1||who!=g.skelligeRevivePlayer||g.skelligeRevivesRemaining<=0)return false;
+  const auto selected=std::find(g.skelligeAgileReviveIds.begin(),g.skelligeAgileReviveIds.end(),cardId);
+  if(selected==g.skelligeAgileReviveIds.end())return false;
+  g.skelligeAgileReviveIds.erase(selected);--g.skelligeRevivesRemaining;
+  if(g.skelligeRevivesRemaining==0) {
+    g.skelligeRevivePlayer=-1;
+    if(g.skelligeRoundOwner>=0)continueSkelligeRoundSetup(g);else startRoundTurn(g);
+  }
+  recompute(g);return true;
+}
+
 std::string validateDeck(const std::vector<Card>& deck, Faction faction) {
   if (deck.size() < 22) return "deck requires at least 22 cards";
   int units = 0, specials = 0;

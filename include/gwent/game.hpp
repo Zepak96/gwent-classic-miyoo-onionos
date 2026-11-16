@@ -108,6 +108,7 @@ bool replaceMulliganCards(Game&, int playerIndex, const std::vector<std::string>
 bool pass(Game&, int playerIndex);
 bool startNextRound(Game&);
 bool chooseSkelligeRevive(Game&, int playerIndex, const std::string& cardId, Row target = Row::None);
+bool cancelSkelligeRevive(Game&, int playerIndex, const std::string& cardId);
 std::string validateDeck(const std::vector<Card>& deck, Faction faction);
 std::string validateDeck(const std::vector<Card>& deck, const Card& leader, Faction faction);
 const std::vector<Card>& referenceCardCatalog();
