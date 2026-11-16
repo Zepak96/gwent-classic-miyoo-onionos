@@ -60,6 +60,12 @@ bool sourceHandCardBefore(const Card& left,const Card& right) {
   if(leftPower!=rightPower)return leftPower<rightPower;
   return left.name<right.name;
 }
+void insertSourceBoardCard(std::vector<Card>& row,Card card) {
+  // The reference Row.addCard() keeps combat rows sorted by Card.compare:
+  // special/weather rank, printed base power, then name.
+  const auto position=std::upper_bound(row.begin(),row.end(),card,sourceHandCardBefore);
+  row.insert(position,std::move(card));
+}
 int cardPower(const Card& c, const std::vector<Card>& row, bool weather, bool horn,
               bool halfWeather = false, bool doubleSpyPower = false) {
   if (c.hero) return c.power; // Heroes ignore all row effects.
@@ -127,8 +133,7 @@ void triggerAvenger(Game& g, int owner, const Card& removed) {
   Card unit=*summoned;
   unit.id="summoned_"+removed.id;
   auto& row=g.players[owner].board[rowIndex(unit.row)];
-  const auto insertion=std::upper_bound(row.begin(),row.end(),unit,sourceHandCardBefore);
-  row.insert(insertion,std::move(unit));
+  insertSourceBoardCard(row,std::move(unit));
 }
 void removeBoardCard(Game& g, int owner, int row, int index) {
   auto& cards=g.players[owner].board[row];
@@ -202,7 +207,7 @@ void applyMuster(Player& player, const Card& played) {
     for (auto it = source.begin(); it != source.end();) {
       if (matchesMusterGroup(*it)) {
         const int r = rowIndex(it->row);
-        if (r >= 0 && r < 3) player.board[r].push_back(*it);
+        if (r >= 0 && r < 3) insertSourceBoardCard(player.board[r],*it);
         it = source.erase(it);
       } else ++it;
     }
@@ -500,9 +505,9 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
     }
     case Kind::Unit:
       if (c.spy) {
-        g.players[1 - who].board[rowIndex(deployRow)].push_back(c);
+        insertSourceBoardCard(g.players[1 - who].board[rowIndex(deployRow)],c);
         for (int i = 0; i < 2 && !p.deck.empty(); ++i) { insertSourceHandCard(p,std::move(p.deck.front()),who); p.deck.erase(p.deck.begin()); }
-      } else p.board[rowIndex(deployRow)].push_back(c);
+      } else insertSourceBoardCard(p.board[rowIndex(deployRow)],c);
       if (c.muster) {
         applyMuster(p, c);
         for(int row=0;row<3;++row)if(p.mardroeme[row])transformBerserkers(p,row);
@@ -512,7 +517,7 @@ bool playCard(Game& g, int who, const std::string& id, Row target, const std::st
         p.graveyard.erase(p.graveyard.begin()+medicIndex);
         int reviveRow = revived.agile ? medicReviveRow : rowIndex(revived.row);
         if (revived.agile && reviveRow < 0) reviveRow = 0;
-        if (reviveRow >= 0 && reviveRow < 3) p.board[reviveRow].push_back(revived);
+        if (reviveRow >= 0 && reviveRow < 3) insertSourceBoardCard(p.board[reviveRow],revived);
       }
       if (hasAbility(c, "scorch_c")) scorchEnemyRow(g, who, 0);
       if (hasAbility(c, "scorch_r")) scorchEnemyRow(g, who, 1);
@@ -715,7 +720,7 @@ bool startNextRound(Game& g) {
       for (int n = 0; n < static_cast<int>(oldRow.size()); ++n) {
         Card card=std::move(oldRow[static_cast<std::size_t>(n)]);
         if (r == keepRow && n == keepIndex) {
-          player.board[r].push_back(std::move(card));
+          insertSourceBoardCard(player.board[r],std::move(card));
           continue;
         }
         const bool temporaryAvengerToken=card.id.rfind("summoned_",0)==0;
@@ -750,7 +755,7 @@ bool startNextRound(Game& g) {
         player.graveyard.push_back(std::move(unit));
       } else {
         const int row=unit.agile?agileTargetRow(g,owner,unit):rowIndex(unit.row);
-        player.board[row].push_back(std::move(unit));
+        insertSourceBoardCard(player.board[row],std::move(unit));
       }
     }
   }
@@ -779,7 +784,7 @@ bool chooseSkelligeRevive(Game& g,int who,const std::string& cardId,Row target) 
   } else if(target!=Row::None && target!=found->row)return false;
   const Card revived=*found;
   grave.erase(found);
-  g.players[who].board[row].push_back(revived);
+  insertSourceBoardCard(g.players[who].board[row],revived);
   g.skelligeAgileReviveIds.erase(std::find(g.skelligeAgileReviveIds.begin(),g.skelligeAgileReviveIds.end(),cardId));
   --g.skelligeRevivesRemaining;
   if(g.skelligeRevivesRemaining==0) {

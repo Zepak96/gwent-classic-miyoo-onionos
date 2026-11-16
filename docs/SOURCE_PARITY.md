@@ -105,6 +105,13 @@ items above:
   insert at index zero. Seeded regressions verify full deck/hand order and RNG
   state for a Daisy start and a normal coin toss. The port still uses xorshift32;
   identical numeric results to browser `Math.random()` are not claimed.
+- Combat rows now use the source `Card.compare` insertion order (special type,
+  base power, then name) for played units, Muster, Spy placement, Medic, Decoy,
+  Avenger summons and Skellige revival. Previously most paths appended to the
+  vector, so the visible row order diverged from the browser source and could
+  make card-flight/selection positions appear to shift. A three-card Muster
+  regression checks ordering across cards deployed from hand and deck. Full
+  animation timing and physical-device verification remain open.
 - Decoy now returns the specifically selected unit, restores its source base
   power, runs Avenger removal effects, inserts the returned card using the
   correct human/AI hand rules, and leaves Decoy in the chosen combat row in its

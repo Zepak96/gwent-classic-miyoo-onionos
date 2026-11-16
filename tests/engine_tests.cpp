@@ -407,6 +407,15 @@ static void abilitiesAndValidation() {
   assert(playCard(muster,0,"muster1"));
   assert(muster.players[0].deck.empty() && muster.players[0].board[0].size()==1 && muster.players[0].board[1].size()==1);
 
+  Game sortedMuster;
+  auto brewess=unit("brewess",6);brewess.name="Crone - Brewess";brewess.muster=true;brewess.group="Crone";
+  auto whispess=unit("whispess",9);whispess.name="Crone - Whispess";whispess.muster=true;whispess.group="Crone";
+  auto weavess=unit("weavess",2);weavess.name="Crone - Weavess";weavess.muster=true;weavess.group="Crone";
+  sortedMuster.players[0].hand={brewess,whispess};sortedMuster.players[0].deck={weavess};
+  assert(playCard(sortedMuster,0,"brewess"));
+  const auto& sortedRow=sortedMuster.players[0].board[0];
+  assert(sortedRow.size()==3&&sortedRow[0].id=="weavess"&&sortedRow[1].id=="brewess"&&sortedRow[2].id=="whispess");
+
   Game roachMuster;
   Card geralt = referenceCard("Geralt of Rivia");
   Card ciri = referenceCard("Cirilla Fiona Elen Riannon");
