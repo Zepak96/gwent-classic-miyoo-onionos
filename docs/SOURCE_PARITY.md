@@ -552,3 +552,24 @@ nested Medic targets, preserving one outer turn and ability ordering; regression
 must include revived Spy, Muster, Scorch, Medic chain and save/resume of pending
 choices. Current SD 19963ba still has this gap. Do not describe its full Medic
 mechanic as source-complete.
+
+## Miniature renderer validation — 7270ad9
+
+Desktop run 43884293468 passed. Its fixed 640x480 fixture contains Hero 7,
+Hero 10, ordinary 10, Spy, Medic, Bond, Morale, Agile and a synthetic 120-power
+unit. The frame was inspected at native size and with nearest-neighbor hand
+enlargement. Compact numerals are 10px tall, the Hero medal is cropped to its
+circle, and non-existent Hero ability badges are suppressed. Row silhouettes
+and four common ability silhouettes are drawn at native pixel size. Other
+ability icons still use source textures and need their own readability review.
+ARM package run 43884509669 succeeded for 7270ad9. Hardware readability is
+not established by these renderer captures.
+
+## Medic repair in progress — 2c96a25 / 2dba6c1
+
+Native revival now replays Spy placement and draws, Muster, row Scorch,
+Mardroeme and Berserker transformation. Engine regressions cover Spy, Muster
+and row Scorch and confirm a single outer turn. Nested Medic selection,
+shared placement resolution, Leader revival paths and pending-choice save/load
+remain unresolved; the Medic parity gate stays open. These repairs postdate
+the 7270ad9 miniature package and are not included in that archive.
