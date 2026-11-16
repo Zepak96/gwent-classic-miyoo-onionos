@@ -2236,7 +2236,7 @@ void handleMatchKey(App& a,SDL_Keycode key) {
     }
     return;
   }
-  if(key==SDLK_AC_BACK&&!a.targetMode) {
+  if(key==SDLK_AC_BACK&&!a.targetMode&&a.game.pendingMedicPlayer<0) {
     if(a.game.phase==gwent::Phase::PlayerTurn)beginHumanPlayConfirmation(a);
     return;
   }
