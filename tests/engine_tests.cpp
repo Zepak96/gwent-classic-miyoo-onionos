@@ -1140,6 +1140,17 @@ static void sourceAiAgileWeatherRows() {
       assert(game.players[1].board[1-weatherRow].size()==1);
     }
   }
+  for(int hornRow=0;hornRow<2;++hornRow) {
+    Game game;game.phase=Phase::OpponentTurn;game.currentPlayer=1;game.rngState=73;
+    game.players[1].roundLosses=1;game.horn[1][hornRow]=true;
+    game.players[1].specialOccupied[hornRow]=true;
+    auto agile=unit("agile-horn",6);agile.agile=true;
+    game.players[1].hand={agile};
+    const auto action=chooseAiAction(game,1);
+    assert(!action.pass&&action.target==static_cast<Row>(hornRow));
+    assert(playCard(game,1,action.cardId,action.target));
+    assert(game.players[1].score==12);
+  }
 }
 
 static void sourceAiFractionalHornTickets() {
