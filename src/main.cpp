@@ -1202,6 +1202,21 @@ void drawMiniRowLabel(SDL_Renderer* r,const App&,int x,int y,const char* rowIcon
     mark(5,1,3,7);mark(3,7,7,2);mark(5,9,3,3);mark(6,0,1,1);
   }
 }
+bool drawMiniAbility(SDL_Renderer* r,int x,int y,const std::string& ability) {
+  const Color ink{255,247,225,255};
+  auto mark=[&](int dx,int dy,int w,int h){box(r,x+dx,y+dy,w,h,ink);};
+  if(ability=="spy") {
+    mark(3,1,5,2);mark(1,3,2,2);mark(0,5,2,1);mark(1,6,2,2);
+    mark(3,8,5,2);mark(8,3,2,2);mark(9,5,2,1);mark(8,6,2,2);mark(4,4,3,3);
+  } else if(ability=="medic") {
+    mark(4,0,3,11);mark(0,4,11,3);
+  } else if(ability=="bond") {
+    frame(r,x,y+1,7,7,ink);frame(r,x+4,y+4,7,7,ink);mark(4,4,3,3);
+  } else if(ability=="morale") {
+    mark(4,1,3,9);mark(1,4,9,3);mark(1,10,9,1);
+  } else return false;
+  return true;
+}
 void drawSourceCard(SDL_Renderer* r,const App& a,int x,int y,const gwent::Card& card,bool selected=false,int displayPower=-1) {
   constexpr int w=28,h=43;
   drawImage(r,a,"img/sm/"+gwent::referenceCardImage(card.referenceIndex),x,y,w,h);
@@ -1239,7 +1254,8 @@ void drawSourceCard(SDL_Renderer* r,const App& a,int x,int y,const gwent::Card& 
   if(!ability.empty()) {
     box(r,x+1,y+30,13,13,Color{9,8,7,238});
     frame(r,x+1,y+30,13,13,Color{210,169,88,255});
-    drawImage(r,a,"img/icons/card_ability_"+ability+".png",x+2,y+31,11,11);
+    if(!drawMiniAbility(r,x+2,y+31,ability))
+      drawImage(r,a,"img/icons/card_ability_"+ability+".png",x+2,y+31,11,11);
   }
   if(selected)frame(r,x-2,y-2,w+4,h+4,gold);
 }
