@@ -151,27 +151,21 @@ void rowScoreText(SDL_Renderer* r,int x,int y,const std::string& value) {
   tallTextInBox(r,x,y,17,44,value,ink,true);
 }
 void powerBadgeNumber(SDL_Renderer* r,int x,int y,int width,int height,const std::string& value) {
-  // The source card art is reduced to 28x43 on the hand. Use one fixed,
-  // readable scale for the usual one- and two-digit strengths; at scale 2 a
-  // two-digit value still fits the 24px medallion without changing font size
-  // when a unit gains or loses strength.
-  constexpr int scale=2;
-  const int digitWidth=value.size()>2?std::max(5,(width-4)/static_cast<int>(value.size())):5*scale;
-  const int advance=value.size()>1?digitWidth:6*scale;
-  const int glyphWidth=value.empty()?0:(static_cast<int>(value.size())-1)*advance+digitWidth;
-  const int glyphHeight=7*scale;
-  const int x0=x+std::max(0,(width-glyphWidth)/2);
-  const int y0=y+std::max(0,(height-glyphHeight)/2);
-  const auto draw=[&](int offsetX,int offsetY,Color inkColor) {
+  // Compact 3x5 numerals, always 10px tall. Up to three digits fit with
+  // consistent spacing and a visible margin inside the 24px power medal.
+  static constexpr unsigned digits[10][5]={
+    {7,5,5,5,7},{2,6,2,2,7},{7,1,7,4,7},{7,1,7,1,7},{5,5,7,1,1},
+    {7,4,7,1,7},{7,4,7,5,7},{7,1,2,2,2},{7,5,7,5,7},{7,5,7,1,7}};
+  constexpr int glyphWidth=6,glyphHeight=10,advance=7;
+  const int total=value.empty()?0:static_cast<int>(value.size())*advance-1;
+  const int x0=x+(width-total)/2,y0=y+(height-glyphHeight)/2;
+  auto draw=[&](int ox,int oy,Color inkColor) {
     color(r,inkColor);
-    for(std::size_t index=0;index<value.size();++index) {
-      const auto found=font().find(value[index]);
-      const Glyph glyph=found==font().end()?font().at('?'):found->second;
-      for(int row=0;row<7;++row)for(int column=0;column<5;++column)
-        if(glyph[static_cast<std::size_t>(row)]&(1u<<(4-column))) {
-          SDL_Rect pixel{x0+static_cast<int>(index)*advance+(column*digitWidth)/5+offsetX,
-                         y0+row*scale+offsetY,
-                         std::max(1,((column+1)*digitWidth)/5-(column*digitWidth)/5),scale};
+    for(std::size_t i=0;i<value.size();++i) {
+      if(value[i]<'0'||value[i]>'9')continue;
+      for(int row=0;row<5;++row)for(int col=0;col<3;++col)
+        if(digits[value[i]-'0'][row]&(1u<<(2-col))) {
+          SDL_Rect pixel{x0+static_cast<int>(i)*advance+col*2+ox,y0+row*2+oy,2,2};
           SDL_RenderFillRect(r,&pixel);
         }
     }
