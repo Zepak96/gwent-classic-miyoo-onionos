@@ -476,3 +476,14 @@ all 604 archive files matched their destination SHA-256. The previous game
 folder was backed up locally in artifacts/qa/package-bc33dcc/sd-backup-20261116-145649.
 This proves copying and file integrity, not successful execution on Miyoo.
 Physical startup, input, audio and miniature readability remain to be checked.
+
+## Confirmed open AI discrepancy — fractional Horn weights
+
+Source ControllerAI.weightCard returns Math.max(...rows)/2 for Commander's Horn,
+so an odd row gain preserves a half-point weight. Native src/ai.cpp currently
+returns int from weightCard and uses integer best/2, dropping that half point.
+Additionally source common.js randomInt floors the weighted ticket, while the
+native selector currently uses a continuous double ticket. These two differences
+must be fixed together and tested at odd Horn gains and fractional cumulative
+boundaries. Current SD revision bc33dcc still contains these differences; the
+full AI distribution must not be described as matching the source.
