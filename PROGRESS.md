@@ -72,6 +72,13 @@ końcowym wydaniem.
   wykonać kolejną akcję, dlatego silnik rozstrzyga sprzątanie atomowo. Regresja
   Cow → Bovine Defense Force → Scorch potwierdza, że token nie może zostać
   wskrzeszony przez Medyka. CTest przechodzi 2/2.
+- Aktualny commit `bd1e346` zbudowano jako ELF32 ARM hard-float; archiwum OnionOS
+  ma 618 wpisów i SHA-256
+  `6a55d9a0a2e58206f91ae01ec1797bb711f36585954cc66be49365493000af49`.
+  Zainstalowano je w `E:\Roms\PORTS\Games\GwentClassic`; audyt porównał
+  SHA-256 wszystkich 602/602 plików. Hash binarki:
+  `52b8c386502084492648974af8aeff67d16525601caebe73f55c8254fb3a1542`.
+  Poprzedni katalog gry zachowano na SD i w `.work/sd-backup-bd1e346/`.
 - Przetłumaczono statusy polskiej wersji dla błędów i akcji meczu (zapis,
   mulligan, pas, cel, lider, Skellige oraz odrzucony ruch AI). CTest 2/2,
   `--input-test` i `--audio-test assets` przechodzą; pełna lokalizacja menu,
