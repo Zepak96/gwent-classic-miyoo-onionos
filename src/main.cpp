@@ -3171,8 +3171,28 @@ int main(int argc,char** argv) {
     }
     gwent::replaceMulliganCards(app.game,0,{}); gwent::performAiMulligan(app.game,1);
     app.game.phase=gwent::Phase::PlayerTurn;app.game.currentPlayer=0;
+    const auto gameplayHand=app.game.players[0].hand;
+    std::vector<gwent::Card> miniatureFixture;
+    const auto addMiniature=[&](const auto& predicate) {
+      const auto& catalog=gwent::referenceCardCatalog();
+      const auto found=std::find_if(catalog.begin(),catalog.end(),predicate);
+      if(found!=catalog.end()) {
+        auto card=*found;card.id="miniature-fixture-"+std::to_string(miniatureFixture.size());
+        miniatureFixture.push_back(std::move(card));
+      }
+    };
+    addMiniature([](const auto& c){return c.kind==gwent::Kind::Unit&&c.hero&&c.power==7;});
+    addMiniature([](const auto& c){return c.kind==gwent::Kind::Unit&&c.hero&&c.power==10;});
+    addMiniature([](const auto& c){return c.kind==gwent::Kind::Unit&&!c.hero&&c.power==10;});
+    addMiniature([](const auto& c){return c.spy&&!c.hero;});
+    addMiniature([](const auto& c){return c.medic&&!c.hero;});
+    addMiniature([](const auto& c){return c.bond;});
+    addMiniature([](const auto& c){return c.morale;});
+    addMiniature([](const auto& c){return c.agile&&!c.hero;});
+    app.game.players[0].hand=miniatureFixture;app.handIndex=0;
     clearFrame();
     drawMatchOnScreen(renderer,app);
+    app.game.players[0].hand=gameplayHand;
     if(argc>2&&!saveFrame(argv[2])) { app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return 4; }
     if(argc>5) {
       app.game.phase=gwent::Phase::PlayerTurn;app.game.currentPlayer=0;
