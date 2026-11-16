@@ -18,7 +18,19 @@ nadal nie spełnia kryterium 1:1 i nie jest wydaniem do instalacji.
   dekoduje 35 SFX i oba utwory. Test audio z SDL dummy nie potwierdza głośnika
   fizycznego Miyoo.
 - Zmiany źródłowe i README są opublikowane na publicznej gałęzi; ta aktualizacja
-  nie zawiera nowej paczki ARM ani zapisu na kartę SD.
+  zawiera poprawkę źródłowego AI mulliganu i 100-meczową regresję. Nowy ARM
+  hard-float build oraz paczka OnionOS przeszły lokalnie; paczka nie została
+  jeszcze uruchomiona na Miyoo ani skopiowana na kartę SD.
+- Skrypt builda OnionOS jest uruchamialny z checkoutu Windows dzięki regule LF
+  dla skryptów `.sh`. Paczka `GwentClassic-OnionOS.zip` zawiera 618 wpisów,
+  SHA-256 `d7dcdcf96659f7f6471b39941e36d284bfc9b8129cef0a255e4ae8055cc9e9ee`;
+  `readelf` potwierdził ELF32 ARM i hard-float ABI. Lokalna paczka leży w
+  `.work/miyoo-7fca1da/` i nie jest jeszcze wydaniem GitHub Release.
+- Poprawiono błąd mulliganu AI: źródłowe `ControllerAI.redraw()` podejmuje dwie
+  kolejne decyzje, każdorazowo po natychmiastowej wymianie z wierzchem talii;
+  wcześniej druga decyzja mogła wskazywać kartę już dobraną. Teraz port wykonuje
+  dwie rzeczywiste podmiany w kolejności źródłowej. CTest przechodzi 2/2, w tym
+  100 deterministycznych pełnych meczów z taliami i liderami źródłowymi.
 
 - Naprawiono mapowanie własnych maksimów w wyborze celu AI dla Manekina:
   wariant źródłowy losuje spośród maksimum każdego własnego rzędu, nie tylko
