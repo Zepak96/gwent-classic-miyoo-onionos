@@ -242,6 +242,12 @@ rodzajami kart; pełny test na urządzeniu opisany wersją binarium i wynikiem.
   gry mają identyczne sumy SHA-256 jak zweryfikowany artefakt. Poprzedni folder
   gry i launcher zachowano jako kopie `.previous-9e74bb8`. Test na samym Miyoo
   pozostaje do wykonania.
+- [x] Aktualizacja z `0828412` z poprawioną kolejnością rzędów, dźwiękiem
+  stałych rzędów, czwartym slotem pogody i kartami w polach specjalnych została
+  zainstalowana. Wszystkie 603 pliki na SD zgadzają się SHA-256 z paczką;
+  poprzednią instalację zachowano jako `.previous-476af90`. Odczytowy `chkdsk`
+  nie wykrył błędów FAT32, ale Windows nadal zgłasza `Full Repair Needed`.
+  Uruchomienie i rozgrywka na fizycznym Miyoo nie są jeszcze potwierdzone.
 - [x] Poprawiono nazwę skrótu w paczce OnionOS z `.notfound` na `.port` i
   dodano kontrolę tej ścieżki do walidacji archiwum.
 - [x] Desktop CI dla silnika i frontendu przeszło: testy reguł, testy wejścia,
