@@ -64,9 +64,26 @@ std::string ascii(const std::string& value) {
   for(std::size_t i=0;i<value.size();) {
     const unsigned char a=static_cast<unsigned char>(value[i]);
     if(a<128) { out.push_back(static_cast<char>(std::toupper(a))); ++i; continue; }
+    if(a>=0xE0) {
+      // Consume a complete UTF-8 codepoint. Typography in localized names
+      // uses three-byte dashes and quotation marks, not two-byte letters.
+      const std::size_t length=a<0xF0?3:4;
+      if(i+length>value.size()){out.push_back('?');break;}
+      const auto b=static_cast<unsigned char>(value[i+1]);
+      const auto c=static_cast<unsigned char>(value[i+2]);
+      if(a==0xE2&&b==0x80) {
+        if(c==0x93||c==0x94)out.push_back('-');
+        else if(c==0x98||c==0x99||c==0x9A)out.push_back('\'');
+        else if(c==0x9C||c==0x9D||c==0x9E)out.push_back('"');
+        else if(c==0xA6)out+="...";
+        else out.push_back('?');
+      } else if(a==0xE2&&b==0x88&&c==0x92)out.push_back('-');
+      else out.push_back('?');
+      i+=length;continue;
+    }
     if(i+1<value.size()) {
       const unsigned char b=static_cast<unsigned char>(value[i+1]);
-      char base='?';
+      char base=(a==0xC2&&b==0xA0)?' ':'?';
       if(a==0xC4) {
         if(b==0x85||b==0x84)base='\x01';
         else if(b==0x87||b==0x86)base='\x02';
@@ -3883,6 +3900,7 @@ int main(int argc,char** argv) {
     app.savePath=(campaignTestDir/"match.sav").string();
     bool probeRunning=true;handleKey(app,SDLK_LEFT,probeRunning);handleKey(app,SDLK_AC_BACK,probeRunning);
     bool okay=app.screen==Screen::Campaign&&probeRunning;
+    okay=okay&&ascii("Foltest \xE2\x80\x94 Mistrz")=="FOLTEST - MISTRZ";
     handleKey(app,SDLK_RIGHT,probeRunning);
     okay=okay&&app.campaignFaction==1;
     handleKey(app,SDLK_LEFT,probeRunning);
