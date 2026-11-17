@@ -1,0 +1,79 @@
+{
+  "tool": "image_gen.imagegen",
+  "style_reference": "assets/gwent-classic/img/campaign/realms-1.png",
+  "rule": "Use Talar as the visual reference for brushwork, palette, amber lighting, background and close bust composition. Preserve each subject identity; do not anthropomorphize creatures.",
+  "assets": [
+    {
+      "id": "realms-4",
+      "output": "assets/gwent-classic/img/campaign/realms-4.png",
+      "original": "exec-56c79224-ccad-45a9-9f47-06e949f82429.png",
+      "prompt": "Edit the FIRST image (Dijkstra) into the exact illustration series of the SECOND image (Talar). The second image is the mandatory style and composition reference: same visible oil-paint brush texture, restrained ochre-brown palette, soft atmospheric edges, amber side lighting, earthy low-key background and close bust crop. Preserve Dijkstra's identity from image 1: bald broad man, stern expression, green-and-gold doublet. Reframe closer like Talar: face equally large in the frame, head near the upper margin, shoulders filling width, lower crop around upper chest/arms. Simplify fine embroidery into painterly shapes like the reference. This must look painted by the SAME artist as image 2 for the SAME portrait collection. Do not borrow Talar's face or clothes. No numbers, text, icons or card frame. Vertical 3:4."
+    },
+    {
+      "id": "nilfgaard-1",
+      "output": "assets/gwent-classic/img/campaign/nilfgaard-1.png",
+      "original": "exec-1f147fc4-d1bb-4866-a1e2-ffb8112f2cd2.png",
+      "prompt": "Create a clean painted portrait of the stern brown-haired courtier in his black and gold doublet from IMAGE 1, in the EXACT illustration style of IMAGE 2 (Talar). Image 2 is the mandatory series reference: matching visible oil-paint brush texture, earthy ochre-brown palette, soft atmospheric edges, amber side lighting, quiet dark brown background. Match its close bust composition: large head in the upper half, shoulders filling width, crop at upper chest/arms. Preserve the subject's identity and own outfit from image 1. Simplify fine details into coherent brushwork like image 2. Do not copy Talar's face or clothes. No card border, text, numbers, badges or UI. Vertical 3:4 illustration, calm portrait pose."
+    },
+    {
+      "id": "nilfgaard-2",
+      "output": "assets/gwent-classic/img/campaign/nilfgaard-2.png",
+      "original": "exec-1e5f061e-51c6-48eb-810b-75fd28e02793.png",
+      "prompt": "Create a clean painted portrait of the broad bald man in leather clothing from IMAGE 1, in the EXACT illustration style of IMAGE 2 (Talar). Image 2 is the mandatory series reference: matching visible oil-paint brush texture, earthy ochre-brown palette, soft atmospheric edges, amber side lighting, quiet dark brown background. Match its close bust composition: large head in the upper half, shoulders filling width, crop at upper chest/arms. Preserve the subject's identity and own outfit from image 1. Simplify fine details into coherent brushwork like image 2. Do not copy Talar's face or clothes. No card border, text, numbers, badges or UI. Vertical 3:4 illustration, calm portrait pose."
+    },
+    {
+      "id": "nilfgaard-3",
+      "output": "assets/gwent-classic/img/campaign/nilfgaard-3.png",
+      "original": "exec-7175f70b-3365-4ccd-b473-b5628718abf9.png",
+      "prompt": "Create a clean painted portrait of the short black-haired adult woman in her green-and-black medieval dress from IMAGE 1, in the EXACT illustration style of IMAGE 2 (Talar). Image 2 is the mandatory series reference: matching visible oil-paint brush texture, earthy ochre-brown palette, soft atmospheric edges, amber side lighting, quiet dark brown background. Match its close bust composition: large head in the upper half, shoulders filling width, crop at upper chest/arms. Preserve the subject's identity and own outfit from image 1. Simplify fine details into coherent brushwork like image 2. Do not copy Talar's face or clothes. No card border, text, numbers, badges or UI. Vertical 3:4 illustration, calm portrait pose."
+    },
+    {
+      "id": "nilfgaard-5",
+      "output": "assets/gwent-classic/img/campaign/nilfgaard-5.png",
+      "original": "exec-9e21ca3e-a159-469c-bc61-4f5112397da6.png",
+      "prompt": "Create a clean painted portrait of the black-haired nobleman in the foreground with black quilted doublet, red sleeves and gold collar, excluding the background attendant from IMAGE 1, in the EXACT illustration style of IMAGE 2 (Talar). Image 2 is the mandatory series reference: matching visible oil-paint brush texture, earthy ochre-brown palette, soft atmospheric edges, amber side lighting, quiet dark brown background. Match its close bust composition: large head in the upper half, shoulders filling width, crop at upper chest/arms. Preserve the subject's identity and own outfit from image 1. Simplify fine details into coherent brushwork like image 2. Do not copy Talar's face or clothes. No card border, text, numbers, badges or UI. Vertical 3:4 illustration, calm portrait pose."
+    },
+    {
+      "id": "monsters-2",
+      "output": "assets/gwent-classic/img/campaign/monsters-2.png",
+      "original": "exec-fbe79aef-1aa6-4f33-b0e8-c5868eed6699.png",
+      "prompt": "Create a clean painted portrait of the natural griffin beast: its dark feathered ruff, hooked black beak, lion-like body and wing roots. An animal creature with its original anatomy, no clothing or accessories from IMAGE 1, in the EXACT illustration style of IMAGE 2 (Talar). Image 2 is the mandatory series reference: matching visible oil-paint brush texture, earthy ochre-brown palette, soft atmospheric edges, amber side lighting, quiet dark brown background. Match its close bust composition: prominent head in the upper half, shoulders or natural creature upper body filling width. Preserve the subject's identity, anatomy and own outfit from image 1. Simplify fine details into coherent brushwork like image 2. Do not copy Talar's face or clothes onto the subject. Remove all card graphics: no text, numbers, border, badges or UI. Vertical 3:4, still portrait."
+    },
+    {
+      "id": "monsters-3",
+      "output": "assets/gwent-classic/img/campaign/monsters-3.png",
+      "original": "exec-b2d9bb09-09aa-4c79-982a-7de6ce35d615.png",
+      "prompt": "Create a clean painted portrait of the antlered forest guardian with deer-skull face and mossy bark body from IMAGE 1, in the EXACT illustration style of IMAGE 2 (Talar). Image 2 is the mandatory series reference: matching visible oil-paint brush texture, earthy ochre-brown palette, soft atmospheric edges, amber side lighting, quiet dark brown background. Match its close bust composition: large head in the upper half, shoulders filling width, crop at upper chest/arms. Preserve the subject's identity and own outfit from image 1. Simplify fine details into coherent brushwork like image 2. Do not copy Talar's face or clothes. No card border, text, numbers, badges or UI. Vertical 3:4 illustration, calm portrait pose."
+    },
+    {
+      "id": "monsters-4",
+      "output": "assets/gwent-classic/img/campaign/monsters-4.png",
+      "original": "exec-93b27c4b-c07e-4d5e-b563-9def5c421964.png",
+      "prompt": "Create a clean painted portrait of the knight in his enclosed ridged steel helmet and layered armor from IMAGE 1, in the EXACT illustration style of IMAGE 2 (Talar). Image 2 is the mandatory series reference: matching visible oil-paint brush texture, earthy ochre-brown palette, soft atmospheric edges, amber side lighting, quiet dark brown background. Match its close bust composition: prominent head in the upper half, shoulders or natural creature upper body filling width. Preserve the subject's identity, anatomy and own outfit from image 1. Simplify fine details into coherent brushwork like image 2. Do not copy Talar's face or clothes onto the subject. Remove all card graphics: no text, numbers, border, badges or UI. Vertical 3:4, still portrait."
+    },
+    {
+      "id": "skellige-1",
+      "output": "assets/gwent-classic/img/campaign/skellige-1.png",
+      "original": "exec-210228ca-32e1-4c80-9dac-8cc95e906333.png",
+      "prompt": "Create a clean painted portrait of the human man with dark swept-back long hair, strong features, dark fur and leather, excluding the apparition and ghost hands from IMAGE 1, in the EXACT illustration style of IMAGE 2 (Talar). Image 2 is the mandatory series reference: matching visible oil-paint brush texture, earthy ochre-brown palette, soft atmospheric edges, amber side lighting, quiet dark brown background. Match its close bust composition: prominent head in the upper half, shoulders or natural creature upper body filling width. Preserve the subject's identity, anatomy and own outfit from image 1. Simplify fine details into coherent brushwork like image 2. Do not copy Talar's face or clothes onto the subject. Remove all card graphics: no text, numbers, border, badges or UI. Vertical 3:4, still portrait."
+    },
+    {
+      "id": "skellige-2",
+      "output": "assets/gwent-classic/img/campaign/skellige-2.png",
+      "original": "exec-c3c1a9bc-2e00-4cfc-8d04-8686a50cabbd.png",
+      "prompt": "Create a clean painted portrait of the older bearded druid with tall ceremonial dark hat, antler ornament and fur mantle from IMAGE 1, in the EXACT illustration style of IMAGE 2 (Talar). Image 2 is the mandatory series reference: matching visible oil-paint brush texture, earthy ochre-brown palette, soft atmospheric edges, amber side lighting, quiet dark brown background. Match its close bust composition: prominent head in the upper half, shoulders or natural creature upper body filling width. Preserve the subject's identity, anatomy and own outfit from image 1. Simplify fine details into coherent brushwork like image 2. Do not copy Talar's face or clothes onto the subject. Remove all card graphics: no text, numbers, border, badges or UI. Vertical 3:4, still portrait."
+    },
+    {
+      "id": "skellige-4",
+      "output": "assets/gwent-classic/img/campaign/skellige-4.png",
+      "original": "exec-b84645b5-bbc7-4666-bbb3-1e39d8f11bc7.png",
+      "prompt": "Create a clean character portrait of the older red-bearded chieftain, his swept-back red-brown hair, broad face, leather armor and dark fur collar in image 1, painted in the EXACT style of image 2 (Talar). Image 2 is the mandatory series reference: same oil-paint brush texture, earthy ochre-brown palette, soft atmospheric edges, amber side lighting and dark quiet background. Match image 2's close bust composition: similarly large head near the upper margin, shoulders filling frame, lower crop around upper chest/arms. Keep the character's own face and clothing, do not borrow Talar's face. Simplify fine details into coherent brushwork. Remove all card-game graphics: number, icons, ribbon, border, name and quote. Only the character illustration, vertical 3:4, no text or UI."
+    },
+    {
+      "id": "skellige-5",
+      "output": "assets/gwent-classic/img/campaign/skellige-5.png",
+      "original": "exec-0a608a8f-102e-4dae-99b3-133db11690df.png",
+      "prompt": "Create a clean character portrait of the red-haired adult woman in the upper left of the card, her recognizable face, copper-red hair and leather armor with a fur collar. Exclude the other figures in image 1, painted in the EXACT style of image 2 (Talar). Image 2 is the mandatory series reference: same oil-paint brush texture, earthy ochre-brown palette, soft atmospheric edges, amber side lighting and dark quiet background. Match image 2's close bust composition: similarly large head near the upper margin, shoulders filling frame, lower crop around upper chest/arms. Keep the character's own face and clothing, do not borrow Talar's face. Simplify fine details into coherent brushwork. Remove all card-game graphics: number, icons, ribbon, border, name and quote. Only the character illustration, vertical 3:4, no text or UI."
+    }
+  ]
+}

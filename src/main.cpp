@@ -212,7 +212,8 @@ struct App {
   bool mainMenuEnabled{false};
   int menuIndex{0};
   gwent::CampaignProgress campaignProgress;
-  int campaignFaction{0},campaignStage{0};
+  int campaignFaction{0},campaignStage{0},campaignDeckIndex{1};
+  bool campaignDeckPicker{false};
   bool campaignIntro{false},campaignResultRecorded{false},returnToCampaignAfterDeck{false};
   std::string activeCampaignId,campaignAchievement;
   Uint32 campaignSaveRetryAt{0};
@@ -840,15 +841,18 @@ void recordCampaignOutcome(App& a) {
   if(a.game.matchWinner!=0){a.campaignResultRecorded=true;return;}
   const auto* node=campaignNodeById(a.activeCampaignId);if(!node)return;
   if(a.campaignSaveRetryAt&&!SDL_TICKS_PASSED(SDL_GetTicks(),a.campaignSaveRetryAt))return;
-  const bool newlyWon=gwent::recordCampaignVictory(a.campaignProgress,node->id);
-  if(newlyWon)a.campaignAchievement=(a.language==Language::Polish?"OSIAGNIECIE: ":"ACHIEVEMENT: ")+
-      (a.language==Language::Polish?node->achievementPl:node->achievementEn);
+  auto savedProgress=a.campaignProgress;
+  const bool newlyWon=gwent::recordCampaignVictory(savedProgress,node->id);
   std::string error;
-  if(a.dataDirectory.empty()||!gwent::saveCampaignProgress(a.dataDirectory+"campaign-v1.gwc",a.campaignProgress,&error)) {
+  if(a.dataDirectory.empty()||!gwent::saveCampaignProgress(a.dataDirectory+"campaign-v1.gwc",savedProgress,&error)) {
     a.status=a.language==Language::Polish?"BLAD ZAPISU KAMPANII":"CAMPAIGN SAVE FAILED";
+    std::cerr<<"Campaign save failed: node="<<node->id<<" path="<<a.dataDirectory<<" error="<<error<<"\n";
     a.campaignSaveRetryAt=SDL_GetTicks()+2000;return;
   }
+  a.campaignProgress=savedProgress;
+  if(newlyWon)a.campaignAchievement=(a.language==Language::Polish?"OSIAGNIECIE: ":"ACHIEVEMENT: ")+(a.language==Language::Polish?node->achievementPl:node->achievementEn);
   a.campaignResultRecorded=true;a.campaignSaveRetryAt=0;
+  std::cerr<<"Campaign victory saved: node="<<node->id<<" path="<<a.dataDirectory<<"\n";
 }
 void leaveCampaignMatch(App& a) {
   recordCampaignOutcome(a);
@@ -1037,7 +1041,7 @@ void startMatch(App& a,std::uint64_t fixtureSeed=0,const std::string& campaignId
   }
   gwent::beginMatchWithLeaders(a.game,std::move(humanDeck),humanLeader,
       std::move(opponent.cards),opponent.leader,seed,-1);
-  a.activeCampaignId=campaignId;a.campaignAchievement.clear();a.campaignResultRecorded=false;a.campaignSaveRetryAt=0;
+  a.activeCampaignId=campaignId;std::cerr<<"Match started: campaign="<<(campaignId.empty()?"none":campaignId)<<" playerDeck="<<(a.userDeckSelected?"custom":recipes()[a.deckIndex].id)<<"\n";a.campaignAchievement.clear();a.campaignResultRecorded=false;a.campaignSaveRetryAt=0;
   a.cardPlayConfirmOpen=false;a.leaderConfirmOpen=false;a.leaderSelectionMode=false;
   a.matchFocusKind=App::MatchFocusKind::Hand;a.matchFocusOwner=0;a.matchFocusRow=0;a.matchFocusCardId.clear();a.opponentPreviewActive=false;
   a.mulligan.clear(); a.handIndex=0; a.rowIndex=0; a.screen=Screen::Match;a.endScreenStartedAt=0;
@@ -1954,8 +1958,8 @@ std::vector<const gwent::Card*> editorLeaders(const App& a) {
   for(const auto& card:gwent::referenceCardCatalog())if(card.kind==gwent::Kind::Leader&&card.faction==a.editDeck.faction)leaders.push_back(&card);
   return leaders;
 }
-// Trial release: expose the complete Northern Realms tower only.
-constexpr int campaignTowerCount=1;
+// Four independent campaign towers share the same progression/save format.
+constexpr int campaignTowerCount=4;
 constexpr std::array<gwent::Faction,4> campaignFactions{{gwent::Faction::NorthernRealms,gwent::Faction::Nilfgaard,gwent::Faction::Monsters,gwent::Faction::Skellige}};
 const gwent::CampaignNode* selectedCampaignNode(const App& a) {
   const auto faction=campaignFactions[static_cast<std::size_t>(std::clamp(a.campaignFaction,0,3))];
@@ -1963,7 +1967,43 @@ const gwent::CampaignNode* selectedCampaignNode(const App& a) {
   const auto found=std::find_if(nodes.begin(),nodes.end(),[&](const auto& n){return n.faction==faction&&n.stage==a.campaignStage+1;});
   return found==nodes.end()?nullptr:&*found;
 }
+bool campaignCustomDeckValid(const App& a) {
+  std::vector<gwent::Card> cards;gwent::Card leader;
+  return gwent::materializeUserDeck(a.editDeck,cards,leader);
+}
+void drawCampaignDeckPicker(SDL_Renderer* r,const App& a) {
+  const bool pl=a.language==Language::Polish;
+  const auto* node=selectedCampaignNode(a);
+  drawImage(r,a,"img/campaign/backdrop.png",0,0,W,H);
+  box(r,0,0,W,H,Color{5,4,3,185});
+  centeredTextInBox(r,20,14,W-40,26,pl?"WYBIERZ TALIE":"CHOOSE YOUR DECK",gold,2);
+  centeredTextInBox(r,20,48,W-40,22,(pl?"PRZECIWNIK: ":"OPPONENT: ")+(node?(pl?node->namePl:node->nameEn):"?"),paper,2);
+  const int total=static_cast<int>(recipes().size())+1;
+  const int selected=std::clamp(a.campaignDeckIndex,0,total-1);
+  const int first=std::clamp(selected-2,0,std::max(0,total-5));
+  const bool customValid=campaignCustomDeckValid(a);
+  for(int row=0;row<5&&first+row<total;++row) {
+    const int index=first+row,y=91+row*52;
+    const bool focused=index==selected,custom=index==0;
+    box(r,42,y,556,46,Color{17,12,8,240});
+    frame(r,42,y,556,46,focused?gold:Color{95,70,39,255});
+    const auto* recipe=custom?nullptr:&recipes()[static_cast<std::size_t>(index-1)];
+    const std::string title=custom?(pl?"TWOJA TALIA":"YOUR CUSTOM DECK"):
+      factionName(recipe->faction,pl)+" - "+std::to_string(index);
+    text(r,54,y+8,title,custom&&!customValid?muted:paper,1);
+    const int leader=custom?a.editDeck.leaderReferenceIndex:recipe->leaderReferenceIndex;
+    const auto& name=gwent::referenceCardName(leader,pl);
+    text(r,54,y+27,shortName((custom&&!customValid?(pl?"NIEKOMPLETNA - Y: EDYTUJ":"INCOMPLETE - Y: EDIT"):(pl?"DOWODCA: ":"LEADER: ")+name),85),focused?gold:muted,1);
+  }
+  box(r,42,359,556,51,Color{17,12,8,240});
+  const auto info=a.status.empty()?(pl?"GOTOWE TALIE SPELNIAJA WYMAGANIA GRY. WYBIERZ TALIE I POTWIERDZ ROZPOCZECIE PARTII.":"PREMADE DECKS MEET THE GAME REQUIREMENTS. CHOOSE A DECK AND CONFIRM TO START THE MATCH."):a.status;
+  const auto lines=wrapDetailText(info,84);
+  for(std::size_t i=0;i<lines.size()&&i<3;++i)text(r,54,370+static_cast<int>(i)*11,lines[i],paper,1);
+  centeredTextInBox(r,18,428,W-36,18,pl?"GORA/DOL: TALIA   B: ROZPOCZNIJ   A: WROC":"UP/DOWN: DECK   B: START MATCH   A: BACK",gold,1);
+  centeredTextInBox(r,18,451,W-36,15,pl?"Y: EDYTUJ WLASNA TALIE":"Y: EDIT YOUR CUSTOM DECK",paper,1);
+}
 void drawCampaign(SDL_Renderer* r,const App& a) {
+  if(a.campaignDeckPicker){drawCampaignDeckPicker(r,a);return;}
   const bool pl=a.language==Language::Polish;
   drawImage(r,a,"img/campaign/backdrop.png",0,0,W,H);
   box(r,0,0,W,H,Color{5,4,3,125});
@@ -1996,8 +2036,8 @@ void drawCampaign(SDL_Renderer* r,const App& a) {
       int tw=0,th=0;SDL_QueryTexture(image,nullptr,nullptr,&tw,&th);
       SDL_Rect src{0,0,tw,th};
       if(portrait.rfind("img/lg/",0)==0)src={static_cast<int>(tw*.30),static_cast<int>(th*.06),static_cast<int>(tw*.70),static_cast<int>(th*.68)};
-      SDL_Rect dst{350,100,208,220};
-      // Crop to cover instead of widening the generated portrait's face.
+      SDL_Rect dst{366,86,177,236};
+      // Match the 3:4 portrait series so heads and antlers are not cropped.
       if(src.w*dst.h>src.h*dst.w) {
         const int crop=src.h*dst.w/dst.h;src.x+=(src.w-crop)/2;src.w=crop;
       } else {
@@ -2005,15 +2045,15 @@ void drawCampaign(SDL_Renderer* r,const App& a) {
       }
       SDL_RenderCopy(r,image,&src,&dst);
     }
-    frame(r,349,99,210,222,gold);
+    frame(r,365,85,179,238,gold);
     centeredTextInBox(r,304,326,300,19,pl?selected->namePl:selected->nameEn,paper,2);
     box(r,306,350,298,63,Color{15,10,6,240});frame(r,306,350,298,63,Color{135,100,53,255});
     const auto lines=wrapDetailText(pl?selected->introPl:selected->introEn,45);
     for(std::size_t i=0;i<lines.size()&&i<5;++i)text(r,315,358+static_cast<int>(i)*10,lines[i],paper,1);
   }
   box(r,12,422,W-24,46,Color{8,6,4,230});
-  centeredTextInBox(r,18,428,W-36,15,a.campaignIntro?(pl?"B: ROZPOCZNIJ PARTIE   A: WROC":"B: START MATCH   A: BACK"):
-    (pl?"GORA/DOL: RYWAL   B: WYBIERZ   A: WROC":"UP/DOWN: OPPONENT   B: SELECT   A: BACK"),gold,1);
+  centeredTextInBox(r,18,428,W-36,15,a.campaignIntro?(pl?"B: WYBIERZ TALIE   A: WROC":"B: CHOOSE DECK   A: BACK"):
+    (pl?"LEWO/PRAWO: FRAKCJA  GORA/DOL: RYWAL  B: WYBIERZ":"LEFT/RIGHT: FACTION  UP/DOWN: OPPONENT  B: SELECT"),gold,1);
   const int achievements=static_cast<int>(std::count(a.campaignProgress.victories.begin(),a.campaignProgress.victories.begin()+5*campaignTowerCount,true));
   centeredTextInBox(r,18,447,W-36,15,a.status.empty()?((pl?"Y: TWOJA TALIA   OSIAGNIECIA ":"Y: YOUR DECK   ACHIEVEMENTS ")+std::to_string(achievements)+"/"+std::to_string(5*campaignTowerCount)):a.status,paper,1);
 }
@@ -2350,6 +2390,8 @@ void drawMatch(SDL_Renderer* r,const App& a) {
         (a.language==Language::Polish?(a.game.matchWinner==0?"RYWAL POKONANY":"SPROBUJ PONOWNIE"):
          (a.game.matchWinner==0?"OPPONENT DEFEATED":"TRY AGAIN")):a.campaignAchievement,48);
       for(std::size_t i=0;i<lines.size()&&i<3;++i)centeredTextInBox(r,100,245+static_cast<int>(i)*13,440,13,lines[i],gold,1);
+      if(a.game.matchWinner==0&&!a.campaignResultRecorded&&a.campaignSaveRetryAt)
+        centeredTextInBox(r,60,302,520,16,a.language==Language::Polish?"BLAD ZAPISU POSTEPU - PONAWIAM":"PROGRESS SAVE FAILED - RETRYING",gold,1);
     }
   }
   const bool showHand=a.game.phase!=gwent::Phase::RoundResult&&a.game.phase!=gwent::Phase::MatchResult;
@@ -2491,6 +2533,11 @@ void drawMatchOnScreen(SDL_Renderer* r,const App& a) {
   drawMatch(r,a);
   drawNotification(r,a);
   SDL_RenderSetViewport(r,nullptr);
+  if(const auto* opponent=campaignNodeById(a.activeCampaignId)) {
+    const bool pl=a.language==Language::Polish;
+    centeredTextInBox(r,12,7,W-24,24,(pl?"KAMPANIA - ":"CAMPAIGN - ")+(pl?opponent->namePl:opponent->nameEn),gold,2);
+    centeredTextInBox(r,12,34,W-24,16,factionName(opponent->faction,pl)+(pl?"   ETAP ":"   STAGE ")+std::to_string(opponent->stage)+"/5",paper,1);
+  }
   if(a.game.pendingMedicPlayer==0) {
     const auto choices=pendingMedicChoices(a);
     if(!choices.empty())drawCardRulesPanel(r,a,*choices[static_cast<std::size_t>(std::clamp(a.targetIndex,0,static_cast<int>(choices.size())-1))],6,MATCH_RULES_PANEL_Y,W-12,MATCH_RULES_PANEL_H);
@@ -2621,6 +2668,11 @@ void handleMatchKey(App& a,SDL_Keycode key) {
       }
     }
   }
+  if(a.game.phase==gwent::Phase::MatchResult) {
+    if(key==SDLK_RETURN||key==SDLK_x||key==SDLK_SPACE||key==SDLK_AC_BACK) { leaveCampaignMatch(a); return; }
+    return;
+  }
+  if(a.game.phase==gwent::Phase::RoundResult&&key==SDLK_AC_BACK)key=SDLK_RETURN;
   if(key==SDLK_AC_BACK&&!a.targetMode&&a.game.pendingMedicPlayer<0) {
     if(a.game.phase==gwent::Phase::PlayerTurn)beginHumanPlayConfirmation(a);
     return;
@@ -2631,10 +2683,6 @@ void handleMatchKey(App& a,SDL_Keycode key) {
   }
   if(key==SDLK_s||key==SDLK_F5) { saveCurrentMatch(a);return; }
   if(key==SDLK_o||key==SDLK_F9) { loadSavedMatch(a);return; }
-  if(a.game.phase==gwent::Phase::MatchResult) {
-    if(key==SDLK_RETURN||key==SDLK_x||key==SDLK_SPACE||key==SDLK_AC_BACK) { leaveCampaignMatch(a); return; }
-    return;
-  }
   if(a.game.phase==gwent::Phase::RoundResult) {
     if(key==SDLK_RETURN||key==SDLK_x||key==SDLK_SPACE) {
       gwent::startNextRound(a.game); a.handIndex=0; a.rowIndex=0; a.targetIndex=0; a.status=tr(a,"your_turn");
@@ -2803,6 +2851,25 @@ void handleMatchKey(App& a,SDL_Keycode key) {
 }
 void handleKey(App& a,SDL_Keycode key,bool& running) {
   if(a.screen==Screen::Campaign) {
+    if(a.campaignDeckPicker) {
+      if(key==SDLK_x||key==SDLK_ESCAPE||key==SDLK_z) {a.campaignDeckPicker=false;a.status.clear();}
+      else if(key==SDLK_UP||key==SDLK_DOWN||key==SDLK_LEFT||key==SDLK_RIGHT) {
+        const int count=static_cast<int>(recipes().size())+1;
+        a.campaignDeckIndex=(a.campaignDeckIndex+((key==SDLK_UP||key==SDLK_LEFT)?count-1:1))%count;a.status.clear();
+      } else if(key==SDLK_l||key==SDLK_f) {a.returnToCampaignAfterDeck=true;openDeckEditor(a);}
+      else if(key==SDLK_AC_BACK||key==SDLK_RETURN||key==SDLK_KP_ENTER) {
+        const auto* node=selectedCampaignNode(a);
+        if(a.campaignDeckIndex==0&&!campaignCustomDeckValid(a)) {
+          a.status=a.language==Language::Polish?"TWOJA TALIA JEST NIEKOMPLETNA. WYBIERZ GOTOWA LUB Y: EDYTUJ.":"YOUR DECK IS INCOMPLETE. SELECT A PREMADE DECK OR Y: EDIT.";
+        } else if(node) {
+          a.userDeckSelected=a.campaignDeckIndex==0;
+          if(!a.userDeckSelected)a.deckIndex=static_cast<std::size_t>(a.campaignDeckIndex-1);
+          const auto id=node->id;startMatch(a,0,id);
+          if(a.screen==Screen::Match)a.campaignDeckPicker=false;
+        }
+      }
+      return;
+    }
     if(key==SDLK_x||key==SDLK_ESCAPE||key==SDLK_z) {
       if(a.campaignIntro)a.campaignIntro=false;else a.screen=Screen::MainMenu;
     } else if(key==SDLK_l||key==SDLK_f) {
@@ -2815,7 +2882,7 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
       const auto* node=selectedCampaignNode(a);
       if(!node||!gwent::campaignUnlocked(a.campaignProgress,node->id))a.status=a.language==Language::Polish?"POKONAJ POPRZEDNIEGO RYWALA":"DEFEAT THE PREVIOUS OPPONENT";
       else if(!a.campaignIntro){a.campaignIntro=true;a.status.clear();}
-      else {const auto id=node->id;startMatch(a,0,id);}
+      else {a.campaignDeckPicker=true;a.campaignDeckIndex=campaignCustomDeckValid(a)?0:1;a.status.clear();}
     }
     return;
   }
@@ -2828,7 +2895,7 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
       if(a.menuIndex==0)startMatch(a);
       else if(a.menuIndex==1)a.screen=Screen::DeckBuilder;
       else if(a.menuIndex==2)loadSavedMatch(a);
-      else {a.screen=Screen::Campaign;a.campaignIntro=false;}
+      else {a.screen=Screen::Campaign;a.campaignIntro=false;a.campaignDeckPicker=false;}
     } else if(key==SDLK_ESCAPE||key==SDLK_HOME) {
       std::cerr<<"Menu exit requested: key="<<SDL_GetKeyName(key)<<"\n";running=false;
     }
@@ -3817,7 +3884,7 @@ int main(int argc,char** argv) {
     bool probeRunning=true;handleKey(app,SDLK_LEFT,probeRunning);handleKey(app,SDLK_AC_BACK,probeRunning);
     bool okay=app.screen==Screen::Campaign&&probeRunning;
     handleKey(app,SDLK_RIGHT,probeRunning);
-    okay=okay&&app.campaignFaction==0;
+    okay=okay&&app.campaignFaction==1;
     handleKey(app,SDLK_LEFT,probeRunning);
     okay=okay&&app.campaignFaction==0;
     handleKey(app,SDLK_UP,probeRunning);handleKey(app,SDLK_AC_BACK,probeRunning);
@@ -3829,16 +3896,72 @@ int main(int argc,char** argv) {
     auto* surface=SDL_CreateRGBSurfaceWithFormat(0,W,H,32,SDL_PIXELFORMAT_ARGB8888);
     const bool saved=surface&&SDL_RenderReadPixels(renderer,nullptr,SDL_PIXELFORMAT_ARGB8888,surface->pixels,surface->pitch)==0&&SDL_SaveBMP(surface,argv[2])==0;
     if(surface)SDL_FreeSurface(surface);
+    // Render every opponent with the actual packaged portrait. A leader-card
+    // fallback must not silently conceal unfinished campaign artwork.
+    for(int faction=0;faction<campaignTowerCount;++faction) {
+      app.campaignFaction=faction;
+      for(int stage=0;stage<5;++stage) {
+        app.campaignStage=stage;
+        const auto* portraitNode=selectedCampaignNode(app);
+        okay=okay&&portraitNode&&textureFor(renderer,app,portraitNode->portrait);
+        SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);
+        drawCampaign(renderer,app);presentFrame();
+        auto* portraitFrame=SDL_CreateRGBSurfaceWithFormat(0,W,H,32,SDL_PIXELFORMAT_ARGB8888);
+        const auto framePath=std::filesystem::path(argv[2]).parent_path()/
+          (std::filesystem::path(argv[2]).stem().string()+"-"+(portraitNode?portraitNode->id:"missing")+".bmp");
+        okay=okay&&portraitFrame&&SDL_RenderReadPixels(renderer,nullptr,SDL_PIXELFORMAT_ARGB8888,portraitFrame->pixels,portraitFrame->pitch)==0&&SDL_SaveBMP(portraitFrame,framePath.string().c_str())==0;
+        if(portraitFrame)SDL_FreeSurface(portraitFrame);
+      }
+    }
+    app.campaignFaction=0;app.campaignStage=0;
     const auto* node=selectedCampaignNode(app);
     if(node) {
-      const auto nodeId=node->id;handleKey(app,SDLK_AC_BACK,probeRunning);handleKey(app,SDLK_AC_BACK,probeRunning);
-      okay=okay&&app.screen==Screen::Match&&app.activeCampaignId==nodeId&&
+      // Regression: a partial custom deck must not prevent choosing a legal
+      // premade deck for the selected campaign opponent.
+      app.editDeck.cardCounts.clear();app.userDeckSelected=true;
+      const auto nodeId=node->id;
+      handleKey(app,SDLK_AC_BACK,probeRunning);handleKey(app,SDLK_AC_BACK,probeRunning);
+      okay=okay&&app.screen==Screen::Campaign&&app.campaignDeckPicker&&app.campaignDeckIndex==1;
+      app.campaignDeckIndex=0;handleKey(app,SDLK_AC_BACK,probeRunning);
+      okay=okay&&app.screen==Screen::Campaign&&app.campaignDeckPicker&&!app.status.empty();
+      handleKey(app,SDLK_DOWN,probeRunning);
+      const auto captureCampaign=[&](const std::string& suffix,bool match) {
+        SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);
+        if(match)drawMatchOnScreen(renderer,app);else drawCampaign(renderer,app);
+        presentFrame();
+        auto* shot=SDL_CreateRGBSurfaceWithFormat(0,W,H,32,SDL_PIXELFORMAT_ARGB8888);
+        const auto path=std::filesystem::path(argv[2]).parent_path()/(std::filesystem::path(argv[2]).stem().string()+suffix+".bmp");
+        const bool result=shot&&SDL_RenderReadPixels(renderer,nullptr,SDL_PIXELFORMAT_ARGB8888,shot->pixels,shot->pitch)==0&&SDL_SaveBMP(shot,path.string().c_str())==0;
+        if(shot)SDL_FreeSurface(shot);return result;
+      };
+      okay=okay&&captureCampaign("-deck-picker",false);
+      handleKey(app,SDLK_AC_BACK,probeRunning);
+      okay=okay&&app.screen==Screen::Match&&!app.campaignDeckPicker&&!app.userDeckSelected&&app.activeCampaignId==nodeId&&
         app.game.players[1].leader.referenceIndex==node->deck.leaderReferenceIndex;
+      okay=okay&&captureCampaign("-match-identity",true);
       app.game.phase=gwent::Phase::MatchResult;app.game.matchWinner=1;
       recordCampaignOutcome(app);
       okay=okay&&std::count(app.campaignProgress.victories.begin(),app.campaignProgress.victories.end(),true)==0;
       startMatch(app,0xCA1234,nodeId);
-      app.game.phase=gwent::Phase::MatchResult;app.game.matchWinner=0;
+      // Resolve actual engine rounds rather than assigning a winning result.
+      const auto& allCards=gwent::referenceCardCatalog();
+      const auto unit=std::find_if(allCards.begin(),allCards.end(),[](const auto& c){return c.kind==gwent::Kind::Unit&&c.power>0&&c.abilities.empty();});
+      if(unit==allCards.end())okay=false;
+      else {
+        for(auto& player:app.game.players) {player.board={};player.passed=false;player.hand={*unit};player.roundLosses=0;player.roundWins=0;}
+        app.game.pendingMedicPlayer=-1;app.game.currentPlayer=0;app.game.phase=gwent::Phase::PlayerTurn;
+        app.game.players[0].board[0]={*unit};
+        okay=okay&&gwent::pass(app.game,0)&&gwent::pass(app.game,1)&&app.game.phase==gwent::Phase::RoundResult;
+        recordCampaignOutcome(app);
+        okay=okay&&!gwent::campaignUnlocked(app.campaignProgress,"realms-2");
+        app.activeNotification.clear();app.cardFlight={};app.actionAnimationLockActive=false;
+        handleKey(app,SDLK_AC_BACK,probeRunning);
+        okay=okay&&app.game.phase!=gwent::Phase::RoundResult;
+        app.game.currentPlayer=0;app.game.phase=gwent::Phase::PlayerTurn;
+        for(auto& player:app.game.players){player.board={};player.passed=false;}
+        app.game.players[0].board[0]={*unit};
+        okay=okay&&gwent::pass(app.game,0)&&gwent::pass(app.game,1)&&app.game.phase==gwent::Phase::MatchResult&&app.game.matchWinner==0;
+      }
       recordCampaignOutcome(app);
       const auto wonProgress=app.campaignProgress.victories;
       recordCampaignOutcome(app);
@@ -3846,7 +3969,8 @@ int main(int argc,char** argv) {
         app.campaignProgress.victories==wonProgress&&gwent::campaignUnlocked(app.campaignProgress,"realms-2");
       gwent::CampaignProgress reloaded;std::string error;
       okay=okay&&gwent::loadCampaignProgress(app.dataDirectory+"campaign-v1.gwc",reloaded,&error)&&reloaded.victories==wonProgress;
-      leaveCampaignMatch(app);okay=okay&&app.screen==Screen::Campaign;
+      app.activeNotification.clear();app.cardFlight={};app.actionAnimationLockActive=false;
+      handleKey(app,SDLK_AC_BACK,probeRunning);okay=okay&&app.screen==Screen::Campaign;
     } else okay=false;
     std::filesystem::remove(campaignTestDir/"campaign-v1.gwc");
     std::filesystem::remove(campaignTestDir);

@@ -4,10 +4,17 @@ Assets are generated with the built-in `image_gen.imagegen` tool. Original
 outputs remain in the Codex generated-images directory; selected project assets
 are copied into `assets/gwent-classic/img/campaign/`.
 
-The campaign requires twenty clean opponent portraits. Eleven are present:
-realms 1–5, nilfgaard 1 and 4, monsters 1, 2 and 5, skellige 3.
-The other nine are outstanding. Existing source-card fallback artwork must not
-be treated as a completed generated portrait.
+All twenty clean opponent portraits are now present. Talar (`realms-1.png`)
+is the canonical visual reference for the series. The twelve additions and
+corrections are recorded with exact prompts and source output basenames in
+`campaign-art-style-lock.json`. Dijkstra, Morvran and Griffin replace earlier
+versions; original generated outputs are preserved outside the asset directory.
+The earlier Dijkstra and Morvran sections below describe historical versions,
+not the selected revised portraits.
+
+The UI uses a 3:4 portrait region to retain heads and antlers without stretching
+or the previous square crop. All twenty screens are emitted by the campaign
+smoke test in normal and software-composition modes for visual review.
 
 ## Dijkstra
 

@@ -66,7 +66,9 @@ jobs:
           name: frontend-smoke-frames
           path: |
             campaign-smoke.bmp
+            campaign-smoke-*.bmp
             composite-campaign-smoke.bmp
+            composite-campaign-smoke-*.bmp
             board-focus-smoke.bmp
             main-menu-smoke.bmp
             composite-main-menu-smoke.bmp
