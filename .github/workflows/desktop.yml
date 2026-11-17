@@ -44,6 +44,12 @@ jobs:
         run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./build-sdl/gwent --menu-smoke-test main-menu-smoke.bmp
       - name: Main menu software composition
         run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy GWENT_SOFTWARE_COMPOSITE=1 ./build-sdl/gwent --menu-smoke-test composite-main-menu-smoke.bmp
+      - name: Crowded board texture stability
+        run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./build-sdl/gwent --crowded-render-test
+      - name: Crowded board software composition
+        run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy GWENT_SOFTWARE_COMPOSITE=1 ./build-sdl/gwent --crowded-render-test
+      - name: Board focus rendering
+        run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./build-sdl/gwent --board-focus-smoke-test board-focus-smoke.bmp
       - name: Miyoo physical-key mapping
         run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./build-sdl/gwent --input-test
       - name: Round and match result screens
@@ -55,6 +61,7 @@ jobs:
         with:
           name: frontend-smoke-frames
           path: |
+            board-focus-smoke.bmp
             main-menu-smoke.bmp
             composite-main-menu-smoke.bmp
             frontend-smoke.bmp

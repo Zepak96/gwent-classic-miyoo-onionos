@@ -252,6 +252,12 @@ struct App {
   int editorCardIndex{0};
   gwent::UserDeck editDeck;
   gwent::Game game;
+  enum class MatchFocusKind { Hand, Board, Special, Weather, Leader, Pass, Grave, Deck };
+  MatchFocusKind matchFocusKind{MatchFocusKind::Hand};
+  int matchFocusOwner{0},matchFocusRow{0};
+  std::string matchFocusCardId;
+  bool opponentPreviewActive{false};
+  gwent::Card opponentPreviewCard;
   int handIndex{0};
   int rowIndex{0};
   int reviveRowIndex{0};
@@ -266,6 +272,10 @@ struct App {
   std::string assetDirectory;
   mutable std::unordered_map<std::string,SDL_Texture*> textures;
   mutable std::vector<std::string> textureOrder;
+  mutable std::unordered_map<std::string,std::size_t> textureBytes;
+  mutable std::unordered_map<std::string,std::uint64_t> textureLastFrame;
+  mutable std::size_t textureCacheBytes{0};
+  mutable std::uint64_t textureFrame{0},textureDecodeCount{0};
   gwent_port::AudioSystem audio;
   std::string status;
   Uint32 aiAt{0};
@@ -511,9 +521,7 @@ SDL_Texture* textureFor(SDL_Renderer* renderer,const App& app,const std::string&
   if(relative.empty()||app.assetDirectory.empty())return nullptr;
   const auto found=app.textures.find(relative);
   if(found!=app.textures.end()) {
-    auto& order=app.textureOrder;
-    order.erase(std::remove(order.begin(),order.end(),relative),order.end());
-    order.push_back(relative);
+    app.textureLastFrame[relative]=app.textureFrame;
     return found->second;
   }
   const auto path=std::filesystem::path(app.assetDirectory)/relative;
@@ -521,7 +529,9 @@ SDL_Texture* textureFor(SDL_Renderer* renderer,const App& app,const std::string&
   unsigned char* pixels=stbi_load(path.string().c_str(),&width,&height,&channels,STBI_rgb_alpha);
   if(!pixels)return nullptr;
   SDL_Texture* loaded=nullptr;
-  const int maxWidth=relative.rfind("img/lg/",0)==0?246:W;
+  // Miniatures never need their 309x444 source raster resident on the handheld.
+  // Keep 3x the 28px board width, also sufficient for deck-builder thumbnails.
+  const int maxWidth=relative.rfind("img/sm/",0)==0?84:relative.rfind("img/lg/",0)==0?246:W;
   if(width>maxWidth||height>H) {
     const float scale=std::min({1.0f,static_cast<float>(maxWidth)/width,static_cast<float>(H)/height});
     const int scaledWidth=std::max(1,static_cast<int>(std::lround(width*scale)));
@@ -537,21 +547,35 @@ SDL_Texture* textureFor(SDL_Renderer* renderer,const App& app,const std::string&
   }
   if(loaded)SDL_SetTextureBlendMode(loaded,SDL_BLENDMODE_BLEND);
   stbi_image_free(pixels);
+  if(!loaded)return nullptr;
+  int residentWidth=0,residentHeight=0;
+  SDL_QueryTexture(loaded,nullptr,nullptr,&residentWidth,&residentHeight);
+  const auto bytes=static_cast<std::size_t>(residentWidth)*residentHeight*4;
   app.textures.emplace(relative,loaded);
-  app.textureOrder.push_back(relative);
-  constexpr std::size_t maxCachedTextures=48;
-  while(app.textureOrder.size()>maxCachedTextures) {
-    const std::string oldest=app.textureOrder.front();
-    app.textureOrder.erase(app.textureOrder.begin());
-    const auto stale=app.textures.find(oldest);
-    if(stale!=app.textures.end()) {
-      SDL_RenderFlush(renderer);
-      if(stale->second)SDL_DestroyTexture(stale->second);
-      app.textures.erase(stale);
-    }
-  }
+  app.textureBytes[relative]=bytes;app.textureCacheBytes+=bytes;
+  app.textureLastFrame[relative]=app.textureFrame;
+  app.textureOrder.push_back(relative);++app.textureDecodeCount;
   return loaded;
 }
+void trimTextureCache(const App& app) {
+  // Evict only after presenting, and never evict this frame's working set.
+  // A fixed 48-entry cache thrashed on crowded boards every single frame.
+  constexpr std::size_t budget=16*1024*1024;
+  for(auto it=app.textureOrder.begin();app.textureCacheBytes>budget&&it!=app.textureOrder.end();) {
+    const auto key=*it;
+    if(app.textureLastFrame[key]==app.textureFrame){++it;continue;}
+    const auto found=app.textures.find(key);
+    if(found!=app.textures.end()) {
+      if(found->second)SDL_DestroyTexture(found->second);
+      app.textures.erase(found);
+    }
+    app.textureCacheBytes-=app.textureBytes[key];
+    app.textureBytes.erase(key);app.textureLastFrame.erase(key);
+    it=app.textureOrder.erase(it);
+  }
+  ++app.textureFrame;
+}
+
 void drawImage(SDL_Renderer* renderer,const App& app,const std::string& relative,int x,int y,int w,int h) {
   if(auto* image=textureFor(renderer,app,relative)) { SDL_Rect destination{x,y,w,h};SDL_RenderCopy(renderer,image,nullptr,&destination); }
 }
@@ -779,6 +803,7 @@ bool loadSavedMatch(App& a) {
   gwent::Game restored;std::string error;
   if(a.savePath.empty()||!gwent::loadGame(a.savePath,restored,&error)) { a.status=tr(a,"no_save");return false; }
   a.game=std::move(restored);a.screen=Screen::Match;a.handIndex=0;a.rowIndex=0;a.targetIndex=0;
+  a.matchFocusKind=App::MatchFocusKind::Hand;a.matchFocusOwner=0;a.matchFocusRow=0;a.matchFocusCardId.clear();a.opponentPreviewActive=false;
   a.endScreenStartedAt=SDL_GetTicks();
   a.targetMode=false;a.cardPlayConfirmOpen=false;a.leaderConfirmOpen=false;
   a.leaderSelectionMode=false;a.leaderRevealOpen=false;a.passConfirmationOpen=false;
@@ -947,6 +972,7 @@ void startMatch(App& a,std::uint64_t fixtureSeed=0) {
   gwent::beginMatchWithLeaders(a.game,std::move(humanDeck),humanLeader,
       std::move(opponent.cards),opponent.leader,seed,-1);
   a.cardPlayConfirmOpen=false;a.leaderConfirmOpen=false;a.leaderSelectionMode=false;
+  a.matchFocusKind=App::MatchFocusKind::Hand;a.matchFocusOwner=0;a.matchFocusRow=0;a.matchFocusCardId.clear();a.opponentPreviewActive=false;
   a.mulligan.clear(); a.handIndex=0; a.rowIndex=0; a.screen=Screen::Match;a.endScreenStartedAt=0;
   queueNotification(a,a.game.firstPlayer==0?"me-coin":"op-coin");
   a.audio.play("game_opening");
@@ -1137,6 +1163,7 @@ void doHumanPlay(App& a) {
   } else a.status=tr(a,"illegal_play");
 }
 void beginHumanPlayConfirmation(App& a) {
+  a.opponentPreviewActive=false;
   auto& hand=a.game.players[0].hand;
   if(a.handIndex<0||a.handIndex>=static_cast<int>(hand.size())) { a.status=tr(a,"no_card_selected");return; }
   const auto& card=hand[static_cast<std::size_t>(a.handIndex)];
@@ -1154,6 +1181,117 @@ bool cardHasRowChoice(const gwent::Card& card) {
     });
   return false;
 }
+struct MatchFocusNode {
+  App::MatchFocusKind kind;int owner,row,index,band,x,y,w,h;
+  const gwent::Card* card;
+};
+bool matchBrowseReady(const App& a) {
+  return (a.game.phase==gwent::Phase::PlayerTurn||a.game.phase==gwent::Phase::OpponentTurn)&&
+    a.game.pendingMedicPlayer<0&&!a.pauseOpen&&!a.cardDetailsOpen&&!a.targetMode&&
+    !a.cardPlayConfirmOpen&&!a.leaderConfirmOpen&&!a.leaderSelectionMode&&!a.leaderRevealOpen&&!a.passConfirmationOpen;
+}
+bool matchDirection(SDL_Keycode key) {return key==SDLK_LEFT||key==SDLK_RIGHT||key==SDLK_UP||key==SDLK_DOWN;}
+std::vector<MatchFocusNode> matchFocusNodes(const App& a) {
+  using Kind=App::MatchFocusKind;
+  std::vector<MatchFocusNode> nodes;
+  const auto& hand=a.game.players[0].hand;
+  const int first=std::clamp(a.handIndex-5,0,std::max(0,static_cast<int>(hand.size())-11));
+  for(int i=0;i<static_cast<int>(hand.size());++i)
+    nodes.push_back({Kind::Hand,0,0,i,7,194+(i-first)*29,277,28,43,&hand[i]});
+  for(int owner=0;owner<2;++owner) {
+    const auto& player=a.game.players[owner];
+    for(int row=0;row<3;++row) {
+      const int y=owner==0?143+row*45:5+(2-row)*45;
+      const int band=owner==0?4+row:3-row;
+      const auto& cards=player.board[row];
+      const auto geometry=currentRowGeometry(a.rowLayouts[owner][row],cards.size(),SDL_GetTicks());
+      for(int i=0;i<static_cast<int>(cards.size());++i)
+        nodes.push_back({Kind::Board,owner,row,i,band,static_cast<int>(std::lround(geometry.firstX+i*geometry.pitch)),y,28,43,&cards[i]});
+      if(!player.specialCards[row].id.empty())nodes.push_back({Kind::Special,owner,row,0,band,190,y,28,43,&player.specialCards[row]});
+    }
+    const int band=owner==0?7:1,y=owner==0?279:26;
+    nodes.push_back({Kind::Leader,owner,0,0,band,47,y,33,45,&player.leader});
+    const auto& grave=player.graveyard;
+    nodes.push_back({Kind::Grave,owner,0,0,band,514,owner==0?275:23,28,43,grave.empty()?nullptr:&grave.back()});
+    // A face-down deck is a focusable counter, never a source of hidden cards.
+    nodes.push_back({Kind::Deck,owner,0,0,band,572,owner==0?275:23,28,43,nullptr});
+  }
+  nodes.push_back({Kind::Pass,0,0,0,7,107,295,34,15,nullptr});
+  for(int i=0;i<static_cast<int>(a.game.weatherCards.size());++i) {
+    const auto& weather=a.game.weatherCards[i];
+    nodes.push_back({Kind::Weather,weather.owner,0,i,4,sourceWeatherCardX(i),149,28,43,&weather.card});
+  }
+  return nodes;
+}
+int focusedMatchNode(const App& a,const std::vector<MatchFocusNode>& nodes) {
+  for(int i=0;i<static_cast<int>(nodes.size());++i) {
+    const auto& n=nodes[i];
+    if(n.kind!=a.matchFocusKind||n.owner!=a.matchFocusOwner||n.row!=a.matchFocusRow)continue;
+    if(n.kind==App::MatchFocusKind::Hand&&a.matchFocusCardId.empty()) {if(n.index==a.handIndex)return i;continue;}
+    if(n.card&&!a.matchFocusCardId.empty()&&n.card->id!=a.matchFocusCardId)continue;
+    return i;
+  }
+  for(int i=0;i<static_cast<int>(nodes.size());++i)
+    if(nodes[i].kind==App::MatchFocusKind::Hand&&nodes[i].index==a.handIndex)return i;
+  return nodes.empty()?-1:0;
+}
+const gwent::Card* matchPreviewCard(const App& a) {
+  if(a.cardFlight.active)return &a.cardFlight.card;
+  if(a.opponentPreviewActive)return &a.opponentPreviewCard;
+  using Kind=App::MatchFocusKind;
+  const int owner=std::clamp(a.matchFocusOwner,0,1),row=std::clamp(a.matchFocusRow,0,2);
+  const auto& player=a.game.players[owner];
+  const auto find=[&](const std::vector<gwent::Card>& cards)->const gwent::Card* {
+    const auto card=std::find_if(cards.begin(),cards.end(),[&](const auto& c){return c.id==a.matchFocusCardId;});
+    return card==cards.end()?nullptr:&*card;
+  };
+  switch(a.matchFocusKind) {
+    case Kind::Hand:break;
+    case Kind::Board:if(const auto* card=find(player.board[row]))return card;break;
+    case Kind::Special:if(!player.specialCards[row].id.empty())return &player.specialCards[row];break;
+    case Kind::Weather:
+      for(const auto& weather:a.game.weatherCards)if(weather.card.id==a.matchFocusCardId)return &weather.card;
+      break;
+    case Kind::Leader:return &player.leader;
+    case Kind::Grave:return player.graveyard.empty()?nullptr:&player.graveyard.back();
+    case Kind::Deck:case Kind::Pass:return nullptr;
+  }
+  const auto& hand=a.game.players[0].hand;
+  if(a.matchFocusKind==Kind::Hand)if(const auto* card=find(hand))return card;
+  return hand.empty()?nullptr:&hand[static_cast<std::size_t>(std::clamp(a.handIndex,0,static_cast<int>(hand.size())-1))];
+}
+bool moveMatchFocus(App& a,SDL_Keycode key) {
+  auto nodes=matchFocusNodes(a);const int current=focusedMatchNode(a,nodes);
+  if(current<0)return false;
+  const auto& origin=nodes[current];int best=current;double bestScore=1e9;
+  if(origin.kind==App::MatchFocusKind::Hand&&(key==SDLK_LEFT||key==SDLK_RIGHT)) {
+    const int next=origin.index+(key==SDLK_LEFT?-1:1);
+    if(next>=0&&next<static_cast<int>(a.game.players[0].hand.size())) {
+      a.handIndex=next;a.matchFocusCardId=a.game.players[0].hand[next].id;
+      a.opponentPreviewActive=false;a.audio.play("ui_card");return true;
+    }
+  }
+  for(int i=0;i<static_cast<int>(nodes.size());++i) {
+    if(i==current)continue;const auto& next=nodes[i];
+    const int dx=(next.x+next.w/2)-(origin.x+origin.w/2),db=next.band-origin.band;
+    double score=0;
+    if(key==SDLK_LEFT||key==SDLK_RIGHT) {
+      if(db!=0||(key==SDLK_LEFT?dx>=0:dx<=0))continue;
+      score=std::abs(dx);
+    } else {
+      if(key==SDLK_UP?db>=0:db<=0)continue;
+      score=std::abs(db)*1000+std::abs(dx);
+    }
+    if(score<bestScore){bestScore=score;best=i;}
+  }
+  const auto& chosen=nodes[best];a.matchFocusKind=chosen.kind;a.matchFocusOwner=chosen.owner;
+  a.matchFocusRow=chosen.row;a.matchFocusCardId=chosen.card?chosen.card->id:std::string{};
+  if(chosen.kind==App::MatchFocusKind::Hand)a.handIndex=chosen.index;
+  a.opponentPreviewActive=false;
+  if(best!=current)a.audio.play("ui_card");
+  return true;
+}
+
 void performAi(App& a) {
   if(a.game.phase!=gwent::Phase::OpponentTurn&&a.game.pendingMedicPlayer!=1)return;
   const auto action=gwent::chooseAiAction(a.game,1);
@@ -1164,6 +1302,7 @@ void performAi(App& a) {
       [&](const auto& c){return c.id==action.selectedCardId;});
     success=gwent::chooseMedicRevive(a.game,1,action.selectedCardId,action.target);
     if(success&&found!=before.players[1].graveyard.end()) {
+      a.opponentPreviewCard=*found;a.opponentPreviewActive=true;
       auto visual=*found;visual.medic=true;
       queueTriggeredEffects(a,before,visual,1);
       playCardSound(a,*found,before,1,action.target);
@@ -1175,7 +1314,10 @@ void performAi(App& a) {
     const auto before=a.game;
     const auto ability=activeLeaderAbility(a.game.players[1].leader);
     success=gwent::activateLeader(a.game,1,action.target,action.leaderSelection);
-    if(success) { queueLeaderTransitionVisuals(a,before,ability,1);lockInputUntilQueuedAnimationsFinish(a,SDL_GetTicks()); }
+    if(success) {
+      a.opponentPreviewCard=a.game.players[1].leader;a.opponentPreviewActive=true;
+      queueLeaderTransitionVisuals(a,before,ability,1);lockInputUntilQueuedAnimationsFinish(a,SDL_GetTicks());
+    }
     a.status=tr(a,"opponent_used_leader");
   } else {
     const auto& aiHand=a.game.players[1].hand;
@@ -1186,6 +1328,7 @@ void performAi(App& a) {
     const auto before=a.game;
     success=gwent::playCard(a.game,1,action.cardId,action.target,action.selectedCardId);
     if(success) {
+      a.opponentPreviewCard=card;a.opponentPreviewActive=true;
       animatePlayedCard(a,card,1,cardIndex,handSizeBefore);
       queueTriggeredEffects(a,before,card,1);
       playCardSound(a,card,before,1,action.target);
@@ -1202,9 +1345,10 @@ void performAi(App& a) {
   a.aiAt=SDL_GetTicks()+360;
 }
 int rowScore(const gwent::Game& game,int owner,int row) {
-  gwent::Player p=game.players[owner];
-  for(int i=0;i<3;++i) if(i!=row) p.board[i].clear();
-  return gwent::calculateScore(p,game.weather,game.horn[owner]);
+  int score=0;
+  for(const auto& card:game.players[owner].board[row])
+    if(card.kind==gwent::Kind::Unit)score+=boardCardPower(game,owner,row,card);
+  return score;
 }
 void drawCardTile(SDL_Renderer* r,const App& app,int x,int y,int w,int h,const gwent::Card& card,bool selected,bool dim=false) {
   if(w>=45&&h>=60)drawImage(r,app,"img/sm/"+gwent::referenceCardImage(card.referenceIndex),x,y,w,h);
@@ -1264,23 +1408,26 @@ bool drawMiniAbility(SDL_Renderer* r,int x,int y,const std::string& ability) {
 void drawSourceCard(SDL_Renderer* r,const App& a,int x,int y,const gwent::Card& card,bool selected=false,int displayPower=-1) {
   constexpr int w=28,h=43;
   drawImage(r,a,"img/sm/"+gwent::referenceCardImage(card.referenceIndex),x,y,w,h);
+  const int shownPower=displayPower>=0?displayPower:card.power;
+  const int badgeWidth=shownPower>=100?22:16;
+  constexpr int badgeHeight=17;
   std::string powerIcon="normal";
   if(card.hero)powerIcon="hero";
   else if(!card.abilities.empty()&&(card.kind==gwent::Kind::Weather||card.kind==gwent::Kind::ClearWeather||card.kind==gwent::Kind::Scorch||card.kind==gwent::Kind::CommanderHorn||card.kind==gwent::Kind::Mardroeme||card.kind==gwent::Kind::Decoy))powerIcon=card.abilities.front();
   if(powerIcon.rfind("scorch",0)==0)powerIcon="scorch";
   const std::string powerPath="img/icons/power_"+powerIcon+".png";
-  if(powerIcon=="hero")drawImageRegion(r,a,powerPath,12,12,116,116,x-1,y-2,24,25);
+  if(powerIcon=="hero")drawImageRegion(r,a,powerPath,12,12,116,116,x,y,badgeWidth,badgeHeight);
   else {
     // The source power PNGs have a 215x215 canvas, but the visible medallion
     // only occupies pixels 15..124. Scaling the whole canvas made the badge
     // half-size while the number was centered in the full rectangle. Crop the
     // transparent export padding so both the badge and strength share the
-    // same 24x25 box on Miyoo's 640x480 display.
-    drawImageRegion(r,a,powerPath,15,14,110,111,x-1,y-2,24,25);
+    // same compact box on Miyoo's 640x480 display.
+    drawImageRegion(r,a,powerPath,15,14,110,111,x,y,badgeWidth,badgeHeight);
   }
   if(card.kind==gwent::Kind::Unit||card.kind==gwent::Kind::Leader) {
     const std::string power=std::to_string(displayPower>=0?displayPower:card.power);
-    powerBadgeNumber(r,x-1,y-2,24,25,power);
+    powerBadgeNumber(r,x,y,badgeWidth,badgeHeight,power);
   }
   if(card.row!=gwent::Row::None) {
     const char* rowIcon=card.agile?"agile":card.row==gwent::Row::Ranged?"ranged":card.row==gwent::Row::Siege?"siege":"close";
@@ -1675,7 +1822,7 @@ void drawRow(SDL_Renderer* r,const App& a,int owner,int row,int y) {
   constexpr int left=170,width=336,rowHeight=44;
   const bool player=owner==0;
   const auto& hand=a.game.players[0].hand;
-  const bool hasSelected=player&&a.game.phase==gwent::Phase::PlayerTurn&&!hand.empty()&&
+  const bool hasSelected=player&&a.cardPlayConfirmOpen&&a.game.phase==gwent::Phase::PlayerTurn&&!hand.empty()&&
     a.handIndex>=0&&a.handIndex<static_cast<int>(hand.size())&&cardHasRowChoice(hand[static_cast<std::size_t>(a.handIndex)]);
   const bool chosen=hasSelected&&a.rowIndex==row;
   if(chosen)box(r,left,y,width,rowHeight,Color{255,255,0,20});
@@ -1971,8 +2118,8 @@ void drawMatch(SDL_Renderer* r,const App& a) {
         (rowChoice?"B: ZAGRAJ  A: ANULUJ  GORA/DOL: RZAD":"B: ZAGRAJ  A: ANULUJ"):
         (rowChoice?"B: PLAY  A: CANCEL  UP/DOWN: ROW":"B: PLAY  A: CANCEL")):
       (a.language==Language::Polish?
-        (rowChoice?"LEWO/PRAWO: KARTA  B: WYBIERZ  GORA/DOL: RZAD  X: PAS": "LEWO/PRAWO: KARTA  B: WYBIERZ  X: PAS"):
-        (rowChoice?"LEFT/RIGHT: CARD  B: SELECT  UP/DOWN: ROW  X: PASS":"LEFT/RIGHT: CARD  B: SELECT  X: PASS"));
+        "KRZYZAK: PLANSZA  B: WYBIERZ/PODGLAD  X PRZYTRZ.: PAS":
+        "DPAD: BOARD  B: SELECT/INSPECT  HOLD X: PASS");
     narrowText(r,184,337,controls,paper,3);
   }
   if(me.passed)text(r,110,282,tr(a,"passed"),paper,1);
@@ -1990,7 +2137,7 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     for(int i=0;i<shown;++i) {
       const int index=start+i,x=194+i*29;
       const bool marked=std::find(a.mulligan.begin(),a.mulligan.end(),me.hand[index].id)!=a.mulligan.end();
-      if(!cardFlightHides(a,me.hand[index],App::CardZone::Hand,0))drawSourceCard(r,a,x,277,me.hand[index],index==a.handIndex);
+      if(!cardFlightHides(a,me.hand[index],App::CardZone::Hand,0))drawSourceCard(r,a,x,277,me.hand[index],index==a.handIndex&&a.matchFocusKind==App::MatchFocusKind::Hand);
       if(marked)drawImage(r,a,"img/icons/icon_gem_on.png",x+17,274,12,12);
     }
   }
@@ -2059,13 +2206,16 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     text(r,265,217,tr(a,"continue"),Color{muted.r,muted.g,muted.b,alpha},1);
   }
   const bool showHand=a.game.phase!=gwent::Phase::RoundResult&&a.game.phase!=gwent::Phase::MatchResult;
-  if((!me.hand.empty()||a.cardFlight.active)&&(showHand||a.cardFlight.active)) {
-    // The engine removes a played card from the hand before its source preview
-    // and flight animation finish. Keep the inspector locked to that card until
-    // the flight ends instead of previewing the next card in the hand.
-    const auto& preview=a.cardFlight.active?a.cardFlight.card:
-      me.hand[static_cast<std::size_t>(std::clamp(a.handIndex,0,static_cast<int>(me.hand.size())-1))];
-    drawCardPreview(r,a,preview);
+  if(matchBrowseReady(a)) {
+    const auto nodes=matchFocusNodes(a);const int selected=focusedMatchNode(a,nodes);
+    if(selected>=0) {
+      const auto& n=nodes[selected];
+      frame(r,n.x-2,n.y-2,n.w+4,n.h+4,Color{255,218,77,255});
+      frame(r,n.x-1,n.y-1,n.w+2,n.h+2,Color{255,237,150,255});
+    }
+  }
+  if(showHand||a.cardFlight.active) {
+    if(const auto* preview=matchPreviewCard(a))drawCardPreview(r,a,*preview);
   }
   if(a.cardFlight.active)drawCardFlight(r,a,a.cardFlight);
   for(const auto& flight:a.triggeredCardFlights)drawCardFlight(r,a,flight);
@@ -2198,12 +2348,9 @@ void drawMatchOnScreen(SDL_Renderer* r,const App& a) {
     const auto choices=pendingMedicChoices(a);
     if(!choices.empty())drawCardRulesPanel(r,a,*choices[static_cast<std::size_t>(std::clamp(a.targetIndex,0,static_cast<int>(choices.size())-1))],6,MATCH_RULES_PANEL_Y,W-12,MATCH_RULES_PANEL_H);
   } else if(a.cardDetailsOpen) {
-    const auto& hand=a.game.players[0].hand;
-    if(!hand.empty())drawCardDetails(r,a,hand[static_cast<std::size_t>(std::clamp(a.handIndex,0,static_cast<int>(hand.size())-1))]);
-  } else if(!a.game.players[0].hand.empty()&&
-            a.game.phase!=gwent::Phase::RoundResult&&a.game.phase!=gwent::Phase::MatchResult) {
-    const auto& hand=a.game.players[0].hand;
-    drawCardRulesPanel(r,a,hand[static_cast<std::size_t>(std::clamp(a.handIndex,0,static_cast<int>(hand.size())-1))],6,MATCH_RULES_PANEL_Y,W-12,MATCH_RULES_PANEL_H);
+    if(const auto* preview=matchPreviewCard(a))drawCardDetails(r,a,*preview);
+  } else if(a.game.phase!=gwent::Phase::RoundResult&&a.game.phase!=gwent::Phase::MatchResult) {
+    if(const auto* preview=matchPreviewCard(a))drawCardRulesPanel(r,a,*preview,6,MATCH_RULES_PANEL_Y,W-12,MATCH_RULES_PANEL_H);
   }
 }
 void handleMatchKey(App& a,SDL_Keycode key) {
@@ -2300,6 +2447,32 @@ void handleMatchKey(App& a,SDL_Keycode key) {
       } else finishLeaderChoice(a);
     }
     return;
+  }
+  if(matchBrowseReady(a)) {
+    if(matchDirection(key)) { moveMatchFocus(a,key);return; }
+    if(key==SDLK_x&&a.matchFocusKind!=App::MatchFocusKind::Hand) {
+      a.matchFocusKind=App::MatchFocusKind::Hand;a.matchFocusOwner=0;a.matchFocusRow=0;
+      a.matchFocusCardId.clear();a.opponentPreviewActive=false;return;
+    }
+    if(key==SDLK_AC_BACK||key==SDLK_RETURN||key==SDLK_KP_ENTER) {
+      const auto nodes=matchFocusNodes(a);const int selected=focusedMatchNode(a,nodes);
+      if(selected>=0) {
+        const auto& focus=nodes[selected];
+        if(focus.kind==App::MatchFocusKind::Leader&&focus.owner==0&&a.game.phase==gwent::Phase::PlayerTurn) {
+          a.opponentPreviewActive=false;beginLeaderChoice(a);return;
+        }
+        if(focus.kind==App::MatchFocusKind::Pass) {
+          if(a.game.phase==gwent::Phase::PlayerTurn)a.passConfirmationOpen=true;
+          return;
+        }
+        if(focus.kind!=App::MatchFocusKind::Hand||a.game.phase!=gwent::Phase::PlayerTurn) {
+          a.opponentPreviewActive=false;
+          if(focus.card)a.cardDetailsOpen=true;
+          return;
+        }
+        a.opponentPreviewActive=false;
+      }
+    }
   }
   if(key==SDLK_AC_BACK&&!a.targetMode&&a.game.pendingMedicPlayer<0) {
     if(a.game.phase==gwent::Phase::PlayerTurn)beginHumanPlayConfirmation(a);
@@ -2462,8 +2635,8 @@ void handleMatchKey(App& a,SDL_Keycode key) {
     }
     a.audio.play("ui_card");
   }
-  else if(key==SDLK_PAGEUP) { if(!hand.empty())a.handIndex=(a.handIndex+static_cast<int>(hand.size())-(5%static_cast<int>(hand.size())))%static_cast<int>(hand.size()); }
-  else if(key==SDLK_PAGEDOWN) { if(!hand.empty())a.handIndex=(a.handIndex+5)%static_cast<int>(hand.size()); }
+  else if(key==SDLK_PAGEUP) { if(!hand.empty())a.handIndex=(a.handIndex+static_cast<int>(hand.size())-(5%static_cast<int>(hand.size())))%static_cast<int>(hand.size());a.matchFocusKind=App::MatchFocusKind::Hand;a.matchFocusOwner=0;a.matchFocusRow=0;a.matchFocusCardId.clear();a.opponentPreviewActive=false; }
+  else if(key==SDLK_PAGEDOWN) { if(!hand.empty())a.handIndex=(a.handIndex+5)%static_cast<int>(hand.size());a.matchFocusKind=App::MatchFocusKind::Hand;a.matchFocusOwner=0;a.matchFocusRow=0;a.matchFocusCardId.clear();a.opponentPreviewActive=false; }
   else if(key==SDLK_UP||key==SDLK_DOWN) {
     if(!hand.empty()&&a.handIndex>=0&&a.handIndex<static_cast<int>(hand.size())&&
        cardHasRowChoice(hand[static_cast<std::size_t>(a.handIndex)])) {
@@ -2497,8 +2670,9 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
     if(a.screen==Screen::Match)saveCurrentMatch(a);
     running=false;return;
   }
-  if(a.screen==Screen::Match&&actionAnimationLocked(a,SDL_GetTicks()))return;
-  if(a.screen==Screen::Match&&!a.activeNotification.empty())return;
+  const bool browsingDirection=a.screen==Screen::Match&&matchDirection(key)&&matchBrowseReady(a);
+  if(a.screen==Screen::Match&&actionAnimationLocked(a,SDL_GetTicks())&&!browsingDirection)return;
+  if(a.screen==Screen::Match&&!a.activeNotification.empty()&&!browsingDirection)return;
   if(a.screen==Screen::Match&&(a.cardPlayConfirmOpen||a.leaderConfirmOpen||a.leaderSelectionMode||a.leaderRevealOpen||a.passConfirmationOpen||a.pauseOpen)) { handleMatchKey(a,key);return; }
   if(a.cardDetailsOpen) {
     if(key==SDLK_i||key==SDLK_ESCAPE||key==SDLK_AC_BACK||key==SDLK_BACKSPACE||key==SDLK_z)a.cardDetailsOpen=false;
@@ -2724,11 +2898,11 @@ int main(int argc,char** argv) {
     SDL_DestroyRenderer(presentationRenderer);
   };
   const auto presentFrame=[&]() {
-    if(!softwareCanvas) { SDL_RenderPresent(presentationRenderer);return; }
+    if(!softwareCanvas) { SDL_RenderPresent(presentationRenderer);trimTextureCache(app);return; }
     SDL_RenderPresent(drawRenderer);
     SDL_UpdateTexture(softwareFrame,nullptr,softwareCanvas->pixels,softwareCanvas->pitch);
     SDL_RenderCopy(presentationRenderer,softwareFrame,nullptr,nullptr);
-    SDL_RenderPresent(presentationRenderer);
+    SDL_RenderPresent(presentationRenderer);trimTextureCache(app);
   };
   SDL_RenderSetLogicalSize(renderer,W,H);
   SDL_SetRenderDrawBlendMode(renderer,SDL_BLENDMODE_BLEND);
@@ -2774,6 +2948,32 @@ int main(int argc,char** argv) {
       std::cout<<"Decoded all 35 reference SFX and both background tracks; music looping/switch and mute controls initialized.\n";
     }
     app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return okay?0:5;
+  }
+  if(argc>1&&std::string(argv[1])=="--crowded-render-test") {
+    std::vector<gwent::Card> fixture;std::vector<std::string> images;
+    for(const auto& card:gwent::referenceCardCatalog()) {
+      const auto path=gwent::referenceCardImage(card.referenceIndex);
+      if(card.kind!=gwent::Kind::Unit||std::find(images.begin(),images.end(),path)!=images.end())continue;
+      fixture.push_back(card);images.push_back(path);if(fixture.size()==72)break;
+    }
+    std::uint64_t warmDecodes=0;Uint64 worstTicks=0;
+    const auto started=SDL_GetPerformanceCounter();
+    for(int frameIndex=0;frameIndex<120;++frameIndex) {
+      const auto before=SDL_GetPerformanceCounter();
+      SDL_SetRenderDrawColor(renderer,25,16,9,255);SDL_RenderClear(renderer);
+      for(std::size_t i=0;i<fixture.size();++i)
+        drawSourceCard(renderer,app,40+static_cast<int>(i%12)*46,42+static_cast<int>(i/12)*62,fixture[i]);
+      presentFrame();
+      if(frameIndex==0)warmDecodes=app.textureDecodeCount;
+      else worstTicks=std::max(worstTicks,SDL_GetPerformanceCounter()-before);
+    }
+    const auto repeatDecodes=app.textureDecodeCount-warmDecodes;
+    const double tickMs=1000.0/SDL_GetPerformanceFrequency();
+    std::cout<<"Crowded render: cards="<<fixture.size()<<" frames=120 warm_decodes="<<warmDecodes
+      <<" repeat_decodes="<<repeatDecodes<<" resident_bytes="<<app.textureCacheBytes
+      <<" total_ms="<<(SDL_GetPerformanceCounter()-started)*tickMs<<" worst_warm_frame_ms="<<worstTicks*tickMs<<"\n";
+    const bool okay=fixture.size()==72&&warmDecodes>48&&repeatDecodes==0;
+    app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return okay?0:14;
   }
   if(argc>1&&std::string(argv[1])=="--input-test") {
     App powerBadgeProbe;gwent::Card powerEight;
@@ -2837,6 +3037,39 @@ int main(int argc,char** argv) {
       handleMatchKey(setupProbe,normalizeMiyooKey(setupProbe,SDLK_LALT));
       okay=okay&&setupProbe.game.pendingMedicPlayer==-1&&setupProbe.game.players[0].board[1].size()==1&&
         setupProbe.game.phase==gwent::Phase::OpponentTurn&&setupProbe.game.currentPlayer==1;
+    }
+    {
+      App focusProbe;focusProbe.screen=Screen::Match;focusProbe.miyooControls=true;
+      const auto card=[](const std::string& id) {gwent::Card c;c.id=id;c.kind=gwent::Kind::Unit;c.row=gwent::Row::Melee;c.power=4;return c;};
+      focusProbe.game.players[0].hand={card("focus-hand-a"),card("focus-hand-b")};
+      focusProbe.game.players[0].board[2]={card("focus-own-siege")};
+      focusProbe.game.players[1].board[0]={card("focus-op-melee")};
+      focusProbe.game.players[1].hand={card("focus-hidden-op-hand")};
+      focusProbe.game.players[0].leader=card("focus-own-leader");focusProbe.game.players[0].leader.kind=gwent::Kind::Leader;
+      bool focusRunning=true;
+      handleKey(focusProbe,SDLK_RIGHT,focusRunning);
+      okay=okay&&focusProbe.handIndex==1&&matchPreviewCard(focusProbe)&&matchPreviewCard(focusProbe)->id=="focus-hand-b";
+      handleKey(focusProbe,SDLK_UP,focusRunning);
+      okay=okay&&focusProbe.matchFocusKind==App::MatchFocusKind::Board&&focusProbe.matchFocusOwner==0;
+      handleKey(focusProbe,SDLK_UP,focusRunning);
+      okay=okay&&focusProbe.matchFocusOwner==1&&matchPreviewCard(focusProbe)&&matchPreviewCard(focusProbe)->id=="focus-op-melee";
+      const auto publicNodes=matchFocusNodes(focusProbe);
+      okay=okay&&std::none_of(publicNodes.begin(),publicNodes.end(),[](const MatchFocusNode& n){return n.card&&n.card->id=="focus-hidden-op-hand";});
+      handleKey(focusProbe,normalizeMiyooKey(focusProbe,SDLK_LALT),focusRunning);
+      okay=okay&&focusProbe.cardDetailsOpen&&focusProbe.game.players[0].hand.size()==2;
+      handleKey(focusProbe,normalizeMiyooKey(focusProbe,SDLK_LALT),focusRunning);
+      okay=okay&&!focusProbe.cardDetailsOpen;
+      focusProbe.matchFocusKind=App::MatchFocusKind::Pass;focusProbe.matchFocusOwner=0;focusProbe.matchFocusRow=0;focusProbe.matchFocusCardId.clear();
+      handleMatchKey(focusProbe,SDLK_AC_BACK);
+      okay=okay&&focusProbe.passConfirmationOpen&&!focusProbe.game.players[0].passed;
+      focusProbe.passConfirmationOpen=false;focusProbe.matchFocusKind=App::MatchFocusKind::Hand;focusProbe.matchFocusCardId.clear();
+      focusProbe.opponentPreviewCard=card("focus-last-op-play");focusProbe.opponentPreviewActive=true;
+      okay=okay&&matchPreviewCard(focusProbe)->id=="focus-last-op-play";
+      handleMatchKey(focusProbe,SDLK_LEFT);
+      okay=okay&&!focusProbe.opponentPreviewActive&&matchPreviewCard(focusProbe)->id=="focus-hand-a";
+      const int beforeRow=focusProbe.rowIndex;
+      handleMatchKey(focusProbe,SDLK_UP);
+      okay=okay&&focusProbe.rowIndex==beforeRow;
     }
     const bool startsInDeckMaker=app.screen==Screen::DeckBuilder;
     app.miyooControls=true;
@@ -3334,6 +3567,28 @@ int main(int argc,char** argv) {
     app.userDeckSelected=false;
   }
   app.audio.play("menu_opening");
+  if(argc>2&&std::string(argv[1])=="--board-focus-smoke-test") {
+    app.screen=Screen::Match;app.game=gwent::Game{};app.activeNotification.clear();
+    app.cardDetailsOpen=false;app.pauseOpen=false;app.cardFlight={};app.opponentPreviewActive=false;
+    app.game.players[0].leader=recipeLeader(0);app.game.players[1].leader=recipeLeader(1);
+    app.game.players[0].faction=app.game.players[0].leader.faction;
+    app.game.players[1].faction=app.game.players[1].leader.faction;
+    const auto& catalog=gwent::referenceCardCatalog();
+    int number=0;
+    for(const auto& source:catalog)if(source.kind==gwent::Kind::Unit&&!source.hero&&source.row!=gwent::Row::None) {
+      auto card=source;card.id="board-focus-fixture-"+std::to_string(number);
+      if(number<3)app.game.players[0].hand.push_back(card);
+      else {const int owner=(number-3)%2,row=((number-3)/2)%3;app.game.players[owner].board[row].push_back(card);}
+      if(++number==15)break;
+    }
+    app.handIndex=0;app.matchFocusKind=App::MatchFocusKind::Board;app.matchFocusOwner=1;app.matchFocusRow=0;
+    app.matchFocusCardId=app.game.players[1].board[0].front().id;
+    SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);drawMatchOnScreen(renderer,app);presentFrame();
+    auto* surface=SDL_CreateRGBSurfaceWithFormat(0,W,H,32,SDL_PIXELFORMAT_ARGB8888);
+    const bool saved=surface&&SDL_RenderReadPixels(renderer,nullptr,SDL_PIXELFORMAT_ARGB8888,surface->pixels,surface->pitch)==0&&SDL_SaveBMP(surface,argv[2])==0;
+    if(surface)SDL_FreeSurface(surface);
+    app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return saved?0:14;
+  }
   if(argc>2&&std::string(argv[1])=="--menu-smoke-test") {
     app.screen=Screen::MainMenu;app.mainMenuEnabled=true;app.miyooControls=true;
     app.language=Language::Polish;app.status.clear();
