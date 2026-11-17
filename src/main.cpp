@@ -2806,9 +2806,12 @@ void handleMatchKey(App& a,SDL_Keycode key) {
   }
   if(matchBrowseReady(a)) {
     if(matchDirection(key)) { moveMatchFocus(a,key);return; }
-    if(key==SDLK_x&&a.matchFocusKind!=App::MatchFocusKind::Hand) {
-      a.matchFocusKind=App::MatchFocusKind::Hand;a.matchFocusOwner=0;a.matchFocusRow=0;
-      a.matchFocusCardId.clear();a.opponentPreviewActive=false;return;
+    if(key==SDLK_x) {
+      if(a.matchFocusKind!=App::MatchFocusKind::Hand) {
+        a.matchFocusKind=App::MatchFocusKind::Hand;a.matchFocusOwner=0;a.matchFocusRow=0;
+        a.matchFocusCardId.clear();a.opponentPreviewActive=false;
+      } else {a.pauseOpen=true;a.pauseIndex=0;}
+      return;
     }
     if(key==SDLK_AC_BACK||key==SDLK_RETURN||key==SDLK_KP_ENTER) {
       const auto nodes=matchFocusNodes(a);const int selected=focusedMatchNode(a,nodes);
@@ -3010,7 +3013,7 @@ void handleMatchKey(App& a,SDL_Keycode key) {
   else if(key==SDLK_BACKSPACE) {
     if(gwent::pass(a.game,0)) { a.audio.play("pass");a.status=tr(a,"you_passed"); if(a.game.phase==gwent::Phase::OpponentTurn)a.aiAt=SDL_GetTicks()+400; }
   }
-  else if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x) beginHumanPlayConfirmation(a);
+  else if(key==SDLK_RETURN||key==SDLK_KP_ENTER) beginHumanPlayConfirmation(a);
 }
 void handleKey(App& a,SDL_Keycode key,bool& running) {
   if(a.screen==Screen::Campaign) {
@@ -3102,7 +3105,7 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
     if(key==SDLK_PAGEDOWN||key==SDLK_RIGHTBRACKET) { a.deckSlot=a.deckSlot>=3?1:a.deckSlot+1;openDeckEditor(a);return; }
     if(key==SDLK_f) { changeDeckFaction(a);return; }
     if(key==SDLK_l||key==SDLK_TAB) {
-      if(a.editingLeader)a.userDeckSelected=true;
+      if(a.editingLeader)a.editDeck.leaderReferenceIndex=a.leaderSelectionOriginalReference;
       else a.leaderSelectionOriginalReference=a.editDeck.leaderReferenceIndex;
       a.editingLeader=!a.editingLeader;
       return;
@@ -3188,11 +3191,11 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
 }
 SDL_Keycode normalizeMiyooKey(const App& app,SDL_Keycode key);
 bool beginMiyooXHold(App& app,Uint32 now) {
-  if(!app.miyooControls||app.screen!=Screen::Match||app.game.phase!=gwent::Phase::PlayerTurn||
-     app.cardPlayConfirmOpen||app.leaderConfirmOpen||app.targetMode||app.leaderSelectionMode)return false;
+  if(app.screen!=Screen::Match||app.game.phase!=gwent::Phase::PlayerTurn||!matchBrowseReady(app))return false;
   app.xDownAt=now;app.xLongPressed=false;return true;
 }
 void updateMiyooXHold(App& app,Uint32 now) {
+  if(app.xDownAt&&(app.screen!=Screen::Match||!matchBrowseReady(app))){app.xDownAt=0;app.xLongPressed=false;return;}
   if(app.xDownAt&&!app.xLongPressed&&app.activeNotification.empty()&&
      app.screen==Screen::Match&&app.game.phase==gwent::Phase::PlayerTurn&&
      !actionAnimationLocked(app,now)&&SDL_TICKS_PASSED(now,app.xDownAt+600)) {
@@ -3205,7 +3208,7 @@ void updateMiyooXHold(App& app,Uint32 now) {
 }
 void releaseMiyooXHold(App& app,bool& running) {
   if(!app.xDownAt)return;
-  if(!app.xLongPressed)handleKey(app,normalizeMiyooKey(app,SDLK_LSHIFT),running);
+  if(!app.xLongPressed)handleKey(app,SDLK_i,running);
   app.xDownAt=0;app.xLongPressed=false;
 }
 SDL_Keycode controllerKey(const SDL_ControllerButtonEvent& button,const App& app) {
@@ -3676,6 +3679,15 @@ int main(int argc,char** argv) {
     okay=okay&&beginMiyooXHold(xTapProbe,SDL_GetTicks()+1);
     releaseMiyooXHold(xTapProbe,xTapRunning);
     okay=okay&&xTapProbe.cardDetailsOpen&&!xTapProbe.passConfirmationOpen;
+    App modalHold;modalHold.screen=Screen::Match;modalHold.game.phase=gwent::Phase::PlayerTurn;
+    okay=okay&&beginMiyooXHold(modalHold,100);
+    modalHold.pauseOpen=true;updateMiyooXHold(modalHold,701);
+    okay=okay&&!modalHold.game.players[0].passed&&modalHold.xDownAt==0&&!beginMiyooXHold(modalHold,800);
+    modalHold.pauseOpen=false;modalHold.cardDetailsOpen=true;
+    okay=okay&&!beginMiyooXHold(modalHold,900);
+    modalHold.cardDetailsOpen=false;bool backRunning=true;
+    handleKey(modalHold,SDLK_x,backRunning);
+    okay=okay&&modalHold.pauseOpen&&!modalHold.cardPlayConfirmOpen;
     deckKeyProbe.cardDetailsOpen=false;deckKeyProbe.editorPane=0;deckKeyProbe.language=Language::Polish;
     if(!recipes().empty()) {
       const auto& recipe=recipes().front();
@@ -3839,7 +3851,7 @@ int main(int argc,char** argv) {
          std::string(sourceWeatherOverlayForRow(2))=="rain";
     App settingsProbe;
     settingsProbe.pauseOpen=true;settingsProbe.pauseIndex=5;
-    handleMatchKey(settingsProbe,SDLK_x);
+    handleMatchKey(settingsProbe,SDLK_AC_BACK);
     okay=okay&&!settingsProbe.musicEnabled&&!settingsProbe.audio.musicEnabled()&&
          MATCH_RULES_PANEL_Y>=(H+STAGE_H)/2&&MATCH_RULES_PANEL_Y+MATCH_RULES_PANEL_H<=H&&
          DECK_RULES_PANEL_Y>=STAGE_H&&DECK_RULES_PANEL_Y+DECK_RULES_PANEL_H<=H;
@@ -4540,9 +4552,13 @@ int main(int argc,char** argv) {
         app.selectDownAt=0;app.selectLongPressed=false;
       }
       else if(event.type==SDL_CONTROLLERBUTTONDOWN) {
-        if(event.cbutton.button==SDL_CONTROLLER_BUTTON_BACK) {
+        if(event.cbutton.button==SDL_CONTROLLER_BUTTON_X&&beginMiyooXHold(app,SDL_GetTicks())) {
+          // Same short-preview/long-pass gesture as the physical Miyoo X.
+        } else if(event.cbutton.button==SDL_CONTROLLER_BUTTON_BACK) {
           app.selectDownAt=SDL_GetTicks();app.selectLongPressed=false;
         } else { const auto mapped=controllerKey(event.cbutton,app);if(mapped!=SDLK_UNKNOWN)handleKey(app,mapped,running); }
+      } else if(event.type==SDL_CONTROLLERBUTTONUP&&event.cbutton.button==SDL_CONTROLLER_BUTTON_X&&app.xDownAt) {
+        releaseMiyooXHold(app,running);
       } else if(event.type==SDL_CONTROLLERBUTTONUP&&event.cbutton.button==SDL_CONTROLLER_BUTTON_BACK) {
         if(app.selectDownAt&&!app.selectLongPressed&&!actionAnimationLocked(app,SDL_GetTicks())) {
           if(app.cardDetailsOpen)handleKey(app,SDLK_BACKSPACE,running);
