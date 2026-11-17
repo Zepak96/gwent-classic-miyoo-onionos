@@ -1954,6 +1954,8 @@ std::vector<const gwent::Card*> editorLeaders(const App& a) {
   for(const auto& card:gwent::referenceCardCatalog())if(card.kind==gwent::Kind::Leader&&card.faction==a.editDeck.faction)leaders.push_back(&card);
   return leaders;
 }
+// Trial release: expose the complete Northern Realms tower only.
+constexpr int campaignTowerCount=1;
 constexpr std::array<gwent::Faction,4> campaignFactions{{gwent::Faction::NorthernRealms,gwent::Faction::Nilfgaard,gwent::Faction::Monsters,gwent::Faction::Skellige}};
 const gwent::CampaignNode* selectedCampaignNode(const App& a) {
   const auto faction=campaignFactions[static_cast<std::size_t>(std::clamp(a.campaignFaction,0,3))];
@@ -1966,7 +1968,7 @@ void drawCampaign(SDL_Renderer* r,const App& a) {
   drawImage(r,a,"img/campaign/backdrop.png",0,0,W,H);
   box(r,0,0,W,H,Color{5,4,3,125});
   centeredTextInBox(r,20,14,W-40,26,pl?"SZLAK GWINTA":"THE GWENT PATH",gold,2);
-  for(int f=0;f<4;++f) {
+  for(int f=0;f<campaignTowerCount;++f) {
     const int x=12+f*158;
     box(r,x,52,150,31,Color{16,12,8,230});
     frame(r,x,52,150,31,a.campaignFaction==f?gold:Color{90,65,35,255});
@@ -2011,9 +2013,9 @@ void drawCampaign(SDL_Renderer* r,const App& a) {
   }
   box(r,12,422,W-24,46,Color{8,6,4,230});
   centeredTextInBox(r,18,428,W-36,15,a.campaignIntro?(pl?"B: ROZPOCZNIJ PARTIE   A: WROC":"B: START MATCH   A: BACK"):
-    (pl?"LEWO/PRAWO: FRAKCJA  GORA/DOL: RYWAL  B: WYBIERZ":"LEFT/RIGHT: FACTION  UP/DOWN: OPPONENT  B: SELECT"),gold,1);
-  const int achievements=static_cast<int>(std::count(a.campaignProgress.victories.begin(),a.campaignProgress.victories.end(),true));
-  centeredTextInBox(r,18,447,W-36,15,a.status.empty()?((pl?"Y: TWOJA TALIA   OSIAGNIECIA ":"Y: YOUR DECK   ACHIEVEMENTS ")+std::to_string(achievements)+"/20"):a.status,paper,1);
+    (pl?"GORA/DOL: RYWAL   B: WYBIERZ   A: WROC":"UP/DOWN: OPPONENT   B: SELECT   A: BACK"),gold,1);
+  const int achievements=static_cast<int>(std::count(a.campaignProgress.victories.begin(),a.campaignProgress.victories.begin()+5*campaignTowerCount,true));
+  centeredTextInBox(r,18,447,W-36,15,a.status.empty()?((pl?"Y: TWOJA TALIA   OSIAGNIECIA ":"Y: YOUR DECK   ACHIEVEMENTS ")+std::to_string(achievements)+"/"+std::to_string(5*campaignTowerCount)):a.status,paper,1);
 }
 
 void drawMainMenu(SDL_Renderer* r,const App& a) {
@@ -2806,7 +2808,7 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
     } else if(key==SDLK_l||key==SDLK_f) {
       a.returnToCampaignAfterDeck=true;openDeckEditor(a);
     } else if(key==SDLK_LEFT||key==SDLK_RIGHT) {
-      a.campaignFaction=(a.campaignFaction+(key==SDLK_LEFT?3:1))%4;a.campaignStage=0;a.campaignIntro=false;a.status.clear();
+      a.campaignFaction=(a.campaignFaction+(key==SDLK_LEFT?campaignTowerCount-1:1))%campaignTowerCount;a.campaignStage=0;a.campaignIntro=false;a.status.clear();
     } else if(key==SDLK_UP||key==SDLK_DOWN) {
       a.campaignStage=std::clamp(a.campaignStage+(key==SDLK_UP?1:-1),0,4);a.campaignIntro=false;a.status.clear();
     } else if(key==SDLK_AC_BACK||key==SDLK_RETURN||key==SDLK_KP_ENTER) {
@@ -3814,6 +3816,10 @@ int main(int argc,char** argv) {
     app.savePath=(campaignTestDir/"match.sav").string();
     bool probeRunning=true;handleKey(app,SDLK_LEFT,probeRunning);handleKey(app,SDLK_AC_BACK,probeRunning);
     bool okay=app.screen==Screen::Campaign&&probeRunning;
+    handleKey(app,SDLK_RIGHT,probeRunning);
+    okay=okay&&app.campaignFaction==0;
+    handleKey(app,SDLK_LEFT,probeRunning);
+    okay=okay&&app.campaignFaction==0;
     handleKey(app,SDLK_UP,probeRunning);handleKey(app,SDLK_AC_BACK,probeRunning);
     okay=okay&&!app.campaignIntro&&app.screen==Screen::Campaign;
     handleKey(app,SDLK_DOWN,probeRunning);handleKey(app,SDLK_AC_BACK,probeRunning);
