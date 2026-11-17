@@ -487,8 +487,12 @@ AiAction resolveSelectedAction(Game& game,int who,const AiAction& intent,const B
 }
 
 AiAction chooseAiAction(Game& game,int who) {
+  // Round-three Skellige may replay a Medic before the first turn starts.
+  // Resolve only that pending choice here; ordinary weighted actions remain
+  // unavailable during round setup.
+  const bool setupMedic=game.phase==Phase::RoundSetup&&game.pendingMedicDuringRoundSetup&&game.pendingMedicPlayer==who;
   if(who<0||who>1||who!=game.currentPlayer||
-     (game.phase!=Phase::PlayerTurn&&game.phase!=Phase::OpponentTurn))return {true,{},{},{}};
+     (game.phase!=Phase::PlayerTurn&&game.phase!=Phase::OpponentTurn&&!setupMedic))return {true,{},{},{}};
   const auto& player=game.players[who];
   if(game.pendingMedicPlayer==who) {
     const Card* target=nullptr;

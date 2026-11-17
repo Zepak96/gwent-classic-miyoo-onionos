@@ -1188,6 +1188,12 @@ static void skelligeAgileCancellationKeepsCardInGrave() {
 }
 
 static void skelligeRoundSetupReplaysSpyAndMedic() {
+  Game noChoice;noChoice.phase=Phase::RoundSetup;noChoice.currentPlayer=0;
+  noChoice.players[0].hand={unit("setup-action-must-wait",8)};
+  const auto untouchedRng=noChoice.rngState;
+  const auto unavailable=chooseAiAction(noChoice,0);
+  assert(unavailable.pass&&!unavailable.resolveMedic&&unavailable.cardId.empty());
+  assert(noChoice.rngState==untouchedRng); // not an ordinary AI turn yet
   Game spy;spy.phase=Phase::RoundResult;spy.round=2;spy.firstPlayer=0;
   spy.players[0].faction=Faction::Skellige;
   spy.players[0].hand={unit("setup-spy-spare",1)};spy.players[1].hand={unit("setup-opponent-spare",1)};
@@ -1214,7 +1220,11 @@ static void skelligeRoundSetupReplaysSpyAndMedic() {
   auto invalid=saved;invalid.skelligeAiReviveQueue={unit("invalid-human-ai-queue",2)};
   assert(saveGame(path,invalid,&error)&&!loadGame(path,saved,&error));std::filesystem::remove(path);
   assert(saved.skelligeAiReviveQueue.empty()&&saved.pendingMedicPlayer==0);
-  assert(chooseMedicRevive(saved,0,target.id));
+  const auto beforeChoiceRng=saved.rngState;
+  const auto continuation=chooseAiAction(saved,0);
+  assert(continuation.resolveMedic&&!continuation.pass&&!continuation.activateLeader);
+  assert(continuation.selectedCardId==target.id&&saved.rngState==beforeChoiceRng);
+  assert(chooseMedicRevive(saved,0,continuation.selectedCardId,continuation.target));
   assert(saved.players[0].board[0].size()==2&&saved.players[0].graveyard.empty());
   assert(saved.pendingMedicPlayer==-1&&!saved.pendingMedicDuringRoundSetup);
   assert(saved.phase==Phase::OpponentTurn&&saved.currentPlayer==1&&saved.skelligeRoundOwner==-1);

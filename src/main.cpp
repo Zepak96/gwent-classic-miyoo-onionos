@@ -1292,8 +1292,15 @@ bool moveMatchFocus(App& a,SDL_Keycode key) {
   return true;
 }
 
+bool opponentAiActionReady(const gwent::Game& game) {
+  if(game.pendingMedicPlayer>=0)
+    return game.pendingMedicPlayer==1&&game.currentPlayer==1&&
+      (game.phase==gwent::Phase::OpponentTurn||
+       (game.phase==gwent::Phase::RoundSetup&&game.pendingMedicDuringRoundSetup));
+  return game.phase==gwent::Phase::OpponentTurn&&game.currentPlayer==1;
+}
 void performAi(App& a) {
-  if(a.game.phase!=gwent::Phase::OpponentTurn&&a.game.pendingMedicPlayer!=1)return;
+  if(!opponentAiActionReady(a.game))return;
   const auto action=gwent::chooseAiAction(a.game,1);
   bool success=false;
   if(action.resolveMedic) {
@@ -2891,6 +2898,7 @@ int main(int argc,char** argv) {
     SDL_SetTextureBlendMode(softwareFrame,SDL_BLENDMODE_NONE);
   }
   SDL_Renderer* drawRenderer=renderer;
+  App app; bool running=true;
   const auto destroyRenderers=[&]() {
     if(softwareFrame)SDL_DestroyTexture(softwareFrame);
     if(drawRenderer!=presentationRenderer)SDL_DestroyRenderer(drawRenderer);
@@ -2913,7 +2921,6 @@ int main(int argc,char** argv) {
   centeredTextInBox(renderer,20,145,W-40,34,"GWENT CLASSIC",paper,2);
   centeredTextInBox(renderer,20,187,W-40,22,"LADOWANIE...",Color{197,169,111},1);
   presentFrame();
-  App app; bool running=true;
   app.miyooControls=(presentationInfo.name&&std::string(presentationInfo.name)=="Miyoo Mini");
   if(const char* mimic=SDL_getenv("GWENT_MIMIC_MIYOO_INPUT"))app.miyooControls=app.miyooControls||std::string(mimic)=="1";
   if(const char* configured=SDL_getenv("GWENT_ASSET_DIR"))app.assetDirectory=configured;
@@ -3070,6 +3077,28 @@ int main(int argc,char** argv) {
       const int beforeRow=focusProbe.rowIndex;
       handleMatchKey(focusProbe,SDLK_UP);
       okay=okay&&focusProbe.rowIndex==beforeRow;
+    }
+    {
+      App setupAiProbe;setupAiProbe.screen=Screen::Match;
+      auto target=gwent::Card{};target.id="setup-ai-continuation";target.kind=gwent::Kind::Unit;
+      target.row=gwent::Row::Melee;target.power=6;
+      auto spare=target;spare.id="setup-ai-own-spare";setupAiProbe.game.players[0].hand={spare};
+      spare.id="setup-ai-opponent-spare";setupAiProbe.game.players[1].hand={spare};
+      setupAiProbe.game.players[1].graveyard={target};
+      setupAiProbe.game.phase=gwent::Phase::RoundSetup;setupAiProbe.game.currentPlayer=1;
+      setupAiProbe.game.firstPlayer=0;setupAiProbe.game.pendingMedicPlayer=1;
+      setupAiProbe.game.pendingMedicDuringRoundSetup=true;
+      setupAiProbe.game.skelligeRoundOwner=1;setupAiProbe.game.skelligeRoundRemaining=0;
+      const bool dispatchable=opponentAiActionReady(setupAiProbe.game);
+      performAi(setupAiProbe);
+      const bool finished=setupAiProbe.game.pendingMedicPlayer==-1&&
+        setupAiProbe.game.players[1].graveyard.empty()&&setupAiProbe.game.players[1].board[0].size()==1&&
+        setupAiProbe.game.phase==gwent::Phase::PlayerTurn&&setupAiProbe.game.currentPlayer==0;
+      std::cerr<<"RoundSetup AI dispatch probe: ready="<<dispatchable<<" completed="<<finished<<"\n";
+      okay=okay&&dispatchable&&finished;
+      setupAiProbe.game.phase=gwent::Phase::OpponentTurn;setupAiProbe.game.currentPlayer=0;
+      setupAiProbe.game.pendingMedicPlayer=0;
+      okay=okay&&!opponentAiActionReady(setupAiProbe.game);
     }
     const bool startsInDeckMaker=app.screen==Screen::DeckBuilder;
     app.miyooControls=true;
@@ -3947,7 +3976,7 @@ int main(int argc,char** argv) {
     }
     if(app.screen==Screen::Match&&app.activeNotification.empty()&&
        !app.leaderSelectionMode&&!app.leaderRevealOpen&&!app.pauseOpen&&!app.passConfirmationOpen&&
-       (app.game.phase==gwent::Phase::OpponentTurn||app.game.pendingMedicPlayer==1)&&!actionAnimationLocked(app,now)&&SDL_GetTicks()>=app.aiAt)performAi(app);
+       opponentAiActionReady(app.game)&&!actionAnimationLocked(app,now)&&SDL_GetTicks()>=app.aiAt)performAi(app);
     app.audio.playMusic(app.screen==Screen::Match?"match":"menu");
     SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);
     if(app.screen==Screen::MainMenu)drawMainMenu(renderer,app);
