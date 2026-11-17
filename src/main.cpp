@@ -1963,7 +1963,7 @@ const gwent::CampaignNode* selectedCampaignNode(const App& a) {
 }
 void drawCampaign(SDL_Renderer* r,const App& a) {
   const bool pl=a.language==Language::Polish;
-  drawImage(r,a,"img/menu/woodland-shrine-v1.png",0,0,W,H);
+  drawImage(r,a,"img/campaign/backdrop.png",0,0,W,H);
   box(r,0,0,W,H,Color{5,4,3,125});
   centeredTextInBox(r,20,14,W-40,26,pl?"SZLAK GWINTA":"THE GWENT PATH",gold,2);
   for(int f=0;f<4;++f) {
@@ -1985,7 +1985,7 @@ void drawCampaign(SDL_Renderer* r,const App& a) {
     frame(r,30,y,254,50,focused?Color{245,205,103,255}:Color{101,74,40,255});
     text(r,40,y+8,std::to_string(stage)+(stage==5?" BOSS":""),focused?gold:paper,1);
     text(r,110,y+8,won?(pl?"POKONANY":"DEFEATED"):unlocked?(pl?"DOSTEPNY":"AVAILABLE"):(pl?"ZABLOKOWANY":"LOCKED"),unlocked?gold:muted,1);
-    centeredTextInBox(r,36,y+25,242,18,pl?node->namePl:node->nameEn,unlocked?paper:muted,1);
+    centeredTextInBox(r,36,y+25,242,18,pl?node->namePl:node->nameEn,unlocked?paper:muted,2);
   }
   if(selected) {
     std::string portrait=selected->portrait;
@@ -1994,10 +1994,17 @@ void drawCampaign(SDL_Renderer* r,const App& a) {
       int tw=0,th=0;SDL_QueryTexture(image,nullptr,nullptr,&tw,&th);
       SDL_Rect src{0,0,tw,th};
       if(portrait.rfind("img/lg/",0)==0)src={static_cast<int>(tw*.30),static_cast<int>(th*.06),static_cast<int>(tw*.70),static_cast<int>(th*.68)};
-      SDL_Rect dst{350,100,208,220};SDL_RenderCopy(r,image,&src,&dst);
+      SDL_Rect dst{350,100,208,220};
+      // Crop to cover instead of widening the generated portrait's face.
+      if(src.w*dst.h>src.h*dst.w) {
+        const int crop=src.h*dst.w/dst.h;src.x+=(src.w-crop)/2;src.w=crop;
+      } else {
+        const int crop=src.w*dst.h/dst.w;src.h=crop;
+      }
+      SDL_RenderCopy(r,image,&src,&dst);
     }
     frame(r,349,99,210,222,gold);
-    centeredTextInBox(r,304,326,300,19,pl?selected->namePl:selected->nameEn,paper,1);
+    centeredTextInBox(r,304,326,300,19,pl?selected->namePl:selected->nameEn,paper,2);
     box(r,306,350,298,63,Color{15,10,6,240});frame(r,306,350,298,63,Color{135,100,53,255});
     const auto lines=wrapDetailText(pl?selected->introPl:selected->introEn,45);
     for(std::size_t i=0;i<lines.size()&&i<5;++i)text(r,315,358+static_cast<int>(i)*10,lines[i],paper,1);
