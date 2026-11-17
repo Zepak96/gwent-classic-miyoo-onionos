@@ -915,6 +915,7 @@ void leaveCampaignMatch(App& a) {
   recordCampaignOutcome(a);
   if(unsavedCampaignVictory(a))return;
   focusActiveCampaignOpponent(a);
+  a.campaignDeckPicker=false;a.returnToCampaignAfterDeck=false;
   if(!a.activeCampaignId.empty()) {a.screen=Screen::Campaign;a.campaignIntro=false;}
   else a.screen=Screen::DeckBuilder;
 }
@@ -923,7 +924,7 @@ bool loadSavedMatch(App& a) {
   gwent::Game restored;std::string error;
   if(a.savePath.empty()||!gwent::loadGame(a.savePath,restored,&error)) { a.status=tr(a,"no_save");return false; }
   if(!loadCampaignMatchAssociation(a)){a.status=a.language==Language::Polish?"BLAD POWIAZANIA ZAPISU KAMPANII":"CAMPAIGN SAVE ASSOCIATION ERROR";return false;}
-  a.game=std::move(restored);focusActiveCampaignOpponent(a);a.screen=Screen::Match;a.handIndex=0;a.rowIndex=0;a.targetIndex=0;
+  a.game=std::move(restored);focusActiveCampaignOpponent(a);a.campaignDeckPicker=false;a.returnToCampaignAfterDeck=false;a.screen=Screen::Match;a.handIndex=0;a.rowIndex=0;a.targetIndex=0;
   a.matchFocusKind=App::MatchFocusKind::Hand;a.matchFocusOwner=0;a.matchFocusRow=0;a.matchFocusCardId.clear();a.opponentPreviewActive=false;
   a.endScreenStartedAt=SDL_GetTicks();
   a.targetMode=false;a.cardPlayConfirmOpen=false;a.leaderConfirmOpen=false;
@@ -1108,6 +1109,7 @@ void startMatch(App& a,std::uint64_t fixtureSeed=0,const std::string& campaignId
       std::move(opponent.cards),opponent.leader,seed,-1);
   a.activeCampaignId=campaignId;std::cerr<<"Match started: campaign="<<(campaignId.empty()?"none":campaignId)<<" playerDeck="<<(a.userDeckSelected?"custom":recipes()[a.deckIndex].id)<<"\n";a.campaignAchievement.clear();a.campaignResultRecorded=false;a.campaignSaveRetryAt=0;
   a.cardPlayConfirmOpen=false;a.leaderConfirmOpen=false;a.leaderSelectionMode=false;
+  a.campaignDeckPicker=false;a.returnToCampaignAfterDeck=false;
   a.matchFocusKind=App::MatchFocusKind::Hand;a.matchFocusOwner=0;a.matchFocusRow=0;a.matchFocusCardId.clear();a.opponentPreviewActive=false;
   a.mulligan.clear(); a.handIndex=0; a.rowIndex=0; a.screen=Screen::Match;a.endScreenStartedAt=0;
   queueNotification(a,a.game.firstPlayer==0?"me-coin":"op-coin");
@@ -2055,7 +2057,7 @@ void drawCampaignDeckPicker(SDL_Renderer* r,const App& a) {
     const auto* recipe=custom?nullptr:&recipes()[static_cast<std::size_t>(index-1)];
     const std::string title=custom?(pl?"TWOJA TALIA":"YOUR CUSTOM DECK"):
       factionName(recipe->faction,pl)+" - "+std::to_string(index);
-    text(r,54,y+8,title,custom&&!customValid?muted:paper,1);
+    text(r,54,y+6,title,custom&&!customValid?muted:paper,2);
     const int leader=custom?a.editDeck.leaderReferenceIndex:recipe->leaderReferenceIndex;
     const auto& name=gwent::referenceCardName(leader,pl);
     text(r,54,y+27,shortName((custom&&!customValid?(pl?"NIEKOMPLETNA - Y: EDYTUJ":"INCOMPLETE - Y: EDIT"):(pl?"DOWODCA: ":"LEADER: ")+name),85),focused?gold:muted,1);
@@ -4028,7 +4030,8 @@ int main(int argc,char** argv) {
       okay=okay&&app.status==tr(app,"save_error");
       std::filesystem::remove(metadataBlock);saveCurrentMatch(app);
       okay=okay&&app.status==tr(app,"saved");
-      app.activeCampaignId.clear();okay=okay&&loadSavedMatch(app)&&app.activeCampaignId==nodeId;
+      app.activeCampaignId.clear();app.campaignDeckPicker=true;app.returnToCampaignAfterDeck=true;
+      okay=okay&&loadSavedMatch(app)&&app.activeCampaignId==nodeId&&!app.campaignDeckPicker&&!app.returnToCampaignAfterDeck;
 
       app.game.phase=gwent::Phase::MatchResult;app.game.matchWinner=1;
       recordCampaignOutcome(app);
@@ -4076,9 +4079,9 @@ int main(int argc,char** argv) {
       handleKey(app,SDLK_AC_BACK,probeRunning);okay=okay&&app.screen==Screen::Campaign;
     } else okay=false;
     App resumed;resumed.activeCampaignId="skellige-3";resumed.game.phase=gwent::Phase::MatchResult;
-    resumed.game.matchWinner=0;resumed.campaignResultRecorded=true;
+    resumed.game.matchWinner=0;resumed.campaignResultRecorded=true;resumed.campaignDeckPicker=true;resumed.returnToCampaignAfterDeck=true;
     leaveCampaignMatch(resumed);
-    okay=okay&&resumed.screen==Screen::Campaign&&resumed.campaignFaction==3&&resumed.campaignStage==2;
+    okay=okay&&resumed.screen==Screen::Campaign&&resumed.campaignFaction==3&&resumed.campaignStage==2&&!resumed.campaignDeckPicker&&!resumed.returnToCampaignAfterDeck;
     std::filesystem::remove(campaignTestDir/"campaign-v1.gwc");
     std::filesystem::remove(app.savePath);std::filesystem::remove(app.savePath+".campaign");
     std::filesystem::remove(campaignTestDir);
