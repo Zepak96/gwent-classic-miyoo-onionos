@@ -114,3 +114,51 @@ Wyniki są historyczne: późniejsza naprawa replay wskrzeszeń Skellige i medyk
 zmienia rozgrywkę. Kolejność wymaga ponownej oceny na tej rewizji oraz na
 niezależnym zakresie ziaren. Małe odstępy (np. Potwory 1→2) nie dają podstawy
 do twierdzenia, że każdy kolejny przeciwnik będzie zawsze zauważalnie trudniejszy.
+
+## Obsada turnieju — dane wdrożeniowe
+
+`data/campaign-opponents.json` zawiera 20 przeciwników, po pięciu na ścieżkę.
+Każde ID jest związane z dokładnie jednym istniejącym przepisem z
+`campaign-decks-draft.json`. Etap oznacza projektowaną trudność talii, nie
+kanoniczną siłę bohatera ani kolejność wydarzeń fabularnych.
+
+Kampania jest umownym turniejem postaci i stworzeń reprezentowanych przez karty
+źródłowego Gwent Classic. Nie twierdzi, że wszystkie te pojedynki wydarzyły się
+w fabule Wiedźmina 3 ani że gracz osobiście spotyka w niej każdą z tych postaci.
+W szczególności udział Vattiera opiera się na obecności jego karty w katalogu,
+a nie na założeniu osobistego spotkania w grze. Frakcja ścieżki określa legalną
+talię przeciwnika. Możliwość wybrania postaci jako twarzy etapu nie daje jej
+kartom wyjątku od limitów ani przynależności frakcyjnej.
+
+| Ścieżka | 1 | 2 | 3 | 4 | 5 |
+| --- | --- | --- | --- | --- | --- |
+| Królestwa Północy | Talar | Ves | Vernon Roche | Sigismund Dijkstra | Filippa Eilhart |
+| Nilfgaard | Morvran Voorhis | Letho z Gulety | Fringilla Vigo | Vattier de Rideaux | Emhyr var Emreis |
+| Potwory | Nekker | Gryf | Leszy | Imlerith | Eredin |
+| Skellige | Błękitny Lugos | Myszowór | Hjalmar | Crach an Craite | Cerys |
+
+Uzasadnienie dramaturgiczne: Północ przechodzi od rozmówcy i żołnierzy do
+intrygantów; Nilfgaard od dworu i wykonawców do wywiadu i cesarza; Potwory od
+stworzeń do dowódców Dzikiego Gonu; Skellige od wojownika przez druida do
+rodziny an Craite. Ostateczna trudność jest przypisana przepisom, a nie tej
+hierarchii fabularnej. Poszczególne nazwy nie mogą być podstawą twierdzenia,
+że etap jest mocniejszy bez wyników rozgrywek kontrolnych.
+
+Każdy przeciwnik ma autorski, krótki tekst polski i angielski oraz tytuł
+osiągnięcia. Teksty nie są cytatami z gry. Nekker, Gryf i Leszy mają
+`dialogue_mode: narration`: panel opisuje zachowanie stworzenia i otoczenie,
+nie przypisuje mu ludzkiej wypowiedzi. Pozostali mają `speech`.
+
+Pole `portrait` wskazuje docelową, generowaną ilustrację
+`img/campaign/<id>.png`. `portrait_reference_name` jest sprawdzoną dokładną
+nazwą karty katalogowej i służy wyłącznie do technicznego podglądu podczas
+wdrażania. Obecność tego pola nie oznacza, że wygenerowany portret jest gotowy.
+Przed wydaniem każdy plik docelowy musi faktycznie istnieć, zostać obejrzany i
+sprawdzony w rozdzielczości urządzenia. Tło i styl portretów powinny współgrać
+ze złotem, drewnem i bursztynową poświatą menu.
+
+Walidacja treści wykonana przy przygotowaniu danych: 20 unikalnych ID,
+zgodność zbioru ID i par frakcja/etap z przepisami, obecność wszystkich nazw
+referencyjnych w źródłowym katalogu oraz niepuste nazwy, wstępy i osiągnięcia
+w obu językach. To walidacja zawartości danych, nie dowód gotowości kampanii,
+portretów ani jej pełnego balansu.

@@ -22,7 +22,14 @@ add_custom_command(
   VERBATIM
 )
 
-add_library(gwent_engine src/game.cpp src/ai.cpp src/save.cpp src/deck.cpp ${GWENT_CATALOG_SOURCE})
+set(GWENT_CAMPAIGN_SOURCE ${GWENT_GENERATED_DIR}/campaign_catalog.cpp)
+add_custom_command(OUTPUT ${GWENT_CAMPAIGN_SOURCE}
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_campaign_catalog.py
+          ${CMAKE_CURRENT_SOURCE_DIR}/data/campaign-decks-draft.json
+          ${CMAKE_CURRENT_SOURCE_DIR}/data/campaign-opponents.json ${GWENT_CAMPAIGN_SOURCE}
+  DEPENDS tools/generate_campaign_catalog.py data/campaign-decks-draft.json data/campaign-opponents.json
+  VERBATIM)
+add_library(gwent_engine src/game.cpp src/ai.cpp src/save.cpp src/deck.cpp src/campaign.cpp ${GWENT_CATALOG_SOURCE} ${GWENT_CAMPAIGN_SOURCE})
 target_include_directories(gwent_engine PUBLIC include)
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9)
   # GCC 8 ships std::filesystem in a separate compatibility library.
@@ -83,6 +90,9 @@ if(GWENT_BUILD_TESTS)
   endif()
   target_link_libraries(gwent_engine_tests PRIVATE gwent_engine)
   add_test(NAME engine_rules COMMAND gwent_engine_tests)
+  add_executable(gwent_campaign_tests tests/campaign_tests.cpp)
+  target_link_libraries(gwent_campaign_tests PRIVATE gwent_engine)
+  add_test(NAME campaign_rules COMMAND gwent_campaign_tests)
   add_test(NAME card_catalog COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/validate_catalog.py ${CMAKE_SOURCE_DIR}/data)
 endif()
 option(GWENT_CAMPAIGN_BENCHMARK "Build campaign draft balance benchmark" OFF)
