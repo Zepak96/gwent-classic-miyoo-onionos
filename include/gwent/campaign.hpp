@@ -6,7 +6,7 @@ struct CampaignNode {
   std::string id;
   Faction faction;
   int stage;
-  std::string namePl,nameEn,introPl,introEn,portrait;
+  std::string namePl,nameEn,introPl,introEn,portrait,achievementPl,achievementEn;
   ReferenceDeck deck;
 };
 const std::vector<CampaignNode>& campaignNodes();

@@ -1,6 +1,6 @@
 # Kampania — projekt talii i progresji
 
-Status: projekt do realizacji po domknięciu mechaniki i nowym menu.
+Status: implementation active; CI verifies match entry, loss without reward, unique victory, next-stage unlock and progress reload. Portrait completion and hardware verification remain outstanding.
 
 ## Ustalenia użytkownika
 

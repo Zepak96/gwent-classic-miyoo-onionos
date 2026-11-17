@@ -842,7 +842,7 @@ void recordCampaignOutcome(App& a) {
   if(a.campaignSaveRetryAt&&!SDL_TICKS_PASSED(SDL_GetTicks(),a.campaignSaveRetryAt))return;
   const bool newlyWon=gwent::recordCampaignVictory(a.campaignProgress,node->id);
   if(newlyWon)a.campaignAchievement=(a.language==Language::Polish?"OSIAGNIECIE: ":"ACHIEVEMENT: ")+
-      (a.language==Language::Polish?node->namePl:node->nameEn);
+      (a.language==Language::Polish?node->achievementPl:node->achievementEn);
   std::string error;
   if(a.dataDirectory.empty()||!gwent::saveCampaignProgress(a.dataDirectory+"campaign-v1.gwc",a.campaignProgress,&error)) {
     a.status=a.language==Language::Polish?"BLAD ZAPISU KAMPANII":"CAMPAIGN SAVE FAILED";
