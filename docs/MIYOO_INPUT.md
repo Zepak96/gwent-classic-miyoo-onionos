@@ -64,3 +64,13 @@ korekta dla testowanego urządzenia, a nie potwierdzenie wszystkich firmware.
 Menu dodatkowo akceptuje oba przyciski jako zatwierdzenie, żeby omyłkowy
 przycisk nie kończył procesu. Regresje używają odpowiednio zmienionych kodów
 SDL; rzeczywiste A/B w meczu nadal wymagają sprawdzenia na konsoli.
+
+## Wgranie poprawki menu/mapowania — 2026-11-17
+
+Wersja 150843d: desktop CI 44055543319 i ARM 44055543930 zakończone sukcesem.
+Na karcie E: MIYOO MINI zweryfikowano SHA-256 wszystkich 607 plików paczki.
+SHA-256 archiwum: 0e86021342e628c6020378f02e543d6c15a702d10accc9717165992363221ffb.
+Poprzednią wersję zachowano lokalnie w
+artifacts/qa/package-150843d/sd-backup-20261117-103028.
+Odczyt logu i zgłoszenie B wskazały odwrotną interpretację A/B; sama instalacja
+nie potwierdza jeszcze faktycznych przycisków w rozgrywce po aktualizacji.
