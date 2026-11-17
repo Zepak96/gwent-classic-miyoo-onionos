@@ -50,6 +50,10 @@ jobs:
         run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy GWENT_SOFTWARE_COMPOSITE=1 ./build-sdl/gwent --crowded-render-test
       - name: Board focus rendering
         run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./build-sdl/gwent --board-focus-smoke-test board-focus-smoke.bmp
+      - name: Campaign ladder navigation and fixed opponent
+        run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./build-sdl/gwent --campaign-smoke-test campaign-smoke.bmp
+      - name: Campaign software composition
+        run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy GWENT_SOFTWARE_COMPOSITE=1 ./build-sdl/gwent --campaign-smoke-test composite-campaign-smoke.bmp
       - name: Miyoo physical-key mapping
         run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./build-sdl/gwent --input-test
       - name: Round and match result screens
@@ -61,6 +65,8 @@ jobs:
         with:
           name: frontend-smoke-frames
           path: |
+            campaign-smoke.bmp
+            composite-campaign-smoke.bmp
             board-focus-smoke.bmp
             main-menu-smoke.bmp
             composite-main-menu-smoke.bmp

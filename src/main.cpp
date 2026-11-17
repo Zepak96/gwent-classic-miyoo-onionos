@@ -4,6 +4,7 @@
 #include "../third_party/stb_image.h"
 #include "gwent/ai.hpp"
 #include "gwent/catalog.hpp"
+#include "gwent/campaign.hpp"
 #include "gwent/deck.hpp"
 #include "gwent/game.hpp"
 #include "gwent/save.hpp"
@@ -175,7 +176,7 @@ void powerBadgeNumber(SDL_Renderer* r,int x,int y,int width,int height,const std
   draw(0,0,Color{255,247,225,255});
 }
 
-enum class Screen { DeckBuilder, Match, MainMenu };
+enum class Screen { DeckBuilder, Match, MainMenu, Campaign };
 enum class Language { Polish, English };
 constexpr Uint32 SOURCE_CARD_PREVIEW_MS=1000;
 constexpr Uint32 SOURCE_CARD_FLIGHT_MS=499;
@@ -210,6 +211,11 @@ struct App {
   Screen screen{Screen::DeckBuilder};
   bool mainMenuEnabled{false};
   int menuIndex{0};
+  gwent::CampaignProgress campaignProgress;
+  int campaignFaction{0},campaignStage{0};
+  bool campaignIntro{false},campaignResultRecorded{false},returnToCampaignAfterDeck{false};
+  std::string activeCampaignId,campaignAchievement;
+  Uint32 campaignSaveRetryAt{0};
   Language language{Language::Polish};
   std::size_t deckIndex{0};
   int deckSlot{1};
@@ -799,10 +805,60 @@ void queueGameplayNotifications(App& a,gwent::Phase previousPhase,int previousRo
   if(enteredTurn&&(roundStarted||a.game.currentPlayer!=previousPlayer))
     queueNotification(a,a.game.currentPlayer==0?"me-turn":"op-turn");
 }
+const gwent::CampaignNode* campaignNodeById(const std::string& id) {
+  const auto& nodes=gwent::campaignNodes();
+  const auto found=std::find_if(nodes.begin(),nodes.end(),[&](const auto& n){return n.id==id;});
+  return found==nodes.end()?nullptr:&*found;
+}
+std::uint64_t campaignHash(const std::string& data) {
+  std::uint64_t hash=1469598103934665603ULL;
+  for(unsigned char c:data){hash^=c;hash*=1099511628211ULL;}return hash;
+}
+std::uint64_t savedMatchFingerprint(const std::string& path) {
+  std::ifstream file(path,std::ios::binary);if(!file)return 0;
+  std::string bytes((std::istreambuf_iterator<char>(file)),std::istreambuf_iterator<char>());
+  return campaignHash(bytes);
+}
+void saveCampaignMatchAssociation(const App& a) {
+  if(a.savePath.empty())return;
+  const auto fingerprint=savedMatchFingerprint(a.savePath);
+  const std::string id=a.activeCampaignId.empty()?"-":a.activeCampaignId;
+  const auto check=campaignHash(std::to_string(fingerprint)+"|"+id);
+  std::ofstream meta(a.savePath+".campaign",std::ios::trunc);
+  if(meta)meta<<"GWENT_CAMPAIGN_MATCH_1 "<<fingerprint<<' '<<id<<' '<<check<<'\n';
+}
+void loadCampaignMatchAssociation(App& a) {
+  a.activeCampaignId.clear();a.campaignAchievement.clear();a.campaignResultRecorded=false;
+  std::ifstream meta(a.savePath+".campaign");std::string tag,id;std::uint64_t hash=0,check=0;
+  if(!(meta>>tag>>hash>>id>>check)||tag!="GWENT_CAMPAIGN_MATCH_1"||id=="-"||
+     hash!=savedMatchFingerprint(a.savePath)||check!=campaignHash(std::to_string(hash)+"|"+id)||
+     !campaignNodeById(id)||!gwent::campaignUnlocked(a.campaignProgress,id))return;
+  a.activeCampaignId=id;
+}
+void recordCampaignOutcome(App& a) {
+  if(a.game.phase!=gwent::Phase::MatchResult||a.activeCampaignId.empty()||a.campaignResultRecorded)return;
+  if(a.game.matchWinner!=0){a.campaignResultRecorded=true;return;}
+  const auto* node=campaignNodeById(a.activeCampaignId);if(!node)return;
+  if(a.campaignSaveRetryAt&&!SDL_TICKS_PASSED(SDL_GetTicks(),a.campaignSaveRetryAt))return;
+  const bool newlyWon=gwent::recordCampaignVictory(a.campaignProgress,node->id);
+  if(newlyWon)a.campaignAchievement=(a.language==Language::Polish?"OSIAGNIECIE: ":"ACHIEVEMENT: ")+
+      (a.language==Language::Polish?node->namePl:node->nameEn);
+  std::string error;
+  if(a.dataDirectory.empty()||!gwent::saveCampaignProgress(a.dataDirectory+"campaign-v1.gwc",a.campaignProgress,&error)) {
+    a.status=a.language==Language::Polish?"BLAD ZAPISU KAMPANII":"CAMPAIGN SAVE FAILED";
+    a.campaignSaveRetryAt=SDL_GetTicks()+2000;return;
+  }
+  a.campaignResultRecorded=true;a.campaignSaveRetryAt=0;
+}
+void leaveCampaignMatch(App& a) {
+  recordCampaignOutcome(a);
+  if(!a.activeCampaignId.empty()) {a.screen=Screen::Campaign;a.campaignIntro=false;}
+  else a.screen=Screen::DeckBuilder;
+}
 bool loadSavedMatch(App& a) {
   gwent::Game restored;std::string error;
   if(a.savePath.empty()||!gwent::loadGame(a.savePath,restored,&error)) { a.status=tr(a,"no_save");return false; }
-  a.game=std::move(restored);a.screen=Screen::Match;a.handIndex=0;a.rowIndex=0;a.targetIndex=0;
+  a.game=std::move(restored);loadCampaignMatchAssociation(a);a.screen=Screen::Match;a.handIndex=0;a.rowIndex=0;a.targetIndex=0;
   a.matchFocusKind=App::MatchFocusKind::Hand;a.matchFocusOwner=0;a.matchFocusRow=0;a.matchFocusCardId.clear();a.opponentPreviewActive=false;
   a.endScreenStartedAt=SDL_GetTicks();
   a.targetMode=false;a.cardPlayConfirmOpen=false;a.leaderConfirmOpen=false;
@@ -817,9 +873,10 @@ bool loadSavedMatch(App& a) {
   return true;
 }
 void saveCurrentMatch(App& a) {
+  recordCampaignOutcome(a);
   std::string error;
   if(a.screen!=Screen::Match||a.savePath.empty()||!gwent::saveGame(a.savePath,a.game,&error))a.status=tr(a,"save_error");
-  else a.status=tr(a,"saved");
+  else {saveCampaignMatchAssociation(a);a.status=tr(a,"saved");}
 }
 std::string factionName(gwent::Faction faction,bool pl) {
   switch(faction) {
@@ -957,7 +1014,7 @@ gwent::Card recipeLeader(std::size_t index) {
   if(!recipes().empty()) gwent::referenceLeader(recipes()[index%recipes().size()].leaderReferenceIndex,leader);
   return leader;
 }
-void startMatch(App& a,std::uint64_t fixtureSeed=0) {
+void startMatch(App& a,std::uint64_t fixtureSeed=0,const std::string& campaignId={}) {
   try {
   if(recipes().size()<2) { a.status=tr(a,"reference_decks_missing"); return; }
   gwent::Card humanLeader=recipeLeader(a.deckIndex);std::vector<gwent::Card> humanDeck;
@@ -966,11 +1023,21 @@ void startMatch(App& a,std::uint64_t fixtureSeed=0) {
   } else humanDeck=gwent::makeReferenceDeck(recipes()[a.deckIndex]);
   const auto seed=fixtureSeed?fixtureSeed:(static_cast<std::uint64_t>(SDL_GetTicks())^SDL_GetPerformanceCounter());
   auto opponent=gwent::makeReferenceOpponentDeck(seed);
+  if(!campaignId.empty()) {
+    const auto* node=campaignNodeById(campaignId);
+    if(!node||!gwent::campaignUnlocked(a.campaignProgress,campaignId)){a.status=tr(a,"deck_invalid");return;}
+    opponent.sourceDeckIndex=0;opponent.cards=gwent::makeReferenceDeck(node->deck);
+    if(!gwent::referenceLeader(node->deck.leaderReferenceIndex,opponent.leader)||
+       !gwent::validateDeck(opponent.cards,opponent.leader,node->faction).empty()) {
+      a.status=tr(a,"reference_deck_invalid");return;
+    }
+  }
   if(opponent.sourceDeckIndex<0||opponent.cards.empty()||opponent.leader.kind!=gwent::Kind::Leader) {
     a.status=tr(a,"reference_deck_invalid");return;
   }
   gwent::beginMatchWithLeaders(a.game,std::move(humanDeck),humanLeader,
       std::move(opponent.cards),opponent.leader,seed,-1);
+  a.activeCampaignId=campaignId;a.campaignAchievement.clear();a.campaignResultRecorded=false;a.campaignSaveRetryAt=0;
   a.cardPlayConfirmOpen=false;a.leaderConfirmOpen=false;a.leaderSelectionMode=false;
   a.matchFocusKind=App::MatchFocusKind::Hand;a.matchFocusOwner=0;a.matchFocusRow=0;a.matchFocusCardId.clear();a.opponentPreviewActive=false;
   a.mulligan.clear(); a.handIndex=0; a.rowIndex=0; a.screen=Screen::Match;a.endScreenStartedAt=0;
@@ -1887,6 +1954,61 @@ std::vector<const gwent::Card*> editorLeaders(const App& a) {
   for(const auto& card:gwent::referenceCardCatalog())if(card.kind==gwent::Kind::Leader&&card.faction==a.editDeck.faction)leaders.push_back(&card);
   return leaders;
 }
+constexpr std::array<gwent::Faction,4> campaignFactions{{gwent::Faction::NorthernRealms,gwent::Faction::Nilfgaard,gwent::Faction::Monsters,gwent::Faction::Skellige}};
+const gwent::CampaignNode* selectedCampaignNode(const App& a) {
+  const auto faction=campaignFactions[static_cast<std::size_t>(std::clamp(a.campaignFaction,0,3))];
+  const auto& nodes=gwent::campaignNodes();
+  const auto found=std::find_if(nodes.begin(),nodes.end(),[&](const auto& n){return n.faction==faction&&n.stage==a.campaignStage+1;});
+  return found==nodes.end()?nullptr:&*found;
+}
+void drawCampaign(SDL_Renderer* r,const App& a) {
+  const bool pl=a.language==Language::Polish;
+  drawImage(r,a,"img/menu/woodland-shrine-v1.png",0,0,W,H);
+  box(r,0,0,W,H,Color{5,4,3,125});
+  centeredTextInBox(r,20,14,W-40,26,pl?"SZLAK GWINTA":"THE GWENT PATH",gold,2);
+  for(int f=0;f<4;++f) {
+    const int x=12+f*158;
+    box(r,x,52,150,31,Color{16,12,8,230});
+    frame(r,x,52,150,31,a.campaignFaction==f?gold:Color{90,65,35,255});
+    centeredTextInBox(r,x+2,56,146,23,factionName(campaignFactions[f],pl),paper,1);
+  }
+  const auto* selected=selectedCampaignNode(a);
+  for(int stage=5;stage>=1;--stage) {
+    const auto& nodes=gwent::campaignNodes();
+    const auto node=std::find_if(nodes.begin(),nodes.end(),[&](const auto& n){return n.faction==campaignFactions[a.campaignFaction]&&n.stage==stage;});
+    if(node==nodes.end())continue;
+    const int y=100+(5-stage)*58;
+    const bool focused=stage==a.campaignStage+1,unlocked=gwent::campaignUnlocked(a.campaignProgress,node->id);
+    const bool won=a.campaignProgress.victories[static_cast<std::size_t>(node-nodes.begin())];
+    if(stage<5)box(r,156,y-7,2,7,Color{168,120,57,220});
+    box(r,30,y,254,50,Color{18,13,8,235});
+    frame(r,30,y,254,50,focused?Color{245,205,103,255}:Color{101,74,40,255});
+    text(r,40,y+8,std::to_string(stage)+(stage==5?" BOSS":""),focused?gold:paper,1);
+    text(r,110,y+8,won?(pl?"POKONANY":"DEFEATED"):unlocked?(pl?"DOSTEPNY":"AVAILABLE"):(pl?"ZABLOKOWANY":"LOCKED"),unlocked?gold:muted,1);
+    centeredTextInBox(r,36,y+25,242,18,pl?node->namePl:node->nameEn,unlocked?paper:muted,1);
+  }
+  if(selected) {
+    std::string portrait=selected->portrait;
+    if(!textureFor(r,a,portrait))portrait="img/lg/"+gwent::referenceCardImage(selected->deck.leaderReferenceIndex);
+    if(auto* image=textureFor(r,a,portrait)) {
+      int tw=0,th=0;SDL_QueryTexture(image,nullptr,nullptr,&tw,&th);
+      SDL_Rect src{0,0,tw,th};
+      if(portrait.rfind("img/lg/",0)==0)src={static_cast<int>(tw*.30),static_cast<int>(th*.06),static_cast<int>(tw*.70),static_cast<int>(th*.68)};
+      SDL_Rect dst{350,100,208,220};SDL_RenderCopy(r,image,&src,&dst);
+    }
+    frame(r,349,99,210,222,gold);
+    centeredTextInBox(r,304,326,300,19,pl?selected->namePl:selected->nameEn,paper,1);
+    box(r,306,350,298,63,Color{15,10,6,240});frame(r,306,350,298,63,Color{135,100,53,255});
+    const auto lines=wrapDetailText(pl?selected->introPl:selected->introEn,45);
+    for(std::size_t i=0;i<lines.size()&&i<5;++i)text(r,315,358+static_cast<int>(i)*10,lines[i],paper,1);
+  }
+  box(r,12,422,W-24,46,Color{8,6,4,230});
+  centeredTextInBox(r,18,428,W-36,15,a.campaignIntro?(pl?"B: ROZPOCZNIJ PARTIE   A: WROC":"B: START MATCH   A: BACK"):
+    (pl?"LEWO/PRAWO: FRAKCJA  GORA/DOL: RYWAL  B: WYBIERZ":"LEFT/RIGHT: FACTION  UP/DOWN: OPPONENT  B: SELECT"),gold,1);
+  const int achievements=static_cast<int>(std::count(a.campaignProgress.victories.begin(),a.campaignProgress.victories.end(),true));
+  centeredTextInBox(r,18,447,W-36,15,a.status.empty()?((pl?"Y: TWOJA TALIA   OSIAGNIECIA ":"Y: YOUR DECK   ACHIEVEMENTS ")+std::to_string(achievements)+"/20"):a.status,paper,1);
+}
+
 void drawMainMenu(SDL_Renderer* r,const App& a) {
   drawImage(r,a,"img/menu/woodland-shrine-v1.png",0,0,W,H);
   box(r,0,0,W,70,Color{0,0,0,110});
@@ -1896,6 +2018,9 @@ void drawMainMenu(SDL_Renderer* r,const App& a) {
   const char* names[]={"Geralt of Rivia","Cirilla Fiona Elen Riannon","Triss Merigold"};
   const char* labelsPL[]={"GRA KLASYCZNA","MOJE TALIE","WZNOW PARTIE"};
   const char* labelsEN[]={"CLASSIC MATCH","MY DECKS","RESUME MATCH"};
+  box(r,220,72,200,25,Color{20,13,7,235});
+  frame(r,220,72,200,25,a.menuIndex==3?gold:Color{110,79,38,255});
+  centeredTextInBox(r,224,76,192,17,pl?"KAMPANIA":"CAMPAIGN",paper,1);
   for(int i=0;i<3;++i) {
     const bool selected=a.menuIndex==i;
     const int x=48+i*186,y=selected?104:118,w=172,h=selected?272:248;
@@ -2211,6 +2336,12 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     text(r,213,139,title,Color{gold.r,gold.g,gold.b,alpha},2);
     text(r,220,174,tr(a,"player_short")+" "+std::to_string(me.score)+"  -  "+std::to_string(op.score)+" "+tr(a,"opponent_short"),Color{paper.r,paper.g,paper.b,alpha},1);
     text(r,265,217,tr(a,"continue"),Color{muted.r,muted.g,muted.b,alpha},1);
+    if(done&&!a.activeCampaignId.empty()) {
+      const auto lines=wrapDetailText(a.campaignAchievement.empty()?
+        (a.language==Language::Polish?(a.game.matchWinner==0?"RYWAL POKONANY":"SPROBUJ PONOWNIE"):
+         (a.game.matchWinner==0?"OPPONENT DEFEATED":"TRY AGAIN")):a.campaignAchievement,48);
+      for(std::size_t i=0;i<lines.size()&&i<3;++i)centeredTextInBox(r,100,245+static_cast<int>(i)*13,440,13,lines[i],gold,1);
+    }
   }
   const bool showHand=a.game.phase!=gwent::Phase::RoundResult&&a.game.phase!=gwent::Phase::MatchResult;
   if(matchBrowseReady(a)) {
@@ -2398,7 +2529,7 @@ void handleMatchKey(App& a,SDL_Keycode key) {
     else if(a.game.phase==gwent::Phase::Mulligan)handleMatchKey(a,SDLK_RETURN);
     else if(a.game.phase==gwent::Phase::RoundSetup)handleMatchKey(a,SDLK_x);
     else if(a.game.phase==gwent::Phase::RoundResult)handleMatchKey(a,SDLK_RETURN);
-    else if(a.game.phase==gwent::Phase::MatchResult)a.screen=Screen::DeckBuilder;
+    else if(a.game.phase==gwent::Phase::MatchResult)leaveCampaignMatch(a);
     return;
   }
   if(a.leaderConfirmOpen) {
@@ -2492,7 +2623,7 @@ void handleMatchKey(App& a,SDL_Keycode key) {
   if(key==SDLK_s||key==SDLK_F5) { saveCurrentMatch(a);return; }
   if(key==SDLK_o||key==SDLK_F9) { loadSavedMatch(a);return; }
   if(a.game.phase==gwent::Phase::MatchResult) {
-    if(key==SDLK_RETURN||key==SDLK_x||key==SDLK_SPACE) { a.screen=Screen::DeckBuilder; return; }
+    if(key==SDLK_RETURN||key==SDLK_x||key==SDLK_SPACE||key==SDLK_AC_BACK) { leaveCampaignMatch(a); return; }
     return;
   }
   if(a.game.phase==gwent::Phase::RoundResult) {
@@ -2662,14 +2793,32 @@ void handleMatchKey(App& a,SDL_Keycode key) {
   else if(key==SDLK_RETURN||key==SDLK_KP_ENTER||key==SDLK_x) beginHumanPlayConfirmation(a);
 }
 void handleKey(App& a,SDL_Keycode key,bool& running) {
+  if(a.screen==Screen::Campaign) {
+    if(key==SDLK_x||key==SDLK_ESCAPE||key==SDLK_z) {
+      if(a.campaignIntro)a.campaignIntro=false;else a.screen=Screen::MainMenu;
+    } else if(key==SDLK_l||key==SDLK_f) {
+      a.returnToCampaignAfterDeck=true;openDeckEditor(a);
+    } else if(key==SDLK_LEFT||key==SDLK_RIGHT) {
+      a.campaignFaction=(a.campaignFaction+(key==SDLK_LEFT?3:1))%4;a.campaignStage=0;a.campaignIntro=false;a.status.clear();
+    } else if(key==SDLK_UP||key==SDLK_DOWN) {
+      a.campaignStage=std::clamp(a.campaignStage+(key==SDLK_UP?1:-1),0,4);a.campaignIntro=false;a.status.clear();
+    } else if(key==SDLK_AC_BACK||key==SDLK_RETURN||key==SDLK_KP_ENTER) {
+      const auto* node=selectedCampaignNode(a);
+      if(!node||!gwent::campaignUnlocked(a.campaignProgress,node->id))a.status=a.language==Language::Polish?"POKONAJ POPRZEDNIEGO RYWALA":"DEFEAT THE PREVIOUS OPPONENT";
+      else if(!a.campaignIntro){a.campaignIntro=true;a.status.clear();}
+      else {const auto id=node->id;startMatch(a,0,id);}
+    }
+    return;
+  }
   if(a.screen==Screen::MainMenu) {
-    if(key==SDLK_LEFT||key==SDLK_UP)a.menuIndex=(a.menuIndex+2)%3;
-    else if(key==SDLK_RIGHT||key==SDLK_DOWN)a.menuIndex=(a.menuIndex+1)%3;
+    if(key==SDLK_LEFT||key==SDLK_UP)a.menuIndex=(a.menuIndex+3)%4;
+    else if(key==SDLK_RIGHT||key==SDLK_DOWN)a.menuIndex=(a.menuIndex+1)%4;
     else if(key==SDLK_AC_BACK||key==SDLK_RETURN||key==SDLK_KP_ENTER) {
       a.status.clear();a.audio.play("ui_card");
       if(a.menuIndex==0)startMatch(a);
       else if(a.menuIndex==1)a.screen=Screen::DeckBuilder;
-      else loadSavedMatch(a);
+      else if(a.menuIndex==2)loadSavedMatch(a);
+      else {a.screen=Screen::Campaign;a.campaignIntro=false;}
     } else if(key==SDLK_x||key==SDLK_ESCAPE||key==SDLK_HOME)running=false;
     return;
   }
@@ -2690,13 +2839,13 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
   if(key==SDLK_m) { a.musicEnabled=!a.musicEnabled;a.audio.setMusicEnabled(a.musicEnabled);saveSettings(a);return; }
   if(key==SDLK_n) { a.notificationsEnabled=!a.notificationsEnabled;saveSettings(a);return; }
   if(a.screen==Screen::DeckBuilder) {
-    if(key==SDLK_ESCAPE) { if(a.mainMenuEnabled)a.screen=Screen::MainMenu;else running=false;return; }
+    if(key==SDLK_ESCAPE) { if(a.returnToCampaignAfterDeck){a.screen=Screen::Campaign;a.returnToCampaignAfterDeck=false;}else if(a.mainMenuEnabled)a.screen=Screen::MainMenu;else running=false;return; }
     if(key==SDLK_AC_BACK) {
       if(a.editingLeader) {
         a.editDeck.leaderReferenceIndex=a.leaderSelectionOriginalReference;
         a.editingLeader=false;
       } else if(a.editorPane==1) { a.editorPane=0;a.editorCardIndex=0; }
-      else if(a.mainMenuEnabled) { a.screen=Screen::MainMenu;a.status.clear(); }
+      else if(a.mainMenuEnabled) { a.screen=a.returnToCampaignAfterDeck?Screen::Campaign:Screen::MainMenu;a.returnToCampaignAfterDeck=false;a.status.clear(); }
       return;
     }
     if(key==SDLK_z) { a.language=a.language==Language::Polish?Language::English:Language::Polish;saveSettings(a);return; }
@@ -2826,7 +2975,7 @@ SDL_Keycode controllerKey(const SDL_ControllerButtonEvent& button,const App& app
     case SDL_CONTROLLER_BUTTON_A:return SDLK_x;
     case SDL_CONTROLLER_BUTTON_B:return SDLK_AC_BACK;
     case SDL_CONTROLLER_BUTTON_X:return SDLK_i;
-    case SDL_CONTROLLER_BUTTON_Y:return app.screen==Screen::Match?SDLK_l:SDLK_f;
+    case SDL_CONTROLLER_BUTTON_Y:return app.screen==Screen::Match||app.screen==Screen::Campaign?SDLK_l:SDLK_f;
     case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:return app.screen==Screen::Match?SDLK_UP:SDLK_TAB;
     case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER:return SDLK_DOWN;
     case SDL_CONTROLLER_BUTTON_START:return app.screen==Screen::Match?SDLK_p:SDLK_RETURN;
@@ -2840,7 +2989,7 @@ SDL_Keycode normalizeMiyooKey(const App& app,SDL_Keycode key) {
     case SDLK_LALT:return SDLK_AC_BACK; // B confirms or opens a card action; modal state defines its meaning.
     case SDLK_LSHIFT:return SDLK_i; // X
     case SDLK_SPACE:
-      if(app.screen==Screen::Match)return SDLK_l; // Y = leader
+      if(app.screen==Screen::Match||app.screen==Screen::Campaign)return SDLK_l; // Y = leader / campaign deck
       if(app.screen==Screen::DeckBuilder)return SDLK_f;
       return SDLK_z;
     case SDLK_TAB:return app.screen==Screen::Match?SDLK_UP:SDLK_TAB; // L1
@@ -3584,6 +3733,7 @@ int main(int argc,char** argv) {
   if(char* directory=SDL_GetPrefPath("GwentClassic","MiyooMiniPlus")) {
     app.dataDirectory=directory;app.savePath=app.dataDirectory+"match-v1.gws";
     loadSettings(app);
+    std::string campaignLoadError;gwent::loadCampaignProgress(app.dataDirectory+"campaign-v1.gwc",app.campaignProgress,&campaignLoadError);
     app.audio.setEnabled(app.sfxEnabled);
     app.audio.setMusicEnabled(app.musicEnabled);
     if(gwent::loadUserDeck(userDeckPath(app,app.deckSlot),app.editDeck))app.userDeckSelected=true;
@@ -3641,6 +3791,28 @@ int main(int argc,char** argv) {
     const bool absentSaveHandled=app.screen==Screen::MainMenu&&app.status==tr(app,"no_save")&&testRunning;
     app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();
     return saved&&moved&&opened&&returnedToCollection&&returned&&absentSaveHandled?0:13;
+  }
+  if(argc>2&&std::string(argv[1])=="--campaign-smoke-test") {
+    app.screen=Screen::MainMenu;app.menuIndex=0;app.mainMenuEnabled=true;app.miyooControls=true;app.language=Language::Polish;
+    app.campaignProgress={};app.campaignFaction=0;app.campaignStage=0;
+    bool probeRunning=true;handleKey(app,SDLK_LEFT,probeRunning);handleKey(app,SDLK_AC_BACK,probeRunning);
+    bool okay=app.screen==Screen::Campaign&&probeRunning;
+    handleKey(app,SDLK_UP,probeRunning);handleKey(app,SDLK_AC_BACK,probeRunning);
+    okay=okay&&!app.campaignIntro&&app.screen==Screen::Campaign;
+    handleKey(app,SDLK_DOWN,probeRunning);handleKey(app,SDLK_AC_BACK,probeRunning);
+    okay=okay&&app.campaignIntro;
+    app.campaignIntro=false;app.status.clear();
+    SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);drawCampaign(renderer,app);presentFrame();
+    auto* surface=SDL_CreateRGBSurfaceWithFormat(0,W,H,32,SDL_PIXELFORMAT_ARGB8888);
+    const bool saved=surface&&SDL_RenderReadPixels(renderer,nullptr,SDL_PIXELFORMAT_ARGB8888,surface->pixels,surface->pitch)==0&&SDL_SaveBMP(surface,argv[2])==0;
+    if(surface)SDL_FreeSurface(surface);
+    const auto* node=selectedCampaignNode(app);
+    if(node) {
+      const auto nodeId=node->id;handleKey(app,SDLK_AC_BACK,probeRunning);handleKey(app,SDLK_AC_BACK,probeRunning);
+      okay=okay&&app.screen==Screen::Match&&app.activeCampaignId==nodeId&&
+        app.game.players[1].leader.referenceIndex==node->deck.leaderReferenceIndex;
+    } else okay=false;
+    app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return okay&&saved?0:17;
   }
   if(argc>3&&std::string(argv[1])=="--medic-smoke-test") {
     app.screen=Screen::Match;app.language=Language::Polish;app.game=gwent::Game{};
@@ -3877,7 +4049,8 @@ int main(int argc,char** argv) {
     }
     presentFrame();
     for(auto& image:app.textures)if(image.second)SDL_DestroyTexture(image.second);
-    app.audio.shutdown();destroyRenderers(); SDL_DestroyWindow(window); SDL_Quit(); return 0;
+    recordCampaignOutcome(app);
+  app.audio.shutdown();destroyRenderers(); SDL_DestroyWindow(window); SDL_Quit(); return 0;
   }
   app.mainMenuEnabled=true;app.screen=Screen::MainMenu;app.status.clear();
   auto observedPhase=app.game.phase;
@@ -3886,6 +4059,7 @@ int main(int argc,char** argv) {
   std::array<bool,2> observedPassed{{app.game.players[0].passed,app.game.players[1].passed}};
   std::array<int,2> observedRoundWins{{app.game.players[0].roundWins,app.game.players[1].roundWins}};
   while(running) {
+    recordCampaignOutcome(app);
     SDL_Event event;
     while(SDL_PollEvent(&event)) {
       if(event.type==SDL_QUIT)running=false;
@@ -3916,7 +4090,7 @@ int main(int argc,char** argv) {
           else if(app.screen==Screen::Match&&app.game.phase==gwent::Phase::Mulligan)handleMatchKey(app,SDLK_RETURN);
           else if(app.screen==Screen::Match&&app.game.phase==gwent::Phase::RoundSetup)handleMatchKey(app,SDLK_x);
           else if(app.screen==Screen::Match&&app.game.phase==gwent::Phase::RoundResult)handleMatchKey(app,SDLK_RETURN);
-          else if(app.screen==Screen::Match&&app.game.phase==gwent::Phase::MatchResult)app.screen=Screen::DeckBuilder;
+          else if(app.screen==Screen::Match&&app.game.phase==gwent::Phase::MatchResult)leaveCampaignMatch(app);
           else if(app.screen==Screen::DeckBuilder)handleKey(app,SDLK_s,running);
           else handleKey(app,SDLK_ESCAPE,running);
         }
@@ -3980,10 +4154,12 @@ int main(int argc,char** argv) {
     app.audio.playMusic(app.screen==Screen::Match?"match":"menu");
     SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);
     if(app.screen==Screen::MainMenu)drawMainMenu(renderer,app);
+    else if(app.screen==Screen::Campaign)drawCampaign(renderer,app);
     else if(app.screen==Screen::DeckBuilder)drawDeckBuilder(renderer,app);
     else drawMatchOnScreen(renderer,app);
     presentFrame(); SDL_Delay(8);
   }
   for(auto& image:app.textures)if(image.second)SDL_DestroyTexture(image.second);
+  recordCampaignOutcome(app);
   app.audio.shutdown();destroyRenderers(); SDL_DestroyWindow(window); SDL_Quit(); return 0;
 }
