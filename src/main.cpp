@@ -2299,8 +2299,8 @@ void drawDeckBuilder(SDL_Renderer* r,const App& a) {
     box(r,trackX+2,thumbY+2,3,thumbHeight-4,Color{85,85,85,170});
   };
   drawArray(bankCards,53,0);drawArray(deckCards,374,1);
-  narrowText(r,54,340,pl?"D-PAD: KARTY  B: DODAJ  A: WROC  L: LIDER":"D-PAD: CARDS  B: ADD  A: BACK  L: LEADER",Color{195,172,129},3);
-  narrowText(r,374,340,pl?"D-PAD: KARTY  B: USUN  A: KOLEKCJA":"D-PAD: CARDS  B: REMOVE  A: COLLECTION",Color{195,172,129},3);
+  text(r,54,340,pl?"D-PAD: KARTY  B: DODAJ  A: WROC  L: LIDER":"D-PAD: CARDS  B: ADD  A: BACK  L: LEADER",Color{195,172,129},1);
+  text(r,374,340,pl?"D-PAD: KARTY  B: USUN  A: KOLEKCJA":"D-PAD: CARDS  B: REMOVE  A: COLLECTION",Color{195,172,129},1);
 
   auto leaders=editorLeaders(a);
   int leaderIndex=0;
@@ -2495,7 +2495,7 @@ void drawMatch(SDL_Renderer* r,const App& a) {
       (a.language==Language::Polish?
         "KRZYZAK: PLANSZA  B: WYBIERZ/PODGLAD  X PRZYTRZ.: PAS":
         "DPAD: BOARD  B: SELECT/INSPECT  HOLD X: PASS");
-    narrowText(r,184,337,controls,paper,3);
+    text(r,184,337,controls,paper,1);
   }
   if(me.passed)text(r,110,282,tr(a,"passed"),paper,1);
   if(op.passed)text(r,110,80,tr(a,"passed"),paper,1);
@@ -2593,9 +2593,9 @@ void drawMatch(SDL_Renderer* r,const App& a) {
     }
   }
   if(a.game.phase==gwent::Phase::Mulligan&&!a.game.scoiataelChoicePending) {
-    box(r,8,328,410,43,Color{7,6,5,238});frame(r,8,328,410,43,Color{143,108,54});
-    centeredTextInBox(r,16,333,394,13,tr(a,"mulligan_controls"),paper,1);
-    centeredTextInBox(r,16,351,394,13,tr(a,"mulligan_details"),Color{214,190,150},1);
+    box(r,8,328,410,32,Color{7,6,5,238});frame(r,8,328,410,32,Color{143,108,54});
+    centeredTextInBox(r,16,330,394,12,tr(a,"mulligan_controls"),paper,1);
+    centeredTextInBox(r,16,345,394,12,tr(a,"mulligan_details"),Color{214,190,150},1);
   }
   if(a.leaderSelectionMode) {
     const auto cards=leaderChoiceCards(a);
