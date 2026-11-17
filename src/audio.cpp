@@ -22,6 +22,10 @@ bool AudioSystem::initialize(const std::filesystem::path& assetDirectory) {
   requested.userdata=this;
   device_=SDL_OpenAudioDevice(nullptr,0,&requested,&output_,0);
   if(!device_)return false;
+  musicStop_.store(false);
+  musicStats_={};musicStats_.capacityBytes=musicCapacity_;
+  musicThread_=SDL_CreateThread(&AudioSystem::musicWorker,"gwent-music",this);
+  if(!musicThread_) { SDL_CloseAudioDevice(device_);device_=0;return false; }
   SDL_PauseAudioDevice(device_,0);
   return true;
 }
@@ -66,54 +70,87 @@ const AudioSystem::Sample* AudioSystem::load(const std::string& key) {
   return &inserted.first->second;
 }
 
-const AudioSystem::Sample* AudioSystem::loadMusic(const std::string& key) {
-  const auto cached=musicSamples_.find(key);
-  if(cached!=musicSamples_.end())return &cached->second;
-  if(failedMusic_.find(key)!=failedMusic_.end())return nullptr;
-  const auto path=musicDirectory_/(key+".mp3");
-  struct DecoderGuard { drmp3 value{}; ~DecoderGuard(){drmp3_uninit(&value);} } guard;
-  auto& decoder=guard.value;
-  if(!drmp3_init_file(&decoder,path.string().c_str(),nullptr)||decoder.channels==0||decoder.sampleRate==0) {
-    failedMusic_.insert(key);
-    return nullptr;
+int AudioSystem::musicWorker(void* userdata) {
+  try { return static_cast<AudioSystem*>(userdata)->runMusicWorker(); }
+  catch(...) {
+    auto& self=*static_cast<AudioSystem*>(userdata);
+    SDL_LockAudioDevice(self.device_);++self.musicStats_.failures;SDL_UnlockAudioDevice(self.device_);
+    return -1;
   }
-  SDL_AudioCVT converter{};
-  const int conversion=SDL_BuildAudioCVT(&converter,AUDIO_S16SYS,static_cast<Uint8>(decoder.channels),static_cast<int>(decoder.sampleRate),
-                                         output_.format,output_.channels,output_.freq);
-  if(conversion<0) { failedMusic_.insert(key);return nullptr; }
-  Sample sample;
-  // Music tracks can be several minutes long. Decoding the entire compressed
-  // file and then asking SDL to expand it in one allocation briefly required
-  // hundreds of megabytes on the Miyoo and terminated the port with
-  // std::bad_alloc. Decode and convert bounded chunks instead.
-  constexpr drmp3_uint64 chunkFrames=4096;
-  const auto samplesPerChunk=static_cast<std::size_t>(chunkFrames)*decoder.channels;
-  std::vector<drmp3_int16> decoded(samplesPerChunk);
-  const auto inputCapacity=samplesPerChunk*sizeof(drmp3_int16);
-  if(inputCapacity>static_cast<std::size_t>(std::numeric_limits<int>::max())||
-     inputCapacity>std::numeric_limits<std::size_t>::max()/static_cast<std::size_t>(std::max(1,converter.len_mult))) {
-    failedMusic_.insert(key);return nullptr;
-  }
-  std::vector<Uint8> converted(inputCapacity*static_cast<std::size_t>(std::max(1,converter.len_mult)));
-  for(;;) {
-    const auto framesRead=drmp3_read_pcm_frames_s16(&decoder,chunkFrames,decoded.data());
-    if(framesRead==0)break;
-    const auto inputBytes=static_cast<std::size_t>(framesRead)*decoder.channels*sizeof(drmp3_int16);
-    if(conversion==0) {
-      const auto* bytes=reinterpret_cast<const Uint8*>(decoded.data());
-      sample.pcm.insert(sample.pcm.end(),bytes,bytes+inputBytes);
-    } else {
-      std::memcpy(converted.data(),decoded.data(),inputBytes);
-      converter.buf=converted.data();converter.len=static_cast<int>(inputBytes);
-      if(SDL_ConvertAudio(&converter)!=0||converter.len_cvt<0) {
-        failedMusic_.insert(key);return nullptr;
+}
+
+int AudioSystem::runMusicWorker() {
+  struct Resources {
+    drmp3 decoder{};bool opened{false};SDL_AudioStream* converter{nullptr};
+    void clear() { if(converter)SDL_FreeAudioStream(converter);converter=nullptr;
+      if(opened)drmp3_uninit(&decoder);opened=false; }
+    ~Resources(){clear();}
+  } resource;
+  std::array<drmp3_int16,2048> decoded{};
+  std::array<Uint8,8192> converted{};
+  std::uint64_t generation=~std::uint64_t{0};
+  bool failed=false, hadFrames=false;
+  while(!musicStop_.load()) {
+    SDL_LockAudioDevice(device_);
+    const auto requestedGeneration=musicGeneration_;
+    const bool active=musicEnabled_&&!musicKey_.empty();
+    std::string key;
+    try { if(requestedGeneration!=generation)key=musicKey_; }
+    catch(...) { SDL_UnlockAudioDevice(device_);throw; }
+    const auto freeBytes=musicCapacity_-musicSize_;
+    SDL_UnlockAudioDevice(device_);
+    if(requestedGeneration!=generation) {
+      resource.clear();generation=requestedGeneration;failed=false;hadFrames=false;
+      if(active) {
+        const auto path=musicDirectory_/(key+".mp3");
+        resource.opened=drmp3_init_file(&resource.decoder,path.string().c_str(),nullptr)!=0;
+        if(resource.opened&&resource.decoder.channels>=1&&resource.decoder.channels<=2&&
+           resource.decoder.sampleRate>=8000&&resource.decoder.sampleRate<=192000)
+          resource.converter=SDL_NewAudioStream(AUDIO_S16SYS,static_cast<Uint8>(resource.decoder.channels),
+            static_cast<int>(resource.decoder.sampleRate),output_.format,output_.channels,output_.freq);
+        if(!resource.converter)failed=true;
+        if(failed) { SDL_LockAudioDevice(device_);++musicStats_.failures;SDL_UnlockAudioDevice(device_); }
       }
-      sample.pcm.insert(sample.pcm.end(),converted.begin(),converted.begin()+converter.len_cvt);
     }
+    if(!active||failed||!resource.converter||freeBytes<converted.size()) { SDL_Delay(2);continue; }
+    int available=SDL_AudioStreamAvailable(resource.converter);
+    if(available<0) {
+      failed=true;SDL_LockAudioDevice(device_);++musicStats_.failures;SDL_UnlockAudioDevice(device_);
+      continue;
+    }
+    if(available==0) {
+      const auto frames=drmp3_read_pcm_frames_s16(&resource.decoder,1024,decoded.data());
+      if(!frames) {
+        if(!hadFrames||!drmp3_seek_to_pcm_frame(&resource.decoder,0))failed=true;
+        else { SDL_LockAudioDevice(device_);++musicStats_.loops;SDL_UnlockAudioDevice(device_);hadFrames=false; }
+      } else {
+        hadFrames=true;
+        if(SDL_AudioStreamPut(resource.converter,decoded.data(),static_cast<int>(frames*resource.decoder.channels*2))<0)failed=true;
+      }
+      if(failed) { SDL_LockAudioDevice(device_);++musicStats_.failures;SDL_UnlockAudioDevice(device_); }
+      continue;
+    }
+    const int bytes=SDL_AudioStreamGet(resource.converter,converted.data(),static_cast<int>(converted.size()));
+    if(bytes<0) { failed=true;SDL_LockAudioDevice(device_);++musicStats_.failures;SDL_UnlockAudioDevice(device_);continue; }
+    SDL_LockAudioDevice(device_);
+    if(generation==musicGeneration_&&musicEnabled_) {
+      const auto count=static_cast<std::size_t>(bytes);
+      const auto write=(musicRead_+musicSize_)%musicCapacity_;
+      const auto first=std::min(count,musicCapacity_-write);
+      std::memcpy(musicPcm_.data()+write,converted.data(),first);
+      std::memcpy(musicPcm_.data(),converted.data()+first,count-first);
+      musicSize_+=count;musicStats_.decodedBytes+=count;
+      musicStats_.peakBufferedBytes=std::max(musicStats_.peakBufferedBytes,musicSize_);
+    }
+    SDL_UnlockAudioDevice(device_);
   }
-  if(sample.pcm.empty()) { failedMusic_.insert(key);return nullptr; }
-  const auto inserted=musicSamples_.emplace(key,std::move(sample));
-  return &inserted.first->second;
+  return 0;
+}
+
+AudioSystem::MusicStreamStats AudioSystem::musicStreamStats() {
+  if(!device_)return musicStats_;
+  SDL_LockAudioDevice(device_);auto result=musicStats_;result.bufferedBytes=musicSize_;SDL_UnlockAudioDevice(device_);
+  return result;
 }
 
 bool AudioSystem::validateAllSfx(std::vector<std::string>& failures) {
@@ -134,8 +171,14 @@ bool AudioSystem::validateAllSfx(std::vector<std::string>& failures) {
 bool AudioSystem::validateBackgroundMusic(std::vector<std::string>& failures) {
   failures.clear();
   for(const auto* key:{"menu","match"}) {
-    const auto* sample=loadMusic(key);
-    if(!sample||sample->pcm.empty())failures.emplace_back(key);
+    drmp3 decoder{};
+    const auto path=musicDirectory_/(std::string(key)+".mp3");
+    if(!drmp3_init_file(&decoder,path.string().c_str(),nullptr)) { failures.emplace_back(key);continue; }
+    bool valid=decoder.channels>=1&&decoder.channels<=2&&decoder.sampleRate>=8000&&decoder.sampleRate<=192000;
+    std::array<drmp3_int16,2048> buffer{};std::uint64_t frames=0;
+    if(valid)while(const auto read=drmp3_read_pcm_frames_s16(&decoder,1024,buffer.data()))frames+=read;
+    drmp3_uninit(&decoder);
+    if(!valid||!frames)failures.emplace_back(key);
   }
   return failures.empty();
 }
@@ -158,17 +201,8 @@ void AudioSystem::play(const std::string& key) {
 
 void AudioSystem::playMusic(const std::string& key) {
   if(!device_||!musicEnabled_||key==musicKey_)return;
-  const Sample* sample=nullptr;
-  try { sample=loadMusic(key); }
-  catch(const std::bad_alloc&) {
-    // Keep the game responsive if an unusually long user track still cannot
-    // fit in available memory after chunked decoding.
-    musicKey_=key;
-    return;
-  }
-  if(!sample||sample->pcm.empty())return;
   SDL_LockAudioDevice(device_);
-  musicVoice_={sample,0,true};musicKey_=key;
+  musicKey_=key;++musicGeneration_;musicRead_=0;musicSize_=0;
   SDL_UnlockAudioDevice(device_);
 }
 
@@ -184,8 +218,7 @@ void AudioSystem::setMusicEnabled(bool enabled) {
   if(!device_) { musicEnabled_=enabled;return; }
   SDL_LockAudioDevice(device_);
   musicEnabled_=enabled;
-  if(!musicEnabled_)musicVoice_={};
-  musicKey_.clear();
+  musicKey_.clear();++musicGeneration_;musicRead_=0;musicSize_=0;
   SDL_UnlockAudioDevice(device_);
 }
 
@@ -209,12 +242,21 @@ void AudioSystem::callback(void* userdata,Uint8* stream,int length) {
       voice.offset+=bytes;written+=bytes;
     }
   };
-  if(self.musicEnabled_)mixVoice(self.musicVoice_,SDL_MIX_MAXVOLUME/2);
+  if(self.musicEnabled_&&!self.musicKey_.empty()) {
+    const auto count=std::min(static_cast<std::size_t>(length)&~std::size_t{1},self.musicSize_);
+    const auto first=std::min(count,musicCapacity_-self.musicRead_);
+    if(first)SDL_MixAudioFormat(stream,self.musicPcm_.data()+self.musicRead_,self.output_.format,static_cast<Uint32>(first),SDL_MIX_MAXVOLUME/2);
+    if(count>first)SDL_MixAudioFormat(stream+first,self.musicPcm_.data(),self.output_.format,static_cast<Uint32>(count-first),SDL_MIX_MAXVOLUME/2);
+    self.musicRead_=(self.musicRead_+count)%musicCapacity_;self.musicSize_-=count;
+    if(count<static_cast<std::size_t>(length))++self.musicStats_.underruns;
+  }
   if(self.enabled_)for(auto& voice:self.voices_)mixVoice(voice,SDL_MIX_MAXVOLUME/3);
 }
 
 void AudioSystem::shutdown() {
+  musicStop_.store(true);
+  if(musicThread_) { SDL_WaitThread(musicThread_,nullptr);musicThread_=nullptr; }
   if(device_) { SDL_CloseAudioDevice(device_);device_=0; }
-  voices_={};musicVoice_={};musicKey_.clear();samples_.clear();musicSamples_.clear();failed_.clear();failedMusic_.clear();
+  voices_={};musicKey_.clear();samples_.clear();failed_.clear();musicRead_=0;musicSize_=0;
 }
 }
