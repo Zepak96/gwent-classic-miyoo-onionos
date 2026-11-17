@@ -2988,8 +2988,8 @@ SDL_Keycode controllerKey(const SDL_ControllerButtonEvent& button,const App& app
 SDL_Keycode normalizeMiyooKey(const App& app,SDL_Keycode key) {
   if(!app.miyooControls)return key;
   switch(key) {
-    case SDLK_LCTRL:return SDLK_x;       // A
-    case SDLK_LALT:return SDLK_AC_BACK; // B confirms or opens a card action; modal state defines its meaning.
+    case SDLK_LALT:return SDLK_x;       // A
+    case SDLK_LCTRL:return SDLK_AC_BACK; // B confirms or opens a card action; modal state defines its meaning.
     case SDLK_LSHIFT:return SDLK_i; // X
     case SDLK_SPACE:
       if(app.screen==Screen::Match||app.screen==Screen::Campaign)return SDLK_l; // Y = leader / campaign deck
@@ -3175,7 +3175,7 @@ int main(int argc,char** argv) {
       okay=okay&&chainProbe.game.pendingMedicAgileId==revived.id;
       handleMatchKey(chainProbe,SDLK_DOWN);
       okay=okay&&chainProbe.rowIndex==1;
-      handleMatchKey(chainProbe,normalizeMiyooKey(chainProbe,SDLK_LALT));
+      handleMatchKey(chainProbe,normalizeMiyooKey(chainProbe,SDLK_LCTRL));
       okay=okay&&chainProbe.game.pendingMedicPlayer==-1&&chainProbe.game.players[0].board[1].size()==1&&
         chainProbe.game.players[0].board[1][0].id==revived.id;
     }
@@ -3193,7 +3193,7 @@ int main(int argc,char** argv) {
       const bool started=gwent::startNextRound(setupProbe.game);
       okay=okay&&started&&setupProbe.game.phase==gwent::Phase::RoundSetup&&setupProbe.game.pendingMedicPlayer==0;
       handleMatchKey(setupProbe,SDLK_AC_BACK);handleMatchKey(setupProbe,SDLK_DOWN);
-      handleMatchKey(setupProbe,normalizeMiyooKey(setupProbe,SDLK_LALT));
+      handleMatchKey(setupProbe,normalizeMiyooKey(setupProbe,SDLK_LCTRL));
       okay=okay&&setupProbe.game.pendingMedicPlayer==-1&&setupProbe.game.players[0].board[1].size()==1&&
         setupProbe.game.phase==gwent::Phase::OpponentTurn&&setupProbe.game.currentPlayer==1;
     }
@@ -3214,9 +3214,9 @@ int main(int argc,char** argv) {
       okay=okay&&focusProbe.matchFocusOwner==1&&matchPreviewCard(focusProbe)&&matchPreviewCard(focusProbe)->id=="focus-op-melee";
       const auto publicNodes=matchFocusNodes(focusProbe);
       okay=okay&&std::none_of(publicNodes.begin(),publicNodes.end(),[](const MatchFocusNode& n){return n.card&&n.card->id=="focus-hidden-op-hand";});
-      handleKey(focusProbe,normalizeMiyooKey(focusProbe,SDLK_LALT),focusRunning);
+      handleKey(focusProbe,normalizeMiyooKey(focusProbe,SDLK_LCTRL),focusRunning);
       okay=okay&&focusProbe.cardDetailsOpen&&focusProbe.game.players[0].hand.size()==2;
-      handleKey(focusProbe,normalizeMiyooKey(focusProbe,SDLK_LALT),focusRunning);
+      handleKey(focusProbe,normalizeMiyooKey(focusProbe,SDLK_LCTRL),focusRunning);
       okay=okay&&!focusProbe.cardDetailsOpen;
       focusProbe.matchFocusKind=App::MatchFocusKind::Pass;focusProbe.matchFocusOwner=0;focusProbe.matchFocusRow=0;focusProbe.matchFocusCardId.clear();
       handleMatchKey(focusProbe,SDLK_AC_BACK);
@@ -3256,8 +3256,8 @@ int main(int argc,char** argv) {
     app.miyooControls=true;
     app.screen=Screen::Match;
     okay=okay&&startsInDeckMaker&&
-              normalizeMiyooKey(app,SDLK_LCTRL)==SDLK_x&&
-              normalizeMiyooKey(app,SDLK_LALT)==SDLK_AC_BACK&&
+              normalizeMiyooKey(app,SDLK_LALT)==SDLK_x&&
+              normalizeMiyooKey(app,SDLK_LCTRL)==SDLK_AC_BACK&&
               normalizeMiyooKey(app,SDLK_LSHIFT)==SDLK_i&&
               normalizeMiyooKey(app,SDLK_SPACE)==SDLK_l&&
               normalizeMiyooKey(app,SDLK_TAB)==SDLK_UP&&
@@ -3267,8 +3267,8 @@ int main(int argc,char** argv) {
               sourceEaseIn(0.0)<0.001&&sourceEaseIn(1.0)>0.999&&
               sourceEase(0.0)<0.001&&sourceEase(0.5)>0.75&&sourceEase(0.5)<0.85&&sourceEase(1.0)>0.999;
     App deckKeyProbe;deckKeyProbe.miyooControls=true;deckKeyProbe.screen=Screen::DeckBuilder;
-    okay=okay&&normalizeMiyooKey(deckKeyProbe,SDLK_LCTRL)==SDLK_x&&
-         normalizeMiyooKey(deckKeyProbe,SDLK_LALT)==SDLK_AC_BACK&&
+    okay=okay&&normalizeMiyooKey(deckKeyProbe,SDLK_LALT)==SDLK_x&&
+         normalizeMiyooKey(deckKeyProbe,SDLK_LCTRL)==SDLK_AC_BACK&&
          normalizeMiyooKey(deckKeyProbe,SDLK_LSHIFT)==SDLK_i&&
          normalizeMiyooKey(deckKeyProbe,SDLK_SPACE)==SDLK_f&&
          normalizeMiyooKey(deckKeyProbe,SDLK_TAB)==SDLK_TAB&&
@@ -3278,9 +3278,9 @@ int main(int argc,char** argv) {
          normalizeMiyooKey(deckKeyProbe,SDLK_RETURN)==SDLK_RETURN&&
          normalizeMiyooKey(deckKeyProbe,SDLK_ESCAPE)==SDLK_s;
     deckKeyProbe.editorPane=1;
-    okay=okay&&normalizeMiyooKey(deckKeyProbe,SDLK_LALT)==SDLK_AC_BACK;
+    okay=okay&&normalizeMiyooKey(deckKeyProbe,SDLK_LCTRL)==SDLK_AC_BACK;
     deckKeyProbe.cardDetailsOpen=true;
-    okay=okay&&normalizeMiyooKey(deckKeyProbe,SDLK_LALT)==SDLK_AC_BACK&&
+    okay=okay&&normalizeMiyooKey(deckKeyProbe,SDLK_LCTRL)==SDLK_AC_BACK&&
          normalizeMiyooKey(deckKeyProbe,SDLK_ESCAPE)==SDLK_ESCAPE;
     App scoiataelProbe;scoiataelProbe.miyooControls=true;
     scoiataelProbe.game.phase=gwent::Phase::Mulligan;
@@ -3326,10 +3326,10 @@ int main(int argc,char** argv) {
     bTestCard.id="button-b-must-not-play";bTestCard.kind=gwent::Kind::Unit;bTestCard.row=gwent::Row::Melee;
     buttonBProbe.game.players[0].hand.push_back(bTestCard);
     buttonBProbe.game.players[1].hand.push_back(inputTestUnit("button-b-opponent-action"));
-    handleMatchKey(buttonBProbe,normalizeMiyooKey(buttonBProbe,SDLK_LALT));
+    handleMatchKey(buttonBProbe,normalizeMiyooKey(buttonBProbe,SDLK_LCTRL));
     okay=okay&&buttonBProbe.cardPlayConfirmOpen&&buttonBProbe.game.players[0].hand.size()==1&&
          buttonBProbe.game.players[0].board[0].empty();
-    handleMatchKey(buttonBProbe,normalizeMiyooKey(buttonBProbe,SDLK_LALT));
+    handleMatchKey(buttonBProbe,normalizeMiyooKey(buttonBProbe,SDLK_LCTRL));
     okay=okay&&!buttonBProbe.cardPlayConfirmOpen&&buttonBProbe.game.players[0].hand.empty()&&
          buttonBProbe.game.players[0].board[0].size()==1&&buttonBProbe.game.players[0].board[0][0].id==bTestCard.id;
     App rowConfirmProbe;rowConfirmProbe.miyooControls=true;rowConfirmProbe.screen=Screen::Match;
@@ -3337,10 +3337,10 @@ int main(int argc,char** argv) {
     rowConfirmProbe.game.players[1].hand.push_back(inputTestUnit("row-confirm-opponent"));
     gwent::Card hornConfirm;hornConfirm.id="row-confirm-horn";hornConfirm.kind=gwent::Kind::CommanderHorn;
     rowConfirmProbe.game.players[0].hand={hornConfirm};
-    handleMatchKey(rowConfirmProbe,normalizeMiyooKey(rowConfirmProbe,SDLK_LALT));
+    handleMatchKey(rowConfirmProbe,normalizeMiyooKey(rowConfirmProbe,SDLK_LCTRL));
     handleMatchKey(rowConfirmProbe,SDLK_DOWN);
     okay=okay&&rowConfirmProbe.cardPlayConfirmOpen&&rowConfirmProbe.rowIndex==1;
-    handleMatchKey(rowConfirmProbe,normalizeMiyooKey(rowConfirmProbe,SDLK_LALT));
+    handleMatchKey(rowConfirmProbe,normalizeMiyooKey(rowConfirmProbe,SDLK_LCTRL));
     okay=okay&&rowConfirmProbe.game.horn[0][1]&&!rowConfirmProbe.game.horn[0][0];
     App leaderConfirmProbe;leaderConfirmProbe.miyooControls=true;leaderConfirmProbe.screen=Screen::Match;
     leaderConfirmProbe.game.phase=gwent::Phase::PlayerTurn;leaderConfirmProbe.game.currentPlayer=0;
@@ -3354,7 +3354,7 @@ int main(int argc,char** argv) {
     handleMatchKey(leaderConfirmProbe,SDLK_x);
     okay=okay&&!leaderConfirmProbe.leaderConfirmOpen&&leaderConfirmProbe.game.players[0].leaderAbilityAvailable;
     beginLeaderChoice(leaderConfirmProbe);
-    handleMatchKey(leaderConfirmProbe,normalizeMiyooKey(leaderConfirmProbe,SDLK_LALT));
+    handleMatchKey(leaderConfirmProbe,normalizeMiyooKey(leaderConfirmProbe,SDLK_LCTRL));
     okay=okay&&!leaderConfirmProbe.leaderConfirmOpen&&!leaderConfirmProbe.game.players[0].leaderAbilityAvailable;
     App xHoldProbe;xHoldProbe.miyooControls=true;xHoldProbe.screen=Screen::Match;
     xHoldProbe.game.phase=gwent::Phase::PlayerTurn;bool xProbeRunning=true;
@@ -3385,12 +3385,12 @@ int main(int argc,char** argv) {
         okay=okay&&deckKeyProbe.editorCardIndex==4;
         const auto* selected=bankAvailable[4];
         const int copiesBefore=deckCopies(deckKeyProbe.editDeck,selected->referenceIndex);
-        handleKey(deckKeyProbe,normalizeMiyooKey(deckKeyProbe,SDLK_LCTRL),navRunning);
+        handleKey(deckKeyProbe,normalizeMiyooKey(deckKeyProbe,SDLK_LALT),navRunning);
         okay=okay&&deckCopies(deckKeyProbe.editDeck,selected->referenceIndex)==copiesBefore+1;
         deckKeyProbe.editorCardIndex=2;
         handleKey(deckKeyProbe,SDLK_RIGHT,navRunning);
         okay=okay&&deckKeyProbe.editorPane==1&&deckKeyProbe.editorCardIndex==0;
-        handleKey(deckKeyProbe,normalizeMiyooKey(deckKeyProbe,SDLK_LALT),navRunning);
+        handleKey(deckKeyProbe,normalizeMiyooKey(deckKeyProbe,SDLK_LCTRL),navRunning);
         okay=okay&&deckKeyProbe.editorPane==0;
       } else okay=false;
       const auto leadersForInput=editorLeaders(deckKeyProbe);
@@ -3399,11 +3399,11 @@ int main(int argc,char** argv) {
         handleKey(deckKeyProbe,SDLK_TAB,navRunning);
         handleKey(deckKeyProbe,SDLK_RIGHT,navRunning);
         okay=okay&&deckKeyProbe.editingLeader&&deckKeyProbe.editDeck.leaderReferenceIndex!=original;
-        handleKey(deckKeyProbe,normalizeMiyooKey(deckKeyProbe,SDLK_LALT),navRunning);
+        handleKey(deckKeyProbe,normalizeMiyooKey(deckKeyProbe,SDLK_LCTRL),navRunning);
         okay=okay&&!deckKeyProbe.editingLeader&&deckKeyProbe.editDeck.leaderReferenceIndex==original;
         handleKey(deckKeyProbe,SDLK_TAB,navRunning);
         handleKey(deckKeyProbe,SDLK_RIGHT,navRunning);
-        handleKey(deckKeyProbe,normalizeMiyooKey(deckKeyProbe,SDLK_LCTRL),navRunning);
+        handleKey(deckKeyProbe,normalizeMiyooKey(deckKeyProbe,SDLK_LALT),navRunning);
         okay=okay&&!deckKeyProbe.editingLeader&&deckKeyProbe.userDeckSelected&&
              deckKeyProbe.editDeck.leaderReferenceIndex!=original;
       } else okay=false;
@@ -3624,7 +3624,7 @@ int main(int argc,char** argv) {
     gwent::Card replacement;replacement.id="replacement-test";replacement.kind=gwent::Kind::Unit;
     app.game.players[0].hand={mulliganCard};app.game.players[0].deck={replacement};
     app.mulligan.clear();
-    handleMatchKey(app,normalizeMiyooKey(app,SDLK_LCTRL));
+    handleMatchKey(app,normalizeMiyooKey(app,SDLK_LALT));
     okay=okay&&app.mulligan.size()==1;
     handleMatchKey(app,normalizeMiyooKey(app,SDLK_SPACE));
     okay=okay&&app.game.phase==gwent::Phase::PlayerTurn&&app.game.players[0].mulliganDone&&app.mulligan.empty();
@@ -3636,7 +3636,7 @@ int main(int argc,char** argv) {
     okay=okay&&app.game.phase==gwent::Phase::PlayerTurn&&app.game.players[0].mulliganDone&&app.mulligan.empty();
     handleMatchKey(app,SDLK_BACKQUOTE);
     okay=okay&&app.passConfirmationOpen&&!app.game.players[0].passed;
-    handleMatchKey(app,normalizeMiyooKey(app,SDLK_LALT));
+    handleMatchKey(app,normalizeMiyooKey(app,SDLK_LCTRL));
     okay=okay&&!app.passConfirmationOpen&&app.game.players[0].passed;
     app.game=gwent::Game{};app.screen=Screen::Match;app.miyooControls=true;
     app.game.phase=gwent::Phase::PlayerTurn;app.game.currentPlayer=0;
@@ -3686,9 +3686,9 @@ int main(int argc,char** argv) {
     okay=okay&&!app.leaderConfirmOpen&&app.game.players[0].leaderAbilityAvailable&&
          !app.leaderSelectionMode&&app.leaderSelections.empty();
     beginLeaderChoice(app);
-    handleMatchKey(app,normalizeMiyooKey(app,SDLK_LALT));
+    handleMatchKey(app,normalizeMiyooKey(app,SDLK_LCTRL));
     okay=okay&&app.leaderSelectionMode;
-    handleMatchKey(app,normalizeMiyooKey(app,SDLK_LALT));handleMatchKey(app,normalizeMiyooKey(app,SDLK_LALT));
+    handleMatchKey(app,normalizeMiyooKey(app,SDLK_LCTRL));handleMatchKey(app,normalizeMiyooKey(app,SDLK_LCTRL));
     okay=okay&&app.leaderSelectionMode&&leaderChoiceCards(app).size()==1&&app.leaderSelections.size()==2;
     handleMatchKey(app,SDLK_ESCAPE); // source deck carousel may be cancelled after discarding.
     okay=okay&&!app.leaderSelectionMode&&!app.game.players[0].leaderAbilityAvailable&&
@@ -3699,8 +3699,8 @@ int main(int argc,char** argv) {
     app.game.players[0].leaderAbilityAvailable=true;app.game.players[0].deck={gwent::Card{}};
     app.game.players[0].deck[0].id="destroyer-ui-draw-only";app.game.players[0].deck[0].kind=gwent::Kind::Unit;
     app.game.players[0].deck[0].row=gwent::Row::Melee;app.leaderSelections.clear();app.leaderSelectionMode=false;
-    beginLeaderChoice(app);handleMatchKey(app,normalizeMiyooKey(app,SDLK_LALT));
-    handleMatchKey(app,normalizeMiyooKey(app,SDLK_LALT));
+    beginLeaderChoice(app);handleMatchKey(app,normalizeMiyooKey(app,SDLK_LCTRL));
+    handleMatchKey(app,normalizeMiyooKey(app,SDLK_LCTRL));
     okay=okay&&!app.leaderSelectionMode&&!app.game.players[0].leaderAbilityAvailable&&
          app.game.players[0].hand.size()==1&&app.game.players[0].graveyard.empty();
     if(okay)std::cout<<"Miyoo controls, source-timed action lock/preview/flight/audio/ability effects, mulligan, guarded pass and Agile Medic row selection passed.\n";
@@ -3782,18 +3782,18 @@ int main(int argc,char** argv) {
     bool testRunning=true;
     handleKey(app,SDLK_RIGHT,testRunning);
     const bool moved=app.menuIndex==1;
-    handleKey(app,normalizeMiyooKey(app,SDLK_LALT),testRunning);
+    handleKey(app,normalizeMiyooKey(app,SDLK_LCTRL),testRunning);
     const bool opened=app.screen==Screen::DeckBuilder;
     app.screen=Screen::MainMenu;
-    handleKey(app,normalizeMiyooKey(app,SDLK_LCTRL),testRunning);
+    handleKey(app,normalizeMiyooKey(app,SDLK_LALT),testRunning);
     const bool openedWithA=app.screen==Screen::DeckBuilder&&testRunning;
     app.editorPane=1;
-    handleKey(app,normalizeMiyooKey(app,SDLK_LALT),testRunning);
+    handleKey(app,normalizeMiyooKey(app,SDLK_LCTRL),testRunning);
     const bool returnedToCollection=app.screen==Screen::DeckBuilder&&app.editorPane==0;
-    handleKey(app,normalizeMiyooKey(app,SDLK_LALT),testRunning);
+    handleKey(app,normalizeMiyooKey(app,SDLK_LCTRL),testRunning);
     const bool returned=app.screen==Screen::MainMenu&&testRunning;
     app.menuIndex=2;app.savePath.clear();
-    handleKey(app,normalizeMiyooKey(app,SDLK_LALT),testRunning);
+    handleKey(app,normalizeMiyooKey(app,SDLK_LCTRL),testRunning);
     const bool absentSaveHandled=app.screen==Screen::MainMenu&&app.status==tr(app,"no_save")&&testRunning;
     app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();
     return saved&&moved&&opened&&openedWithA&&returnedToCollection&&returned&&absentSaveHandled?0:13;

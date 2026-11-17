@@ -20,8 +20,8 @@ nie zastępuje odczytu `event0` na konkretnej wersji firmware.
 | Miyoo | Zdarzenie SDL Mini | Akcja w grze |
 |---|---|---|
 | D-pad | strzałki | W edytorze porusza się po siatce kart; przejście przez krawędź łączy kolekcję z talią. W meczu wybiera kartę; w podglądzie zagrania góra/dół zmienia rząd, jeśli karta pozwala go wybrać |
-| A | Left Ctrl | Anuluje podgląd zagrania, wyboru celu lub zdolności przywódcy; podczas mulliganu zaznacza kartę |
-| B | Left Alt | W meczu otwiera wybór karty, a następne B zagrywa ją do podświetlonego rzędu. Potwierdza też wybrany cel, kartę przywódcy i pasowanie; w edytorze wraca z talii do kolekcji |
+| A | Left Alt | Anuluje podgląd zagrania, wyboru celu lub zdolności przywódcy; podczas mulliganu zaznacza kartę |
+| B | Left Ctrl | W meczu otwiera wybór karty, a następne B zagrywa ją do podświetlonego rzędu. Potwierdza też wybrany cel, kartę przywódcy i pasowanie; w edytorze wraca z talii do kolekcji |
 | X | Left Shift | Krótkie naciśnięcie otwiera podgląd karty; przytrzymanie przez 600 ms podczas swojej tury od razu pasuje |
 | Y | Space | Zmienia frakcję w edytorze; w meczu otwiera podgląd zdolności przywódcy, który B potwierdza, a A anuluje; zatwierdza/pomija wymianę w mulliganie |
 | L | Tab | W meczu zmienia wybrany rząd dla karty z wyborem rzędu; w edytorze otwiera wybór lidera |
@@ -53,3 +53,14 @@ Przypięty sterownik nie mapował `KEY_HOME`; projekt dodaje patch
 nim bibliotekę SDL i dołącza patch do paczki. ELF SDL jest ARM32 hard-float, a
 aplikacja zapisuje mecz i kończy działanie po `SDLK_HOME`. Fizycznego naciśnięcia
 MENU oraz zachowania OnionOS nadal trzeba potwierdzić na konsoli.
+
+## Odczyt na konsoli użytkownika — 2026-11-17
+
+Użytkownik zgłosił naciśnięcie B przy wyjściu z menu. Log urządzenia zawiera
+`raw=Left Ctrl code=1073742048 normalized=X`. Wersja zainstalowana na SD
+interpretowała ten klawisz jako anulowanie/wyjście. W mapowaniu portu B jest
+teraz Left Ctrl, A Left Alt, zgodnie z tym zgłoszeniem i odczytem. Jest to
+korekta dla testowanego urządzenia, a nie potwierdzenie wszystkich firmware.
+Menu dodatkowo akceptuje oba przyciski jako zatwierdzenie, żeby omyłkowy
+przycisk nie kończył procesu. Regresje używają odpowiednio zmienionych kodów
+SDL; rzeczywiste A/B w meczu nadal wymagają sprawdzenia na konsoli.
