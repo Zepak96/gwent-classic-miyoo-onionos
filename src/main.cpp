@@ -3808,6 +3808,10 @@ int main(int argc,char** argv) {
   if(argc>2&&std::string(argv[1])=="--campaign-smoke-test") {
     app.screen=Screen::MainMenu;app.menuIndex=0;app.mainMenuEnabled=true;app.miyooControls=true;app.language=Language::Polish;
     app.campaignProgress={};app.campaignFaction=0;app.campaignStage=0;
+    const auto campaignTestDir=std::filesystem::temp_directory_path()/("gwent-campaign-smoke-"+std::to_string(SDL_GetPerformanceCounter()));
+    std::filesystem::create_directory(campaignTestDir);
+    app.dataDirectory=campaignTestDir.string()+"/";
+    app.savePath=(campaignTestDir/"match.sav").string();
     bool probeRunning=true;handleKey(app,SDLK_LEFT,probeRunning);handleKey(app,SDLK_AC_BACK,probeRunning);
     bool okay=app.screen==Screen::Campaign&&probeRunning;
     handleKey(app,SDLK_UP,probeRunning);handleKey(app,SDLK_AC_BACK,probeRunning);
@@ -3824,7 +3828,22 @@ int main(int argc,char** argv) {
       const auto nodeId=node->id;handleKey(app,SDLK_AC_BACK,probeRunning);handleKey(app,SDLK_AC_BACK,probeRunning);
       okay=okay&&app.screen==Screen::Match&&app.activeCampaignId==nodeId&&
         app.game.players[1].leader.referenceIndex==node->deck.leaderReferenceIndex;
+      app.game.phase=gwent::Phase::MatchResult;app.game.matchWinner=1;
+      recordCampaignOutcome(app);
+      okay=okay&&std::count(app.campaignProgress.victories.begin(),app.campaignProgress.victories.end(),true)==0;
+      startMatch(app,0xCA1234,nodeId);
+      app.game.phase=gwent::Phase::MatchResult;app.game.matchWinner=0;
+      recordCampaignOutcome(app);
+      const auto wonProgress=app.campaignProgress.victories;
+      recordCampaignOutcome(app);
+      okay=okay&&app.campaignResultRecorded&&!app.campaignAchievement.empty()&&
+        app.campaignProgress.victories==wonProgress&&gwent::campaignUnlocked(app.campaignProgress,"realms-2");
+      gwent::CampaignProgress reloaded;std::string error;
+      okay=okay&&gwent::loadCampaignProgress(app.dataDirectory+"campaign-v1.gwc",reloaded,&error)&&reloaded.victories==wonProgress;
+      leaveCampaignMatch(app);okay=okay&&app.screen==Screen::Campaign;
     } else okay=false;
+    std::filesystem::remove(campaignTestDir/"campaign-v1.gwc");
+    std::filesystem::remove(campaignTestDir);
     app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();return okay&&saved?0:17;
   }
   if(argc>3&&std::string(argv[1])=="--medic-smoke-test") {
