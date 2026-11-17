@@ -15,36 +15,35 @@ Spację, Start jako Enter, Select jako Escape, L jako Tab, L2/R2 jako PageDown/
 PageUp, R jako Backspace, a przycisk MENU jako Home. To źródło społecznościowe;
 nie zastępuje odczytu `event0` na konkretnej wersji firmware.
 
-## Mapowanie portu
+## Aktualny kontrakt przycisków — 2026-11-17
 
-| Miyoo | Zdarzenie SDL Mini | Akcja w grze |
-|---|---|---|
-| D-pad | strzałki | W edytorze porusza się po siatce kart; przejście przez krawędź łączy kolekcję z talią. W meczu wybiera kartę; w podglądzie zagrania góra/dół zmienia rząd, jeśli karta pozwala go wybrać |
-| A | Left Alt | Anuluje podgląd zagrania, wyboru celu lub zdolności przywódcy; podczas mulliganu zaznacza kartę |
-| B | Left Ctrl | W meczu otwiera wybór karty, a następne B zagrywa ją do podświetlonego rzędu. Potwierdza też wybrany cel, kartę przywódcy i pasowanie; w edytorze wraca z talii do kolekcji |
-| X | Left Shift | Krótkie naciśnięcie otwiera podgląd karty; przytrzymanie przez 600 ms podczas swojej tury od razu pasuje |
-| Y | Space | Zmienia frakcję w edytorze; w meczu otwiera podgląd zdolności przywódcy, który B potwierdza, a A anuluje; zatwierdza/pomija wymianę w mulliganie |
-| L | Tab | W meczu zmienia wybrany rząd dla karty z wyborem rzędu; w edytorze otwiera wybór lidera |
-| R | Backspace | W meczu zmienia wybrany rząd dla karty z wyborem rzędu; w edytorze przesuwa kursor w dół |
-| L2 / R2 | PageDown / PageUp | L2: następny, R2: poprzedni slot talii; w meczu L2 przewija rękę o pięć kart naprzód, R2 wstecz |
-| Start | Enter | Rozpoczyna mecz z edytora; otwiera pauzę w meczu; zatwierdza/pomija mulligan |
-| Select | Escape | Zapis talii w edytorze; zamyka podgląd, jeśli jest otwarty. W meczu otwiera potwierdzenie pasowania lub zatwierdza wybór fazy |
-| MENU | `KEY_HOME` → `SDLK_HOME` przez lokalną poprawkę SDL | Zapisuje mecz (jeśli trwa) i zamyka grę, aby OnionOS odzyskał kontrolę |
+B zatwierdza wybór lub akcję, A cofa/anuluje. X i Y uruchamiają akcje
+pomocnicze opisane na ekranie. Kod SDL `SDLK_x` jest wewnętrznym aliasem A,
+nie nazwą fizycznego X; `SDLK_AC_BACK` oznacza fizyczne B.
 
-Jest jeden ekran przygotowania talii. Usunięto dodatkowy ekran `DeckSelect` z
-wcześniejszego prototypu. W edytorze `P` wczytuje następny preset, `R` wznawia
-zapisany mecz, `Z` zmienia język, a `F` zmienia frakcję. Te klawisze są dostępne
-na klawiaturze; fizyczne Y zmienia frakcję, a język jest domyślnie polski.
+| Przycisk | Kod SDL Mini | Działanie |
+| --- | --- | --- |
+| B | Left Ctrl | Menu/kampania: zatwierdź. Edytor: dodaj/usuń kartę lub zatwierdź lidera. Mecz: podgląd zagrania, następne B zagrywa do podświetlonego rzędu; wybór celu/lidera/pasu. Pauza: zatwierdź opcję. Wynik: kontynuuj. Mulligan: zaznacz/odznacz kartę. |
+| A | Left Alt | Anuluj podgląd/wybór. Edytor: z talii do kolekcji, potem do poprzedniego ekranu; podgląd lidera cofa niezapisany wybór. Pauza: wróć. Mulligan: cofnij zaznaczenie, a bez zaznaczeń otwórz pauzę. Na ręce lub wyniku rundy otwiera pauzę. |
+| X | Left Shift | Krótko: podgląd karty. Przytrzymanie 600 ms w swobodnej własnej turze: pas. Pauza, inspektor i inne modale blokują ten gest; zmiana kontekstu kasuje rozpoczęte przytrzymanie. |
+| Y | Space | Edytor: frakcja. Kampania: edytuj własną talię. Mecz: podgląd zdolności lidera, B potwierdza, A anuluje. Mulligan: zakończ/pomiń wymianę. |
+| D-pad | Strzałki | Nawigacja po kartach i polach, wybór rzędu tam, gdzie pozwala karta. |
+| L / R | Tab / Backspace | Edytor: L otwiera/zamyka wybór lidera; zamknięcie L anuluje niezapisany wybór. R przesuwa kursor w dół. W meczu odpowiadają wyborowi rzędu góra/dół. |
+| L2 / R2 | PageDown / PageUp | Następny/poprzedni slot talii; w meczu przewijanie ręki po pięć kart. |
+| Start | Return | Edytor: rozpocznij partię. Mecz: pauza; podczas mulliganu zakończ wymianę. Nie jest przyciskiem opisanym jako kontynuacja wyniku. |
+| Select | Escape | Edytor: zapisz talię. Mecz: potwierdzenie pasowania/akcja bieżącej fazy; dłuższe przytrzymanie otwiera inspektor. Menu główne: wyjście. |
+| MENU | Home | Zapis meczu i powrót do OnionOS. |
 
-Klawisz Select nie pasuje automatycznie: najpierw otwiera pytanie, B zatwierdza,
-a A anuluje. Przytrzymanie X przez 600 ms pasuje bez dodatkowego potwierdzenia. Na ekranie
-mulliganu lewo/prawo wybiera kartę, A ją zaznacza, a Start, Y lub Select
-zatwierdza wybór albo pomija wymianę, gdy nic nie zaznaczono. Krótkie naciśnięcie
-X otwiera tekstowy inspektor karty. Wbudowany smoke `--input-test`
-sprawdza mapowanie klawiszy Mini SDL i alternatywnych zdarzeń gamepada dla obu
-ekranów, zachowanie B zależnie od panelu, pauzę, bezpieczne potwierdzanie
-pasowania oraz ochronę wyboru celu. Test sprawdza założone kody SDL, nie odczyt
-fizycznych przycisków konkretnej konsoli; wymaga to osobnego testu na Miyoo.
+Przy obowiązkowym wyborze wynikającym z już zagranej zdolności cofnięcie nie
+odwraca jej skutków; obowiązują zasady źródłowego Gwent Classic. Gamepad SDL
+stosuje ten sam kontrakt A/B i krótki/długi X. Klawiatura zachowuje pomocnicze
+Enter/Escape/F5/F9.
+
+Test `--input-test` sprawdza rzeczywiste przejścia modalne i kody Mini SDL:
+B/B na karcie, A bez zagrania, B w pauzie, A zamykające pauzę, B w edytorze,
+A cofające lidera, mulligan i ochronę długiego X w modalach. Test menu
+sprawdza, że A nie zatwierdza opcji. Są to testy programowe; weryfikację
+fizyczną trzeba wykonać na docelowym Miyoo.
 
 ## Status weryfikacji
 
@@ -61,8 +60,8 @@ Użytkownik zgłosił naciśnięcie B przy wyjściu z menu. Log urządzenia zawi
 interpretowała ten klawisz jako anulowanie/wyjście. W mapowaniu portu B jest
 teraz Left Ctrl, A Left Alt, zgodnie z tym zgłoszeniem i odczytem. Jest to
 korekta dla testowanego urządzenia, a nie potwierdzenie wszystkich firmware.
-Menu dodatkowo akceptuje oba przyciski jako zatwierdzenie, żeby omyłkowy
-przycisk nie kończył procesu. Regresje używają odpowiednio zmienionych kodów
+Historyczna poprawka menu akceptowała oba przyciski jako zatwierdzenie.
+Obecna wersja zastępuje to kontraktem B: zatwierdź, A: cofnij. Regresje używają odpowiednio zmienionych kodów
 SDL; rzeczywiste A/B w meczu nadal wymagają sprawdzenia na konsoli.
 
 ## Wgranie poprawki menu/mapowania — 2026-11-17
