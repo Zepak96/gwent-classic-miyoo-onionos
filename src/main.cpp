@@ -2048,7 +2048,7 @@ void drawMainMenu(SDL_Renderer* r,const App& a) {
   }
   box(r,22,402,W-44,57,Color{0,0,0,180});
   centeredTextInBox(r,28,412,W-56,18,pl?"LEWO/PRAWO: WYBOR   B: POTWIERDZ":"LEFT/RIGHT: SELECT   B: CONFIRM",paper,1);
-  centeredTextInBox(r,28,434,W-56,16,a.status.empty()?(pl?"A: WYJSCIE":"A: EXIT"):a.status,gold,1);
+  centeredTextInBox(r,28,434,W-56,16,a.status.empty()?(pl?"A/B: POTWIERDZ   SELECT: WYJSCIE":"A/B: CONFIRM   SELECT: EXIT"):a.status,gold,1);
 }
 
 void drawDeckBuilder(SDL_Renderer* r,const App& a) {
@@ -2813,13 +2813,16 @@ void handleKey(App& a,SDL_Keycode key,bool& running) {
   if(a.screen==Screen::MainMenu) {
     if(key==SDLK_LEFT||key==SDLK_UP)a.menuIndex=(a.menuIndex+3)%4;
     else if(key==SDLK_RIGHT||key==SDLK_DOWN)a.menuIndex=(a.menuIndex+1)%4;
-    else if(key==SDLK_AC_BACK||key==SDLK_RETURN||key==SDLK_KP_ENTER) {
+    else if(key==SDLK_AC_BACK||key==SDLK_x||key==SDLK_RETURN||key==SDLK_KP_ENTER) {
+      std::cerr<<"Menu confirm: index="<<a.menuIndex<<" key="<<SDL_GetKeyName(key)<<"\n";
       a.status.clear();a.audio.play("ui_card");
       if(a.menuIndex==0)startMatch(a);
       else if(a.menuIndex==1)a.screen=Screen::DeckBuilder;
       else if(a.menuIndex==2)loadSavedMatch(a);
       else {a.screen=Screen::Campaign;a.campaignIntro=false;}
-    } else if(key==SDLK_x||key==SDLK_ESCAPE||key==SDLK_HOME)running=false;
+    } else if(key==SDLK_ESCAPE||key==SDLK_HOME) {
+      std::cerr<<"Menu exit requested: key="<<SDL_GetKeyName(key)<<"\n";running=false;
+    }
     return;
   }
   if(key==SDLK_HOME) {
@@ -3781,6 +3784,9 @@ int main(int argc,char** argv) {
     const bool moved=app.menuIndex==1;
     handleKey(app,normalizeMiyooKey(app,SDLK_LALT),testRunning);
     const bool opened=app.screen==Screen::DeckBuilder;
+    app.screen=Screen::MainMenu;
+    handleKey(app,normalizeMiyooKey(app,SDLK_LCTRL),testRunning);
+    const bool openedWithA=app.screen==Screen::DeckBuilder&&testRunning;
     app.editorPane=1;
     handleKey(app,normalizeMiyooKey(app,SDLK_LALT),testRunning);
     const bool returnedToCollection=app.screen==Screen::DeckBuilder&&app.editorPane==0;
@@ -3790,7 +3796,7 @@ int main(int argc,char** argv) {
     handleKey(app,normalizeMiyooKey(app,SDLK_LALT),testRunning);
     const bool absentSaveHandled=app.screen==Screen::MainMenu&&app.status==tr(app,"no_save")&&testRunning;
     app.audio.shutdown();destroyRenderers();SDL_DestroyWindow(window);SDL_Quit();
-    return saved&&moved&&opened&&returnedToCollection&&returned&&absentSaveHandled?0:13;
+    return saved&&moved&&opened&&openedWithA&&returnedToCollection&&returned&&absentSaveHandled?0:13;
   }
   if(argc>2&&std::string(argv[1])=="--campaign-smoke-test") {
     app.screen=Screen::MainMenu;app.menuIndex=0;app.mainMenuEnabled=true;app.miyooControls=true;app.language=Language::Polish;
