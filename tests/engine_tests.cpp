@@ -1446,6 +1446,51 @@ static void sourceAiDefersRandomActionTargets() {
          chosenWithoutLeader.cardId==spy.id&&unchosenLeader.rngState==expectedState);
 }
 
+static void sourceAiRowChangeIncludesCandidate() {
+  // Expected weights come from pinned ControllerAI.weightRowChangeTrue:
+  // row.updateState changes effects only; the candidate score is added after
+  // scoring existing units. Exercise complete weighted selection (including
+  // pass), rather than duplicating the native private weight helper.
+  struct Fixture { const char* name; int ally; int weight; };
+  const Fixture cases[]={
+    {"Blue Stripes Commando",0,4}, {"Blue Stripes Commando",4,12},
+    {"Kaedweni Siege Expert",0,1}, {"Kaedweni Siege Expert",5,2},
+    {"Dandelion",0,2}, {"Dandelion",5,7},
+    {"Isengrim Faoiltiarna",5,11}
+  };
+  for(const auto& fixture:cases)for(int loss=0;loss<2;++loss)for(int trial=1;trial<=64;++trial) {
+    Game game;game.phase=Phase::OpponentTurn;game.currentPlayer=1;
+    game.rngState=static_cast<std::uint64_t>(trial)*7919;
+    game.players[1].roundLosses=loss;
+    auto candidate=referenceCard(fixture.name);
+    const int row=static_cast<int>(candidate.row);
+    if(fixture.ally) {
+      auto ally=unit("row-change-ally",fixture.ally,candidate.row);
+      if(candidate.bond) {ally=candidate;ally.id="row-change-bond-copy";}
+      game.players[1].board[row]={ally};
+    }
+    game.players[1].hand={candidate,unit("row-change-control",5)};
+    game.players[1].score=fixture.ally;game.players[0].score=fixture.ally+10;
+    const int passWeight=loss?0:10;
+    auto expectedState=game.rngState;
+    const auto ticket=static_cast<int>(std::floor(
+      static_cast<double>(expectedRandom(expectedState))/4294967296.0*(fixture.weight+5+passWeight)));
+    const auto action=chooseAiAction(game,1);
+    assert(game.rngState==expectedState);
+    if(ticket<fixture.weight)assert(!action.pass&&action.cardId==candidate.id);
+    else if(ticket<fixture.weight+5)assert(!action.pass&&action.cardId=="row-change-control");
+    else assert(action.pass);
+  }
+  // Four useful synergy cards must not collapse to the all-zero fallback
+  // pass on the last life, even when all receiving rows are still empty.
+  Game fourCards;fourCards.phase=Phase::OpponentTurn;fourCards.currentPlayer=1;
+  fourCards.players[1].roundLosses=1;fourCards.players[0].score=10;
+  fourCards.players[1].hand={referenceCard("Blue Stripes Commando"),
+    referenceCard("Poor Fucking Infantry"),referenceCard("Kaedweni Siege Expert"),referenceCard("Dandelion")};
+  const auto action=chooseAiAction(fourCards,1);
+  assert(!action.pass&&!action.cardId.empty());
+}
+
 static void sourceAiHeroMoraleWeight() {
   constexpr std::uint64_t seed=2688;
   auto state=seed;
@@ -1885,4 +1930,4 @@ static void leaderAbilities() {
   for(int owner=0;owner<2;++owner)
     for(std::size_t i=0;i<untouchedDecks[owner].size();++i)assert(emptyCrach.players[owner].deck[i].id==untouchedDecks[owner][i]);
 }
-int main() { scoreRules(); duplicateWeatherIsDiscarded(); allSourceWeatherTypesAndOwnership(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiFractionalHornTickets(); sourceAiAgileWeatherRows(); graveLeadersReturnWithoutPlaying(); skelligeChoiceAcceptsGraveyardIdReference(); rejectedRandomMedicPreservesRng(); skelligeAgileCancellationKeepsCardInGrave(); skelligeRoundSetupReplaysSpyAndMedic(); firstMedicCommitsBeforeChoiceAndAgileCancel(); randomNestedMedicKeepsTarget(); nestedMedicWaitsForChoice(); medicReplaysSpyPlacement(); medicReplaysMusterAndScorch(); sourceAiDefersRandomActionTargets(); sourceAiHeroMoraleWeight(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }
+int main() { scoreRules(); duplicateWeatherIsDiscarded(); allSourceWeatherTypesAndOwnership(); turnsAndRounds(); sourceAutomaticPassing(); factionStartAndSkelligeRoundThree(); saveRoundTripAndCorruptionHandling(); userDeckPersistenceAndValidation(); abilitiesAndValidation(); openingHandAndMulligan(); sourceMulliganSwapSemantics(); referenceCatalog(); aiUsesNoHiddenCardsAndCompletesMatches(); sourceAiPassDecisions(); sourceAiFractionalHornTickets(); sourceAiAgileWeatherRows(); graveLeadersReturnWithoutPlaying(); skelligeChoiceAcceptsGraveyardIdReference(); rejectedRandomMedicPreservesRng(); skelligeAgileCancellationKeepsCardInGrave(); skelligeRoundSetupReplaysSpyAndMedic(); firstMedicCommitsBeforeChoiceAndAgileCancel(); randomNestedMedicKeepsTarget(); nestedMedicWaitsForChoice(); medicReplaysSpyPlacement(); medicReplaysMusterAndScorch(); sourceAiDefersRandomActionTargets(); sourceAiHeroMoraleWeight(); sourceAiRowChangeIncludesCandidate(); sourceMatchInitializationOrder(); matchCardInstancesHaveUniqueIds(); avengerCards(); scorchSourceTargets(); leaderAbilities(); }

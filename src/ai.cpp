@@ -115,15 +115,12 @@ int weightRowChange(const Game& game,int who,int row,const Card& card) {
   const int before=scoreRow(game,who,row,cards,game.weather[row],game.horn[who][row]);
   if(card.kind==Kind::Unit)cards.push_back(card);
   const int after=scoreRow(game,who,row,cards,game.weather[row],game.horn[who][row]);
-  int change=after-before;
-  if(card.kind==Kind::Unit)
-    change-=cardPower(game,who,row,card,cards);
-  // The source AI's calcRowPower() excludes Heroes, but weightRowChangeTrue()
-  // still subtracts row.calcCardScore(card) for every non-special card. For a
-  // Hero with Morale/Bond this leaves its printed strength in the source
-  // weight as well as the gain to other units. Preserve that source behavior.
-  if(card.kind==Kind::Unit&&card.hero)change+=cardPower(game,who,row,card,cards);
-  return std::max(0,change);
+  // Source weightRowChangeTrue updates row effects without inserting the
+  // candidate into row.cards, then explicitly adds its resulting strength.
+  // Our simulated row already includes that candidate: after-before therefore
+  // contains both its strength and its effect on existing cards. Subtracting
+  // the candidate here incorrectly made first Bond/Morale/Horn units weight 0.
+  return std::max(0,after-before);
 }
 int weightHornRow(const Game& game,int who,int row) {
   if(game.players[who].specialOccupied[row])return 0;

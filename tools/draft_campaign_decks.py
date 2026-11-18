@@ -41,6 +41,10 @@ for faction, leader_ids in leaders.items():
         counts = collections.Counter(i for i, _ in chosen)
         # Avoid flooding weak decks with specials; concentrated advanced decks get utility.
         specials = [[4, 1], [5, 1]] if level == 0 else [[1, 1], [5, 1], [2, 1]]
+        # Foltest King searches the remaining deck for Fog. Preserve one
+        # legal target instead of generating a permanently unusable leader.
+        if faction == 'realms' and level == 0:
+            specials = [[9, 1], [5, 1]]
         if level in (2, 3):
             specials.append([10, 1])
         if faction == 'skellige' and level >= 2 and any('berserker' in cards[i]['ability'] for i in counts):
