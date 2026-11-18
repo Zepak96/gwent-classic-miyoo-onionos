@@ -58,3 +58,18 @@ The existing historical report `artifacts/qa/ci-44064830723/campaign-balance/cam
 4. Recheck the minimally corrected realms-1 recipe in the new benchmark. `tools/draft_campaign_decks.py` now generates the same Fog replacement; an isolated temporary-directory generator replay confirmed identical realms-1 cards and leader, preventing regeneration from restoring the unusable leader. All twenty generated recipes passed its structural assertions; the current realms-1/2 files were independently checked too. No other recipe was modified.
 
 No rule was added to prevent a source-valid pass with cards in hand. `git diff --check` passed for the native edits. No commit was created by this review.
+
+## Post-correction training benchmark and recipe ordering
+
+The new report `artifacts/qa/ci-5b5b499/14421683832/campaign-balance.md` ran 240 matches per recipe after the source-weight correction, using the existing paired-side/control seeds 1–12 protocol. Reported point estimates were:
+
+- Northern Realms: .054, .062, .150, .540, .767.
+- Nilfgaard: .077, .056, .104, .444, .733.
+- Monsters: .071, .090, .285, .490, .625.
+- Skellige: .425, .098, .140, .212, .477.
+
+At the parent's explicit instruction, only complete existing recipes were reassigned to stages: Nilfgaard stages now use previous stage compositions **2,1,3,4,5**; Skellige stages now use previous stage compositions **2,3,4,1,5**. Each complete recipe retains its own leader, exact card counts, unit/special counts and balance metadata. Stable stage IDs, factions and stage numbers are retained; characters, portraits, dialogues, achievements and progress files are not changed. Northern Realms and Monsters recipes are unchanged. No stats, extra cards, health, draw or hidden bonuses were added.
+
+This makes the **same training results reordered**, not newly measured outcomes: Nilfgaard .056,.077,.104,.444,.733; Skellige .098,.140,.212,.425,.477. The small Nilfgaard difference is not evidence of statistically established difficulty, and all numbers describe this AI/control setup, not human challenge. Independent seeds 13–24 must verify the ordering before making a difficulty claim; no holdout result was available during this change.
+
+`composition_origin_stage` tracks the original generated recipe rather than recursively numbering each permutation. The generator's original-index ordering is consequently **2,1,3,4,5 for both affected factions**, because the previous Skellige stage order already permuted original indices as 4,2,1,3,5. `tools/draft_campaign_decks.py` now emits `enabled-in-game` status. An isolated temporary-directory replay asserted **exact equality of the entire generated JSON with the active JSON**, not just selected fields. Independent structural checks passed all20 recipes, including leaders, factions, available copies, 22-unit minimum and ten-special maximum. The realms-1 Fog repair is preserved. `git diff --check` passed. Native engine benchmark/holdout integration remains the parent's CI task.

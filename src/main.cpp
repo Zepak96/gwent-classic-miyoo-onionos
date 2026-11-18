@@ -282,7 +282,7 @@ struct App {
   int menuIndex{0},lastMenuCard{0},settingsIndex{0};
   bool resetProgressConfirm{false},achievementDetailOpen{false};
   int achievementIndex{0},calibrationStep{-1};
-  std::array<SDL_Keycode,4> rawButtons{{SDLK_LALT,SDLK_LCTRL,SDLK_LSHIFT,SDLK_SPACE}},pendingButtons{};
+  std::array<SDL_Keycode,4> rawButtons{{SDLK_SPACE,SDLK_LCTRL,SDLK_LSHIFT,SDLK_LALT}},pendingButtons{};
   AiDecisionWorker aiWorker;std::uint64_t matchGeneration{1};Uint32 aiRetryAt{0};
   mutable std::array<std::array<RowPowerCache,3>,2> powerCache{};
   mutable std::uint64_t powerCacheRebuilds{0};
@@ -746,8 +746,8 @@ std::string tr(const App& a,const std::string& key) {
   if(key=="pause_resume")return pl?"WROC DO GRY":"RESUME GAME";
   if(key=="pause_save")return pl?"ZAPISZ MECZ":"SAVE MATCH";
   if(key=="pause_load")return pl?"WCZYTAJ MECZ":"LOAD MATCH";
-  if(key=="pause_language")return pl?"JEZYK":"LANGUAGE";
-  if(key=="pause_sfx")return pl?"EFEKTY DZWIEKOWE":"SOUND EFFECTS";
+  if(key=="pause_language")return pl?"JĘZYK":"LANGUAGE";
+  if(key=="pause_sfx")return pl?"EFEKTY DŹWIĘKOWE":"SOUND EFFECTS";
   if(key=="pause_music")return pl?"MUZYKA":"MUSIC";
   if(key=="pause_notifications")return pl?"POWIADOMIENIA":"NOTIFICATIONS";
   if(key=="pause_exit")return pl?"WRÓĆ DO MENU TALII":"RETURN TO DECK MENU";
@@ -1562,7 +1562,14 @@ void performAi(App& a,const gwent::AiAction* prepared=nullptr) {
       lockCardActionUntilAnimationsFinish(a,visual,before,1,action.target);
     }
   }
-  else if(action.pass) { success=gwent::pass(a.game,1);a.audio.play("pass");a.status=tr(a,"ai_pass"); }
+  else if(action.pass) {
+    const auto& me=a.game.players[1];const auto& opponent=a.game.players[0];
+    std::cerr<<"AI pass: campaign="<<a.activeCampaignId<<" round="<<a.game.round<<" health="<<(2-me.roundLosses)
+      <<" score="<<me.score<<" opponent_score="<<opponent.score<<" hand="<<me.hand.size()<<" units="
+      <<std::count_if(me.hand.begin(),me.hand.end(),[](const auto& card){return card.kind==gwent::Kind::Unit;})
+      <<" opponent_passed="<<opponent.passed<<"\n";
+    success=gwent::pass(a.game,1);a.audio.play("pass");a.status=tr(a,"ai_pass");
+  }
   else if(action.activateLeader) {
     const auto before=a.game;
     const auto ability=activeLeaderAbility(a.game.players[1].leader);
@@ -2261,7 +2268,7 @@ void drawMainMenu(SDL_Renderer* r,const App& a) {
   centeredTextInBox(r,30,16,W-60,24,"GWENT CLASSIC",gold,2);
   centeredTextInBox(r,30,45,W-60,16,"MIYOO MINI PLUS",paper,1);
   const char* names[]={"Geralt of Rivia","Cirilla Fiona Elen Riannon","Triss Merigold"};
-  const char* labelsPL[]={"GRA KLASYCZNA","MOJE TALIE","WZNOW PARTIE","KAMPANIA","USTAWIENIA","OSIAGNIECIA"};
+  const char* labelsPL[]={"GRA KLASYCZNA","MOJE TALIE","WZNÓW PARTIĘ","KAMPANIA","USTAWIENIA","OSIĄGNIĘCIA"};
   const char* labelsEN[]={"CLASSIC MATCH","MY DECKS","RESUME MATCH","CAMPAIGN","SETTINGS","ACHIEVEMENTS"};
   const int position=mainMenuPosition(a.menuIndex);
   for(int slot=0;slot<3;++slot) {
@@ -2317,7 +2324,7 @@ void drawAchievementBadge(SDL_Renderer* r,const App& a,int x,int y,int faction,i
 void drawAchievements(SDL_Renderer* r,const App& a) {
   const bool pl=a.language==Language::Polish;
   drawImage(r,a,"img/campaign/backdrop.png",0,0,W,H);box(r,0,0,W,H,Color{6,4,3,210});
-  centeredTextInBox(r,24,17,W-48,27,pl?"OSIAGNIECIA":"ACHIEVEMENTS",gold,2);
+  centeredTextInBox(r,24,17,W-48,27,pl?"OSIĄGNIĘCIA":"ACHIEVEMENTS",gold,2);
   const auto count=std::count(a.campaignProgress.victories.begin(),a.campaignProgress.victories.end(),true);
   centeredTextInBox(r,24,51,W-48,18,(pl?"ZDOBYTE: ":"EARNED: ")+std::to_string(count)+"/20",paper,1);
   const auto& nodes=gwent::campaignNodes();
@@ -2329,13 +2336,13 @@ void drawAchievements(SDL_Renderer* r,const App& a) {
   const auto& selected=nodes[static_cast<std::size_t>(std::clamp(a.achievementIndex,0,19))];
   box(r,24,374,592,63,Color{16,11,7,248});frame(r,24,374,592,63,Color{126,91,43,255});
   centeredTextInBox(r,32,381,576,21,pl?selected.achievementPl:selected.achievementEn,gold,2);
-  centeredTextInBox(r,32,411,576,16,(pl?"POKONAJ: ":"DEFEAT: ")+(pl?selected.namePl:selected.nameEn),paper,1);
+  centeredTextInBox(r,32,411,576,16,(a.campaignProgress.victories[a.achievementIndex]?(pl?"POKONANO: ":"DEFEATED: "):(pl?"POKONAJ: ":"DEFEAT: "))+(pl?selected.namePl:selected.nameEn),paper,1);
   centeredTextInBox(r,24,449,W-48,17,pl?"KRZYZAK: ODZNAKA   B: SZCZEGOLY   A: WROC":"DPAD: BADGE   B: DETAILS   A: BACK",gold,1);
   if(a.achievementDetailOpen) {
     box(r,0,0,W,H,Color{0,0,0,225});box(r,52,112,536,245,panel);frame(r,52,112,536,245,gold);
     drawAchievementBadge(r,a,288,132,a.achievementIndex/5,a.achievementIndex%5,a.campaignProgress.victories[a.achievementIndex],true);
     centeredTextInBox(r,64,203,512,25,pl?selected.achievementPl:selected.achievementEn,gold,2);
-    centeredTextInBox(r,64,246,512,19,(pl?"POKONAJ: ":"DEFEAT: ")+(pl?selected.namePl:selected.nameEn),paper,1);
+    centeredTextInBox(r,64,246,512,19,(a.campaignProgress.victories[a.achievementIndex]?(pl?"POKONANO: ":"DEFEATED: "):(pl?"POKONAJ: ":"DEFEAT: "))+(pl?selected.namePl:selected.nameEn),paper,1);
     centeredTextInBox(r,64,280,512,18,a.campaignProgress.victories[a.achievementIndex]?(pl?"ZDOBYTE":"EARNED"):(pl?"ZABLOKOWANE":"LOCKED"),paper,1);
     centeredTextInBox(r,64,326,512,17,pl?"B / A: WROC":"B / A: BACK",gold,1);
   }
@@ -2344,7 +2351,7 @@ void drawSettings(SDL_Renderer* r,const App& a) {
   const bool pl=a.language==Language::Polish;
   drawImage(r,a,"img/menu/woodland-shrine-v1.png",0,0,W,H);box(r,0,0,W,H,Color{6,4,3,220});
   centeredTextInBox(r,30,24,W-60,28,pl?"USTAWIENIA":"SETTINGS",gold,2);
-  const std::array<std::string,7> labels{{pl?"MUZYKA":"MUSIC",pl?"EFEKTY DZWIEKOWE":"SOUND EFFECTS",pl?"POWIADOMIENIA":"NOTIFICATIONS",pl?"JEZYK":"LANGUAGE",pl?"PRZYCISKI":"BUTTONS",pl?"RESET KAMPANII":"RESET CAMPAIGN",pl?"WROC":"BACK"}};
+  const std::array<std::string,7> labels{{pl?"MUZYKA":"MUSIC",pl?"EFEKTY DŹWIĘKOWE":"SOUND EFFECTS",pl?"POWIADOMIENIA":"NOTIFICATIONS",pl?"JĘZYK":"LANGUAGE",pl?"PRZYCISKI":"BUTTONS",pl?"RESET KAMPANII":"RESET CAMPAIGN",pl?"WROC":"BACK"}};
   for(int i=0;i<7;++i) {
     const int y=72+i*40;box(r,48,y,544,35,Color{23,16,9,240});frame(r,48,y,544,35,a.settingsIndex==i?gold:Color{92,67,35,255});
     text(r,62,y+10,labels[i],a.settingsIndex==i?gold:paper,2);
@@ -2359,7 +2366,7 @@ void drawSettings(SDL_Renderer* r,const App& a) {
   centeredTextInBox(r,30,438,W-60,18,pl?"GORA/DOL: WYBOR   B: POTWIERDZ   A: WROC":"UP/DOWN: SELECT   B: CONFIRM   A: BACK",gold,1);
   if(a.resetProgressConfirm) {
     box(r,0,0,W,H,Color{0,0,0,220});box(r,48,115,544,237,panel);frame(r,48,115,544,237,gold);
-    centeredTextInBox(r,64,135,512,25,pl?"WYZEROWAC KAMPANIE?":"RESET CAMPAIGN PROGRESS?",gold,2);
+    centeredTextInBox(r,64,135,512,25,pl?"WYZEROWAĆ KAMPANIĘ?":"RESET CAMPAIGN PROGRESS?",gold,2);
     const auto warning=wrapDetailText(pl?"Postep i osiagniecia wszystkich czterech wiez wroca do zera. Zapisany pojedynek przestanie naliczac postep kampanii. Talie i ustawienia pozostana bez zmian.":"Progress and achievements in all four towers will be reset. The saved match will no longer award campaign progress. Decks and settings are preserved.",78);
     for(std::size_t i=0;i<warning.size()&&i<6;++i)text(r,66,183+static_cast<int>(i)*15,warning[i],paper,1);
     if(!a.status.empty())centeredTextInBox(r,64,286,512,16,shortName(a.status,82),gold,1);
@@ -2368,8 +2375,8 @@ void drawSettings(SDL_Renderer* r,const App& a) {
   if(a.calibrationStep>=0) {
     box(r,0,0,W,H,Color{0,0,0,228});box(r,48,116,544,240,panel);frame(r,48,116,544,240,gold);
     const char* buttons[]={"A","B","X","Y"};
-    centeredTextInBox(r,64,137,512,26,pl?"KALIBRACJA PRZYCISKOW":"BUTTON CALIBRATION",gold,2);
-    centeredTextInBox(r,64,187,512,28,(pl?"NACISNIJ PRZYCISK ":"PRESS BUTTON ")+std::string(buttons[a.calibrationStep]),paper,2);
+    centeredTextInBox(r,64,137,512,26,pl?"KALIBRACJA PRZYCISKÓW":"BUTTON CALIBRATION",gold,2);
+    centeredTextInBox(r,64,187,512,28,(pl?"NACIŚNIJ PRZYCISK ":"PRESS BUTTON ")+std::string(buttons[a.calibrationStep]),paper,2);
     for(int i=0;i<4;++i){const int x=210+i*58;frame(r,x,234,44,36,i==a.calibrationStep?gold:muted);centeredTextInBox(r,x,234,44,36,buttons[i],i<a.calibrationStep?gold:paper,2);}
     if(!a.status.empty())centeredTextInBox(r,64,287,512,16,shortName(a.status,82),gold,1);
     centeredTextInBox(r,64,324,512,17,pl?"START: ANULUJ":"START: CANCEL",gold,1);
@@ -3165,7 +3172,7 @@ void handleMatchKey(App& a,SDL_Keycode key) {
 void handleKey(App& a,SDL_Keycode key,bool& running) {
   if(key==SDLK_HOME){if(a.screen==Screen::Match)saveCurrentMatch(a);running=false;return;}
   if(a.screen==Screen::Achievements) {
-    if(a.achievementDetailOpen) {if(key==SDLK_x||key==SDLK_ESCAPE||key==SDLK_AC_BACK||key==SDLK_RETURN)a.achievementDetailOpen=false;}
+    if(a.achievementDetailOpen) {if(key==SDLK_x||key==SDLK_ESCAPE||key==SDLK_AC_BACK||key==SDLK_RETURN||key==SDLK_KP_ENTER)a.achievementDetailOpen=false;}
     else if(key==SDLK_x||key==SDLK_ESCAPE){a.screen=Screen::MainMenu;a.menuIndex=5;}
     else if(key==SDLK_AC_BACK||key==SDLK_RETURN||key==SDLK_KP_ENTER)a.achievementDetailOpen=true;
     else {
@@ -3737,10 +3744,10 @@ int main(int argc,char** argv) {
     app.miyooControls=true;
     app.screen=Screen::Match;
     okay=okay&&startsInDeckMaker&&
-              normalizeMiyooKey(app,SDLK_LALT)==SDLK_x&&
+              normalizeMiyooKey(app,SDLK_SPACE)==SDLK_x&&
               normalizeMiyooKey(app,SDLK_LCTRL)==SDLK_AC_BACK&&
               normalizeMiyooKey(app,SDLK_LSHIFT)==SDLK_i&&
-              normalizeMiyooKey(app,SDLK_SPACE)==SDLK_l&&
+              normalizeMiyooKey(app,SDLK_LALT)==SDLK_l&&
               normalizeMiyooKey(app,SDLK_TAB)==SDLK_UP&&
               normalizeMiyooKey(app,SDLK_BACKSPACE)==SDLK_DOWN&&
               normalizeMiyooKey(app,SDLK_RETURN)==SDLK_p&&
@@ -3767,10 +3774,10 @@ int main(int argc,char** argv) {
       }
     }
     App deckKeyProbe;deckKeyProbe.miyooControls=true;deckKeyProbe.screen=Screen::DeckBuilder;
-    okay=okay&&normalizeMiyooKey(deckKeyProbe,SDLK_LALT)==SDLK_x&&
+    okay=okay&&normalizeMiyooKey(deckKeyProbe,SDLK_SPACE)==SDLK_x&&
          normalizeMiyooKey(deckKeyProbe,SDLK_LCTRL)==SDLK_AC_BACK&&
          normalizeMiyooKey(deckKeyProbe,SDLK_LSHIFT)==SDLK_i&&
-         normalizeMiyooKey(deckKeyProbe,SDLK_SPACE)==SDLK_f&&
+         normalizeMiyooKey(deckKeyProbe,SDLK_LALT)==SDLK_f&&
          normalizeMiyooKey(deckKeyProbe,SDLK_TAB)==SDLK_TAB&&
          normalizeMiyooKey(deckKeyProbe,SDLK_BACKSPACE)==SDLK_DOWN&&
          normalizeMiyooKey(deckKeyProbe,SDLK_PAGEDOWN)==SDLK_PAGEDOWN&&
@@ -3899,7 +3906,7 @@ int main(int argc,char** argv) {
         deckKeyProbe.editorCardIndex=2;
         handleKey(deckKeyProbe,SDLK_RIGHT,navRunning);
         okay=okay&&deckKeyProbe.editorPane==1&&deckKeyProbe.editorCardIndex==0;
-        handleKey(deckKeyProbe,normalizeMiyooKey(deckKeyProbe,SDLK_LALT),navRunning);
+        handleKey(deckKeyProbe,normalizeMiyooKey(deckKeyProbe,SDLK_SPACE),navRunning);
         okay=okay&&deckKeyProbe.editorPane==0;
       } else okay=false;
       const auto leadersForInput=editorLeaders(deckKeyProbe);
@@ -3908,7 +3915,7 @@ int main(int argc,char** argv) {
         handleKey(deckKeyProbe,SDLK_TAB,navRunning);
         handleKey(deckKeyProbe,SDLK_RIGHT,navRunning);
         okay=okay&&deckKeyProbe.editingLeader&&deckKeyProbe.editDeck.leaderReferenceIndex!=original;
-        handleKey(deckKeyProbe,normalizeMiyooKey(deckKeyProbe,SDLK_LALT),navRunning);
+        handleKey(deckKeyProbe,normalizeMiyooKey(deckKeyProbe,SDLK_SPACE),navRunning);
         okay=okay&&!deckKeyProbe.editingLeader&&deckKeyProbe.editDeck.leaderReferenceIndex==original;
         handleKey(deckKeyProbe,SDLK_TAB,navRunning);
         handleKey(deckKeyProbe,SDLK_RIGHT,navRunning);
@@ -4137,11 +4144,11 @@ int main(int argc,char** argv) {
     app.mulligan.clear();
     handleMatchKey(app,normalizeMiyooKey(app,SDLK_LCTRL));
     okay=okay&&app.mulligan.size()==1;
-    handleMatchKey(app,normalizeMiyooKey(app,SDLK_LALT));
+    handleMatchKey(app,normalizeMiyooKey(app,SDLK_SPACE));
     okay=okay&&app.mulligan.empty()&&app.game.phase==gwent::Phase::Mulligan;
     handleMatchKey(app,normalizeMiyooKey(app,SDLK_LCTRL));
     okay=okay&&app.mulligan.size()==1;
-    handleMatchKey(app,normalizeMiyooKey(app,SDLK_SPACE));
+    handleMatchKey(app,normalizeMiyooKey(app,SDLK_LALT));
     okay=okay&&app.game.phase==gwent::Phase::PlayerTurn&&app.game.players[0].mulliganDone&&app.mulligan.empty();
     app.game=gwent::Game{};app.game.phase=gwent::Phase::Mulligan;app.mulligan.clear();
     gwent::Card humanSpare;humanSpare.id="mulligan-spare-human";humanSpare.kind=gwent::Kind::Unit;
@@ -4326,13 +4333,13 @@ int main(int argc,char** argv) {
     handleKey(app,normalizeMiyooKey(app,SDLK_LCTRL),testRunning);
     const bool opened=app.screen==Screen::DeckBuilder;
     app.screen=Screen::MainMenu;
-    handleKey(app,normalizeMiyooKey(app,SDLK_LALT),testRunning);
+    handleKey(app,normalizeMiyooKey(app,SDLK_SPACE),testRunning);
     const bool aDidNotConfirm=app.screen==Screen::MainMenu&&testRunning;
     handleKey(app,normalizeMiyooKey(app,SDLK_LCTRL),testRunning);
     app.editorPane=1;
-    handleKey(app,normalizeMiyooKey(app,SDLK_LALT),testRunning);
+    handleKey(app,normalizeMiyooKey(app,SDLK_SPACE),testRunning);
     const bool returnedToCollection=app.screen==Screen::DeckBuilder&&app.editorPane==0;
-    handleKey(app,normalizeMiyooKey(app,SDLK_LALT),testRunning);
+    handleKey(app,normalizeMiyooKey(app,SDLK_SPACE),testRunning);
     const bool returned=app.screen==Screen::MainMenu&&testRunning;
     app.menuIndex=2;app.savePath.clear();
     handleKey(app,normalizeMiyooKey(app,SDLK_LCTRL),testRunning);
@@ -4372,14 +4379,14 @@ int main(int argc,char** argv) {
     handleKey(app,SDLK_AC_BACK,probeRunning);okay=okay&&app.language==Language::Polish&&capture("-settings");
     app.settingsIndex=4;handleKey(app,SDLK_AC_BACK,probeRunning);okay=okay&&app.calibrationStep==0&&capture("-calibration");
     const auto original=app.rawButtons;captureCalibrationKey(app,SDLK_RETURN);okay=okay&&app.calibrationStep==-1&&app.rawButtons==original;
-    handleKey(app,SDLK_AC_BACK,probeRunning);captureCalibrationKey(app,SDLK_SPACE);captureCalibrationKey(app,SDLK_SPACE);
+    handleKey(app,SDLK_AC_BACK,probeRunning);captureCalibrationKey(app,SDLK_LALT);captureCalibrationKey(app,SDLK_LALT);
     okay=okay&&app.calibrationStep==1&&!app.status.empty();
-    captureCalibrationKey(app,SDLK_LCTRL);captureCalibrationKey(app,SDLK_LSHIFT);captureCalibrationKey(app,SDLK_LALT);
-    loadSettings(restored);okay=okay&&app.calibrationStep==-1&&restored.rawButtons==app.rawButtons&&normalizeMiyooKey(app,SDLK_SPACE)==SDLK_x;
+    captureCalibrationKey(app,SDLK_LCTRL);captureCalibrationKey(app,SDLK_LSHIFT);captureCalibrationKey(app,SDLK_SPACE);
+    loadSettings(restored);okay=okay&&app.calibrationStep==-1&&restored.rawButtons==app.rawButtons&&normalizeMiyooKey(app,SDLK_LALT)==SDLK_x;
     app.screen=Screen::Campaign;app.campaignDeckPicker=false;app.campaignIntro=false;
-    handleKey(app,normalizeMiyooKey(app,SDLK_SPACE),probeRunning);okay=okay&&app.screen==Screen::MainMenu;
-    app.screen=Screen::Campaign;handleKey(app,normalizeMiyooKey(app,SDLK_LALT),probeRunning);okay=okay&&app.screen==Screen::DeckBuilder;
-    handleKey(app,normalizeMiyooKey(app,SDLK_SPACE),probeRunning);okay=okay&&app.screen==Screen::Campaign;
+    handleKey(app,normalizeMiyooKey(app,SDLK_LALT),probeRunning);okay=okay&&app.screen==Screen::MainMenu;
+    app.screen=Screen::Campaign;handleKey(app,normalizeMiyooKey(app,SDLK_SPACE),probeRunning);okay=okay&&app.screen==Screen::DeckBuilder;
+    handleKey(app,normalizeMiyooKey(app,SDLK_LALT),probeRunning);okay=okay&&app.screen==Screen::Campaign;
     app.screen=Screen::MainMenu;app.menuIndex=5;app.status.clear();okay=okay&&capture("-menu-achievements");
     handleKey(app,SDLK_AC_BACK,probeRunning);okay=okay&&app.screen==Screen::Achievements&&capture("-achievements");
     handleKey(app,SDLK_RIGHT,probeRunning);handleKey(app,SDLK_AC_BACK,probeRunning);

@@ -67,18 +67,23 @@ for faction, leader_ids in leaders.items():
         recipes.append({'id': f'{faction}-{level+1}', 'faction': faction, 'stage': level+1,
                         'leader': leader_id, 'cards': entries, 'units': unit_count,
                         'specials': special_count, 'balance_status': 'unverified-draft'})
-# Training benchmark 43908517238 found two Skellige inversions. Preserve the
-# five compositions but order them by measured score. This is provisional
-# until the independent holdout and newer engine revision both agree.
-skellige = [d for d in recipes if d['faction'] == 'skellige']
-recipes = [d for d in recipes if d['faction'] != 'skellige']
-for stage, source_stage in enumerate((4, 2, 1, 3, 5), 1):
-    deck = dict(skellige[source_stage-1])
-    deck['id'] = f'skellige-{stage}'
-    deck['stage'] = stage
-    deck['composition_origin_stage'] = source_stage
-    recipes.append(deck)
+# Post-parity benchmark 5b5b499, seeds 1..12: order complete existing
+# compositions only. These are original generated composition indices, not
+# the previous published stages. Independent seeds 13..24 remain required.
+orders = {'nilfgaard': (2, 1, 3, 4, 5), 'skellige': (2, 1, 3, 4, 5)}
+original = {d['id']: d for d in recipes}
+reordered = []
+for deck in recipes:
+    faction, stage = deck['faction'], deck['stage']
+    if faction in orders:
+        source_stage = orders[faction][stage-1]
+        deck = dict(original[f'{faction}-{source_stage}'])
+        deck['id'] = f'{faction}-{stage}'
+        deck['stage'] = stage
+        deck['composition_origin_stage'] = source_stage
+    reordered.append(deck)
+recipes = reordered
 output = ROOT / 'data/campaign-decks-draft.json'
-output.write_text(json.dumps({'schema_version': 1, 'status': 'not-enabled-in-game', 'decks': recipes},
+output.write_text(json.dumps({'schema_version': 1, 'status': 'enabled-in-game', 'decks': recipes},
                              ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 print(f'{len(recipes)} draft recipes: faction, leader, copies, units and specials checks passed')

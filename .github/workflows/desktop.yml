@@ -20,12 +20,18 @@ jobs:
         run: ./build/gwent_campaign_benchmark > campaign-balance.csv
       - name: Summarize campaign progression
         run: python3 tools/campaign_balance_report.py campaign-balance.csv campaign-balance.md
+      - name: Independent campaign seed holdout
+        run: |
+          ./build/gwent_campaign_benchmark 13 12 > campaign-balance-holdout.csv
+          python3 tools/campaign_balance_report.py campaign-balance-holdout.csv campaign-balance-holdout.md
       - uses: actions/upload-artifact@v4
         with:
           name: campaign-balance
           path: |
             campaign-balance.csv
             campaign-balance.md
+            campaign-balance-holdout.csv
+            campaign-balance-holdout.md
   frontend:
     runs-on: ubuntu-latest
     steps:

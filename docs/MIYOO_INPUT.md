@@ -24,9 +24,9 @@ nie nazwą fizycznego X; `SDLK_AC_BACK` oznacza fizyczne B.
 | Przycisk | Kod SDL Mini | Działanie |
 | --- | --- | --- |
 | B | Left Ctrl | Menu/kampania: zatwierdź. Edytor: dodaj/usuń kartę lub zatwierdź lidera. Mecz: podgląd zagrania, następne B zagrywa do podświetlonego rzędu; wybór celu/lidera/pasu. Pauza: zatwierdź opcję. Wynik: kontynuuj. Mulligan: zaznacz/odznacz kartę. |
-| A | Left Alt | Anuluj podgląd/wybór. Edytor: z talii do kolekcji, potem do poprzedniego ekranu; podgląd lidera cofa niezapisany wybór. Pauza: wróć. Mulligan: cofnij zaznaczenie, a bez zaznaczeń otwórz pauzę. Na ręce lub wyniku rundy otwiera pauzę. |
+| A | Space | Anuluj podgląd/wybór. Edytor: z talii do kolekcji, potem do poprzedniego ekranu; podgląd lidera cofa niezapisany wybór. Pauza: wróć. Mulligan: cofnij zaznaczenie, a bez zaznaczeń otwórz pauzę. Na ręce lub wyniku rundy otwiera pauzę. |
 | X | Left Shift | Krótko: podgląd karty. Przytrzymanie 600 ms w swobodnej własnej turze: pas. Pauza, inspektor i inne modale blokują ten gest; zmiana kontekstu kasuje rozpoczęte przytrzymanie. |
-| Y | Space | Edytor: frakcja. Kampania: edytuj własną talię. Mecz: podgląd zdolności lidera, B potwierdza, A anuluje. Mulligan: zakończ/pomiń wymianę. |
+| Y | Left Alt | Edytor: frakcja. Kampania: edytuj własną talię. Mecz: podgląd zdolności lidera, B potwierdza, A anuluje. Mulligan: zakończ/pomiń wymianę. |
 | D-pad | Strzałki | Nawigacja po kartach i polach, wybór rzędu tam, gdzie pozwala karta. |
 | L / R | Tab / Backspace | Edytor: L otwiera/zamyka wybór lidera; zamknięcie L anuluje niezapisany wybór. R przesuwa kursor w dół. W meczu odpowiadają wyborowi rzędu góra/dół. |
 | L2 / R2 | PageDown / PageUp | Następny/poprzedni slot talii; w meczu przewijanie ręki po pięć kart. |
@@ -73,3 +73,17 @@ Poprzednią wersję zachowano lokalnie w
 artifacts/qa/package-150843d/sd-backup-20261117-103028.
 Odczyt logu i zgłoszenie B wskazały odwrotną interpretację A/B; sama instalacja
 nie potwierdza jeszcze faktycznych przycisków w rozgrywce po aktualizacji.
+
+## Korekta A/Y — 2026-11-18
+
+Poprzednie przypisanie A do Left Alt było błędne: powodowało otwarcie
+edytora zamiast powrotu z wieży. Aktualny domyślny układ A/B/X/Y to
+Space / Left Ctrl / Left Shift / Left Alt. Potwierdza go oficjalny
+[OnionUI keymap_hw.h](https://github.com/OnionUI/Onion/blob/main/src/common/system/keymap_hw.h#L9-L12)
+i przypięty SDL_event_mini.c. Ta korekta zastępuje wcześniejsze założenia
+o A i Y opisane powyżej. B nadal zatwierdza, A cofa.
+
+Ustawienia zawierają kalibrację czterech fizycznych przycisków. Format V4
+zapisuje unikatowe kody; starsze ustawienia zachowują aktualny default.
+Test settings-flow sprawdza również odmienną kalibrację, trwałość zapisu,
+powrót z kampanii oraz anulowanie i atomowe wykonanie resetu progresji.
