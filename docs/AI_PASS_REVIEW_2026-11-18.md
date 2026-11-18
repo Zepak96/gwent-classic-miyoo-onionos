@@ -73,3 +73,26 @@ At the parent's explicit instruction, only complete existing recipes were reassi
 This makes the **same training results reordered**, not newly measured outcomes: Nilfgaard .056,.077,.104,.444,.733; Skellige .098,.140,.212,.425,.477. The small Nilfgaard difference is not evidence of statistically established difficulty, and all numbers describe this AI/control setup, not human challenge. Independent seeds 13–24 must verify the ordering before making a difficulty claim; no holdout result was available during this change.
 
 `composition_origin_stage` tracks the original generated recipe rather than recursively numbering each permutation. The generator's original-index ordering is consequently **2,1,3,4,5 for both affected factions**, because the previous Skellige stage order already permuted original indices as 4,2,1,3,5. `tools/draft_campaign_decks.py` now emits `enabled-in-game` status. An isolated temporary-directory replay asserted **exact equality of the entire generated JSON with the active JSON**, not just selected fields. Independent structural checks passed all20 recipes, including leaders, factions, available copies, 22-unit minimum and ten-special maximum. The realms-1 Fog repair is preserved. `git diff --check` passed. Native engine benchmark/holdout integration remains the parent's CI task.
+
+## Verified release candidate e363d30
+
+Desktop run 44295391590 and ARM package run 44295391338 both passed.
+The desktop job includes actual upstream JavaScript row-weight probes, native
+engine regressions, physical-key normalization, menu/campaign navigation,
+settings persistence, achievement detail navigation, calibration and reset
+failure rollback, plus normal/software-composition screenshots. The
+640×480 achievement and settings captures were visually inspected.
+
+Independent seeds 13–24 produced 240 matches per recipe (4,800 total).
+Northern Realms scores were .054, .094, .175, .556, .733; Skellige
+.108, .146, .175, .352, .502. Nilfgaard stages 1/2 scored .087/.058
+and Monsters stages 1/2 .077/.035: those early-stage difficulty differences
+remain unestablished and require further balance work. No holdout-driven
+recipe changes were made. Talar/Ves are still easy introductory opponents;
+source parity and an increasing later difficulty do not establish human
+challenge. Raw CSV and reports are retained in the campaign-balance artifact
+of desktop run 44295391590.
+
+The SD card was not mounted during verification. Hardware execution and
+installation are not implied by CI success. Existing user progress has not
+been reset.
